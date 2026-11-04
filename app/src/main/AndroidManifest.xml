@@ -122,6 +122,13 @@
             <property android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
                 android:value="Brings the launcher back when the TV's Home button opens the stock home screen" />
         </service>
+        <service
+            android:name=".ReadyService"
+            android:exported="false"
+            android:foregroundServiceType="specialUse">
+            <property android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
+                android:value="Keeps the TV launcher ready so the Home button returns to it instantly" />
+        </service>
         <receiver android:name=".Updater$InstallReceiver" android:exported="false" />
         <receiver android:name=".BootReceiver" android:exported="true">
             <intent-filter>

@@ -575,6 +575,14 @@ final class NativeHome extends FrameLayout {
         if (photos.length() == 0) loadPhotos(true); else restartPhoto();
         mergeShelf();
         updateTshelf(false);
+        // the start-up picture (MainActivity.showCover) goes once Home has drawn itself (and its photo has a moment)
+        getViewTreeObserver().addOnPreDrawListener(new android.view.ViewTreeObserver.OnPreDrawListener() {
+            @Override public boolean onPreDraw() {
+                getViewTreeObserver().removeOnPreDrawListener(this);
+                postDelayed(new Runnable() { @Override public void run() { act.coverOff(""); } }, 700);
+                return true;
+            }
+        });
     }
 
     private LayoutParams photoLp() {

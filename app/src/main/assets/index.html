@@ -1238,6 +1238,8 @@ function buildAllSettings() {
     ...(!IS_TV && lkOn() ? [{ label: 'TV app icons', value: () => 'Send a photo to ' + lkTvName(), ok: () => { closeSettings(); icTvApps(); } }] : []),
     { label: 'Reset custom icons', value: () => { const n = Object.keys(ICN).length; return n ? `${n} customized` : ''; }, ok: () => icResetAll() },
     { label: 'Home button', value: homeLabel, ok: homeButton, cycle: homeButton },
+    ...(IS_TV && B.keepReady ? [{ label: 'Keep TopShelf ready', value: () => B.keepReady() ? 'On · Home comes straight back' : 'Off',
+      ok: () => { B.keepReadySet(!B.keepReady()); drawSettings(); }, cycle: () => { B.keepReadySet(!B.keepReady()); drawSettings(); } }] : []),
     { label: hidden.length ? `Show ${hidden.length} hidden app${hidden.length > 1 ? 's' : ''}` : 'No hidden apps', value: () => '',
       ok: () => { if (!hidden.length) return; hidden = []; writeJSON('hidden', hidden); buildItems(); render(); buildSettings(); drawSettings(); toast('All apps shown'); } },
     { label: 'Reset app order', value: () => '', ok: () => { order = []; writeJSON('order', []); loadApps(); focus = 0; render(); toast('App order reset'); } },

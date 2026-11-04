@@ -499,6 +499,12 @@ public class Bridge {
                     .put("acc", HomeWatchService.accessibilityOn(act)).put("log", new JSONObject(HomeWatchService.status())).toString();
         } catch (Exception e) { return "{}"; }
     }
+    /** Settings › Keep TopShelf ready (see ReadyService) */
+    @JavascriptInterface public boolean keepReady() { return ReadyService.wanted(act); }
+    @JavascriptInterface public void keepReadySet(boolean on) {
+        prefs.edit().putBoolean("keepReady", on).apply();
+        if (on) ReadyService.startIfWanted(act); else ReadyService.stop(act);
+    }
     @JavascriptInterface
     public void homeWatchSet(boolean on) {
         prefs.edit().putBoolean("homewatch", on).putBoolean("redirect", true).commit();

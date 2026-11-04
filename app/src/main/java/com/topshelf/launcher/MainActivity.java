@@ -96,6 +96,7 @@ public class MainActivity extends Activity {
         hideSystemBars();
         getWindow().setBackgroundDrawable(null);         // the page or the native Home always covers the screen
         buildWebView();
+        showCover();
         registerPackageReceiver();
         link = new LinkServer(this);
         link.start();
@@ -254,6 +255,7 @@ public class MainActivity extends Activity {
     }
     void nativeHomeBroken(Throwable t) {
         homeBroken = true;
+        coverOff("Home broke");
         java.io.StringWriter sw = new java.io.StringWriter();
         t.printStackTrace(new java.io.PrintWriter(sw));
         String st = sw.toString();
@@ -374,7 +376,10 @@ public class MainActivity extends Activity {
         try {
             if (Build.VERSION.SDK_INT >= 30) {
                 android.app.ActivityManager am = (android.app.ActivityManager) getSystemService(ACTIVITY_SERVICE);
-                java.util.List<android.app.ApplicationExitInfo> l = am.getHistoricalProcessExitReasons(null, 0, 1);
+                // (the newest exit of TopShelf itself: the web view's helper processes have their own, which hid it)
+                java.util.List<android.app.ApplicationExitInfo> all = am.getHistoricalProcessExitReasons(null, 0, 16);
+                java.util.List<android.app.ApplicationExitInfo> l = new java.util.ArrayList<>();
+                for (android.app.ApplicationExitInfo e : all) if (getPackageName().equals(e.getProcessName())) { l.add(e); break; }
                 if (!l.isEmpty()) {
                     android.app.ApplicationExitInfo x = l.get(0);
                     long seen = pr.getLong("lastExitSeen", 0);
@@ -398,6 +403,7 @@ public class MainActivity extends Activity {
             }
         } catch (Throwable ignored) { }
         if (!reason.isEmpty()) Diag.ev(reason.split("\n")[0]);
+        noteStart(reason.isEmpty() ? "" : reason.split("\n")[0].replace("last time TopShelf stopped: ", ""));
         final String crash = pr.getString("lastCrash", "");
         if (!(bad || !crash.isEmpty())) return;
         final String text = reason + (crash.isEmpty() ? "" : "\n\n" + crash);
@@ -874,6 +880,7 @@ public class MainActivity extends Activity {
         snapHomeSoon();
         hideSystemBars();
         HomeWatchService.startIfWanted(this);
+        if (isTv()) ReadyService.startIfWanted(this);
         if (web != null) {
             web.onResume();
             web.requestFocus();
@@ -915,20 +922,114 @@ public class MainActivity extends Activity {
     @Override public void startActivity(Intent intent, Bundle options) { leftOnPurposeAt = android.os.SystemClock.uptimeMillis(); super.startActivity(intent, options); }
     @Override public void startActivityForResult(Intent intent, int requestCode, Bundle options) { leftOnPurposeAt = android.os.SystemClock.uptimeMillis(); super.startActivityForResult(intent, requestCode, options); }
 
+    /* Start-up from nothing (Android closed TopShelf while another app was in front): the last picture of Home is
+       on screen at once, while the page and Home get going underneath; it fades as soon as Home has drawn itself.
+       The picture is taken whenever Home is at rest on screen (at most once a minute). */
+    private android.widget.ImageView cover;
+    private long coverAt;
+    private java.io.File coverFile() { return new java.io.File(getCacheDir(), "home-cover.jpg"); }
+    private long coverSaved;
+    private void saveCover(final android.graphics.Bitmap b) {
+        if (!isTv() || android.os.SystemClock.uptimeMillis() - coverSaved < 60000) return;
+        coverSaved = android.os.SystemClock.uptimeMillis();
+        new Thread(new Runnable() { @Override public void run() {
+            java.io.File f = coverFile(), tmp = new java.io.File(getCacheDir(), "home-cover.tmp");
+            try (java.io.FileOutputStream o = new java.io.FileOutputStream(tmp)) { b.compress(android.graphics.Bitmap.CompressFormat.JPEG, 82, o); } catch (Throwable t) { return; }
+            tmp.renameTo(f);
+            if (!HomeWatchService.isRunning()) b.recycle();
+        } }, "home-cover").start();
+    }
+    /** TopShelf's process itself just started (not the screen made again, as a change of look does) */
+    private static boolean freshProcess() { return Build.VERSION.SDK_INT < 24 || android.os.SystemClock.uptimeMillis() - android.os.Process.getStartUptimeMillis() < 8000; }
+    private static boolean startNoted;
+    private void showCover() {
+        if (!isTv() || !nativeHomeWanted() || !freshProcess()) return;
+        java.io.File f = coverFile();
+        if (!f.exists() || System.currentTimeMillis() - f.lastModified() > 7 * 86400000L) return;
+        try {
+            android.graphics.Bitmap b = android.graphics.BitmapFactory.decodeFile(f.getPath());
+            if (b == null) return;
+            cover = new android.widget.ImageView(this);
+            cover.setScaleType(android.widget.ImageView.ScaleType.FIT_XY);
+            cover.setImageBitmap(b);
+            root.addView(cover, new FrameLayout.LayoutParams(FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.MATCH_PARENT));
+            coverAt = android.os.SystemClock.uptimeMillis();
+            main.postDelayed(new Runnable() { @Override public void run() { coverOff("Home took too long"); } }, 15000);
+        } catch (Throwable ignored) { cover = null; }
+    }
+    /** Home has drawn itself (NativeHome), or it isn't coming */
+    void coverOff(final String why) {
+        if (startMs < 0 && startNoted) {
+            startMs = android.os.SystemClock.uptimeMillis() - (Build.VERSION.SDK_INT >= 24 ? android.os.Process.getStartUptimeMillis() : coverAt);
+            Diag.ev("start-up: Home on screen " + String.format(java.util.Locale.US, "%.1f", startMs / 1000f) + " s after TopShelf started" + (cover != null ? " (its last picture showed meanwhile)" : "") + (why.isEmpty() ? "" : " · " + why));
+            noteStartReady(startMs);
+        }
+        final android.widget.ImageView c = cover;
+        if (c == null) return;
+        cover = null;
+        c.animate().alpha(0f).setDuration(220).withEndAction(new Runnable() { @Override public void run() {
+            root.removeView(c);
+            android.graphics.drawable.Drawable d = c.getDrawable();
+            if (d instanceof android.graphics.drawable.BitmapDrawable) { android.graphics.Bitmap bm = ((android.graphics.drawable.BitmapDrawable) d).getBitmap(); c.setImageDrawable(null); if (bm != null) bm.recycle(); }
+        } }).start();
+    }
+    private long startMs = -1;
+    /* Each start from nothing, kept (the last 12) so a report shows how often it happens and why: the events
+       themselves only cover the time since the last start. */
+    private void noteStart(String lastStop) {
+        if (startNoted || !freshProcess()) return;
+        startNoted = true;
+        try {
+            SharedPreferences p = getSharedPreferences(Bridge.PREFS, MODE_PRIVATE);
+            org.json.JSONArray a = new org.json.JSONArray(p.getString("startLog", "[]"));
+            StringBuilder sb = new StringBuilder();
+            for (int i = Math.max(0, a.length() - 6); i < a.length(); i++) {
+                org.json.JSONObject o = a.optJSONObject(i); if (o == null) continue;
+                sb.append("\n    ").append(new java.text.SimpleDateFormat("MMM d HH:mm", java.util.Locale.US).format(new java.util.Date(o.optLong("at"))))
+                  .append(" · ").append(o.optString("stop", "?")).append(o.has("ms") ? " · Home after " + String.format(java.util.Locale.US, "%.1f", o.optLong("ms") / 1000f) + " s" : "");
+            }
+            if (sb.length() > 0) Diag.ev("start-ups before this one:" + sb);
+            boolean ready = ReadyService.isRunning() || HomeWatchService.isRunning();
+            a.put(new org.json.JSONObject().put("at", System.currentTimeMillis()).put("stop", lastStop.isEmpty() ? "unknown" : lastStop.replaceAll(" · \\d+ (s|min) before this start", "")));
+            while (a.length() > 12) a.remove(0);
+            p.edit().putString("startLog", a.toString()).apply();
+            Diag.ev("start-up: from nothing · keep ready " + (ReadyService.wanted(this) ? "on" : "off") + " · Home button by " + (HomeWatchService.accessibilityOn(this) ? "accessibility" : HomeWatchService.wanted(this) ? "the watcher" : "nothing") + (isDefaultHome() ? " · TopShelf is the TV's home app" : ""));
+        } catch (Throwable ignored) { }
+    }
+    private void noteStartReady(long ms) {
+        try {
+            SharedPreferences p = getSharedPreferences(Bridge.PREFS, MODE_PRIVATE);
+            org.json.JSONArray a = new org.json.JSONArray(p.getString("startLog", "[]"));
+            if (a.length() > 0) a.optJSONObject(a.length() - 1).put("ms", ms);
+            p.edit().putString("startLog", a.toString()).apply();
+        } catch (Throwable ignored) { }
+    }
+    private boolean isDefaultHome() {
+        try {
+            Intent i = new Intent(Intent.ACTION_MAIN); i.addCategory(Intent.CATEGORY_HOME);
+            android.content.pm.ResolveInfo r = getPackageManager().resolveActivity(i, android.content.pm.PackageManager.MATCH_DEFAULT_ONLY);
+            return r != null && r.activityInfo != null && getPackageName().equals(r.activityInfo.packageName);
+        } catch (Throwable t) { return false; }
+    }
+
     /** a picture of Home as it is now (half size), for the curtain that hides Google's home screen */
     void snapHomeSoon() {
         main.removeCallbacks(snapHome);
         main.postDelayed(snapHome, 2500);
     }
     private final Runnable snapHome = new Runnable() { @Override public void run() {
-        if (!inFront || Build.VERSION.SDK_INT < 26 || !HomeWatchService.isRunning()) return;
+        if (!inFront || Build.VERSION.SDK_INT < 26 || !(HomeWatchService.isRunning() || isTv())) return;
         if (home == null || !home.onHomeAtRest()) return;
         try {
             View d = getWindow().getDecorView();
             int w = Math.max(16, d.getWidth() / 2), hh = Math.max(16, d.getHeight() / 2);
             final android.graphics.Bitmap b = android.graphics.Bitmap.createBitmap(w, hh, android.graphics.Bitmap.Config.ARGB_8888);
             android.view.PixelCopy.request(getWindow(), b, new android.view.PixelCopy.OnPixelCopyFinishedListener() {
-                @Override public void onPixelCopyFinished(int result) { if (result == android.view.PixelCopy.SUCCESS) HomeWatchService.homeShot = b; }
+                @Override public void onPixelCopyFinished(int result) {
+                    if (result != android.view.PixelCopy.SUCCESS) return;
+                    if (HomeWatchService.isRunning()) HomeWatchService.homeShot = b;
+                    saveCover(b);
+                }
             }, main);
         } catch (Throwable ignored) { }
     } };
