@@ -223,7 +223,7 @@ final class Ring {
 
     /** a one-time ticket for Ring's live-video signalling (see Doorbell's live view) */
     String liveTicket() throws Exception {
-        JSONObject o = api("POST", "https://app.ring.com/api/v1/clients/signalling/ticket", new JSONObject());
+        JSONObject o = api("POST", "https://prd-api-us.prd.rings.solutions/api/v1/clap/ticket/request/signalsocket", new JSONObject());
         String t = o.optString("ticket");
         if (t.isEmpty()) throw new Exception("no ticket");
         return t;
