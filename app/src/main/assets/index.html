@@ -1141,8 +1141,12 @@ function buildAllSettings() {
     { label: 'Trailer starts after', value: () => (S.trailerDelay || 5) + ' seconds',
       cycle: d => { const o = [2, 3, 5, 8, 12]; const i = o.indexOf(S.trailerDelay || 5); S.trailerDelay = o[((i < 0 ? 2 : i) + (d < 0 ? -1 : 1) + o.length) % o.length]; save(); } },
     { label: 'Trailer sound', value: () => S.trailerSound ? 'On' : 'Off', cycle: () => { S.trailerSound = !S.trailerSound; save(); } },
-    { label: 'Ambient light on trailers', value: () => S.ambientBars === false ? 'Off' : 'On · glow over black bars on Featured',
-      cycle: () => { S.ambientBars = S.ambientBars === false; save(); }, ok: () => { S.ambientBars = S.ambientBars === false; save(); } },
+    /* Featured trailers' black bars: lit from the picture's edges (a smooth glow, or a blurred reflection of the edge), or left black */
+    { label: 'Ambient light on trailers', value: () => S.ambientBars === false ? 'Off' : S.ambientStyle === 'reflection' ? 'Reflection · a blurred mirror of the edge' : 'Glow · the edge\'s colours',
+      cycle: d => { const o = ['glow', 'reflection', 'off'], cur = S.ambientBars === false ? 'off' : S.ambientStyle === 'reflection' ? 'reflection' : 'glow';
+        const n = o[(o.indexOf(cur) + (d < 0 ? -1 : 1) + o.length) % o.length]; S.ambientBars = n !== 'off'; if (n !== 'off') S.ambientStyle = n; save(); },
+      ok: () => { const o = ['glow', 'reflection', 'off'], cur = S.ambientBars === false ? 'off' : S.ambientStyle === 'reflection' ? 'reflection' : 'glow';
+        const n = o[(o.indexOf(cur) + 1) % o.length]; S.ambientBars = n !== 'off'; if (n !== 'off') S.ambientStyle = n; save(); } },
     /* YouTube trailers that run on into the channel's outro: stopped where SponsorBlock says it starts, or this many
        seconds before the end when nobody has marked it (Apple TV's trailers have no outro). */
     { label: 'Trailer outro', value: () => { const t = typeof S.trailerTail === 'number' ? S.trailerTail : 10; return t ? 'Skip marked outro, else last ' + t + ' s' : 'Skip marked outro only'; },
