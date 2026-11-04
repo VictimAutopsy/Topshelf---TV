@@ -68,17 +68,17 @@ final class VodPlayer extends FrameLayout {
         addView(cues, cl);
         pics = new SubPics(getContext());
         addView(pics, new LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.MATCH_PARENT));
-        /* The bar: what's playing up in the top left (over a soft shade), and the controls in one floating capsule
-           near the foot — the timeline inside it, play controls in the middle, From the start and Episodes on the
-           left, Subtitles, Audio, Next episode and More on the right. The picture stays clear around it. */
+        /* The bar: what's playing up in the top left (over a soft shade), and the controls across the whole foot of
+           the screen over a deeper shade — the timeline from edge to edge (lined up with the title), play controls in
+           the middle, From the start and Episodes on the left, Subtitles, Audio, Next episode and More on the right. */
         bar = new FrameLayout(getContext());
         bar.setClipChildren(false);
         View topShade = new View(getContext());
         topShade.setBackground(new GradientDrawable(GradientDrawable.Orientation.TOP_BOTTOM, new int[] { 0xC0000000, 0x66000000, 0x00000000 }));
         bar.addView(topShade, new LayoutParams(LayoutParams.MATCH_PARENT, h.px(15)));
         View footShade = new View(getContext());
-        footShade.setBackground(new GradientDrawable(GradientDrawable.Orientation.BOTTOM_TOP, new int[] { 0x8C000000, 0x00000000 }));
-        bar.addView(footShade, new LayoutParams(LayoutParams.MATCH_PARENT, h.px(20), Gravity.BOTTOM));
+        footShade.setBackground(new GradientDrawable(GradientDrawable.Orientation.BOTTOM_TOP, new int[] { 0xD9000000, 0xA6000000, 0x4D000000, 0x00000000 }));
+        bar.addView(footShade, new LayoutParams(LayoutParams.MATCH_PARENT, h.px(26), Gravity.BOTTOM));
         LinearLayout col = new LinearLayout(getContext()); col.setOrientation(LinearLayout.VERTICAL);
         tSub = h.text(h.fMed, 1.1f, 0xC7FFFFFF); tSub.setSingleLine(true); tSub.setEllipsize(TextUtils.TruncateAt.END);
         tTitle = h.text(h.fSemi, 2.3f, Color.WHITE); tTitle.setSingleLine(true); tTitle.setEllipsize(TextUtils.TruncateAt.END);
@@ -91,13 +91,10 @@ final class VodPlayer extends FrameLayout {
         bar.addView(col, cll);
         capsule = new FrameLayout(getContext());
         capsule.setClipChildren(false);
-        GradientDrawable cb = new GradientDrawable(); cb.setCornerRadius(4f * R); cb.setColor(0xE8101116); cb.setStroke(Math.max(1, h.px(.08f)), 0x1FFFFFFF);
-        capsule.setBackground(cb);
-        capsule.setElevation(h.px(1.2f));
         ctl = new Bar(getContext());
         capsule.addView(ctl, new LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.MATCH_PARENT));
-        LayoutParams capl = new LayoutParams(h.px(Math.min(84, h.SW - 8)), h.px(13.2f), Gravity.BOTTOM | Gravity.CENTER_HORIZONTAL);
-        capl.bottomMargin = h.px(3.6f);
+        LayoutParams capl = new LayoutParams(LayoutParams.MATCH_PARENT, h.px(13.2f), Gravity.BOTTOM);
+        capl.bottomMargin = h.px(2.4f);
         bar.addView(capsule, capl);
         addView(bar, new LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.MATCH_PARENT));
         buildPauseInfo();
@@ -811,7 +808,7 @@ final class VodPlayer extends FrameLayout {
         h.showMenu(l, a, null, 1f, "Audio");
     }
 
-    /** inside the capsule: the timeline (times at either end), then the round buttons */
+    /** across the foot: the timeline (times at either end), then the round buttons; edges in line with the title */
     private final class Bar extends View {
         private final TextPaint tTime = new TextPaint(Paint.ANTI_ALIAS_FLAG), tNum = new TextPaint(Paint.ANTI_ALIAS_FLAG);
         private final Paint p = new Paint(Paint.ANTI_ALIAS_FLAG), st = new Paint(Paint.ANTI_ALIAS_FLAG);
@@ -827,7 +824,7 @@ final class VodPlayer extends FrameLayout {
         @Override protected void onDraw(Canvas c) {
             NativePlayer np = h.act.nativePlayer();
             int w = getWidth();
-            float pad = 2.8f * R;
+            float pad = 5f * R;
             long pos = np == null ? 0 : np.positionMs(), dur = dur(np), buf = np == null ? 0 : np.bufferedMs();
             float span = Math.max(1, dur);
             boolean seekRow = row == 0;
