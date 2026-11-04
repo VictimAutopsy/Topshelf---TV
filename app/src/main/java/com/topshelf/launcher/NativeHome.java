@@ -2985,11 +2985,26 @@ final class NativeHome extends FrameLayout {
         updateTshelf(true);
     }
 
+    /* instant play: the first two titles of Continue watching have their streams found ahead (the first one's
+       link resolved too), a few seconds after Home has them, so choosing one plays at once */
+    private java.util.List<JSONObject> cwAhead;
+    private final Runnable cwAheadRun = new Runnable() { @Override public void run() {
+        java.util.List<JSONObject> l = cwAhead; if (l == null || vodPlayingNow()) return;
+        for (int i = 0; i < l.size() && i < 2; i++) {
+            JSONObject m = l.get(i);
+            Addons.get(getContext()).prepare(m.optString("type"), m.optString("video", m.optString("id")), m.optJSONObject("cwStream"), i == 0, "Continue watching · " + m.optString("name"));
+        }
+    } };
+    private void prepareCw(java.util.List<JSONObject> cw) {
+        cwAhead = cw;
+        removeCallbacks(cwAheadRun); postDelayed(cwAheadRun, 5000);
+    }
     /** Continue watching (movies and shows) first in the top shelf, then the page's titles */
     private void mergeShelf() {
         JSONArray all = new JSONArray();
         java.util.List<JSONObject> cw = Progress.continueList(getContext(), null, 12);
         cwCount = cw.size();
+        prepareCw(cw);
         for (JSONObject m : cw) {
             try {
                 JSONObject c = new JSONObject(m.toString());

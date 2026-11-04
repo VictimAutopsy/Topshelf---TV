@@ -516,8 +516,13 @@ final class VodPlayer extends FrameLayout {
         long st0 = Progress.startAt(getContext(), videoId);
         startPct = st0 < 0 ? Progress.pct(getContext(), videoId) : 0;
         final long start = Math.max(0, st0);
-        final String url = stream.optString("url");
+        String url0 = stream.optString("url");
+        // (resolved ahead by instant play: straight to the file, no waiting on the addon's redirect)
+        String rd = Addons.get(getContext()).readyLink(url0);
+        if (rd != null) Diag.ev("instant play: playing the link resolved ahead");
+        final String url = rd != null ? rd : url0;
         playUrl = url;
+        preparedNext = false;
         headers = streamHeaders(stream);
         addonSubs.clear(); subsAsked = false;
         // (black until the picture comes: nothing of the app shows through meanwhile)
@@ -641,11 +646,23 @@ final class VodPlayer extends FrameLayout {
         if (t != null) t.scrobble(what, item.optString("type"), item.optString("id"), videoId, Math.max(0, pct));
     }
     private final Runnable saveTick = new Runnable() { @Override public void run() { save(); postDelayed(this, 10000); } };
+    /** instant play: the next episode's streams found (and its link resolved) during this one's last minutes */
+    private boolean preparedNext;
+    private void prepareNext() {
+        if (preparedNext || next == null) return;
+        NativePlayer np = h.act.nativePlayer(); long d = dur(np);
+        if (np == null || d <= 0) return;
+        long pos = np.positionMs();
+        if (d - pos > 8 * 60000L && pos < d * .85) return;
+        preparedNext = true;
+        Addons.get(getContext()).prepare(item.optString("type", "series"), next.optString("id"), stream, true, "the next episode");
+    }
     private final Runnable tick = new Runnable() { @Override public void run() {
         keepHomeAway();
         if (bar.getAlpha() > .05f) ctl.invalidate();
         checkSkip();
         checkUpNext();
+        prepareNext();
         /* the bar (all of it) goes once nothing's happened for 7 s while playing: it used to stay up after a menu
            (More, Subtitles) had closed, since nothing set it going again */
         if (bar.getAlpha() > .5f && !paused && !scrubbing && !h.menuOpenNow() && SystemClock.uptimeMillis() - barAt > 7000) {

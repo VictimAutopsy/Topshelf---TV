@@ -216,7 +216,7 @@ final class Addons {
             if (!offers(m, "stream", type, id)) continue;
             final String name = m.optString("name"), key = o.optString("url") + "|" + type + "|" + id;
             Object[] hit = streamCache.get(key);
-            if (hit != null && System.currentTimeMillis() - (Long) hit[0] < 10 * 60000L) {
+            if (hit != null && System.currentTimeMillis() - (Long) hit[0] < 30 * 60000L) {
                 @SuppressWarnings("unchecked") List<JSONObject> got = copy((List<JSONObject>) hit[1]);
                 l.addon(name, got, (String) hit[2]);
                 continue;
@@ -254,6 +254,79 @@ final class Addons {
         }
         for (Future<?> f : ask.fs) try { f.get(25, TimeUnit.SECONDS); } catch (Exception ignored) { }
     }
+    /* ------------------------------------------------------------------ instant play
+       Asked ahead (the next episode near the end of this one; the first titles of Continue watching while Home
+       is up): the addons' answers wait in the cache above, and the link most likely to be played (the same
+       source as last time) is resolved ahead too: a debrid link answers with a redirect to the real file, and
+       working that out is the slow part of pressing Play. The resolved address is kept 20 minutes. */
+    private final java.util.Map<String, Object[]> ready = java.util.Collections.synchronizedMap(new java.util.LinkedHashMap<String, Object[]>(16, .75f, true) {
+        @Override protected boolean removeEldestEntry(java.util.Map.Entry<String, Object[]> e) { return size() > 24; }
+    });
+    private final java.util.Set<String> preAsked = java.util.Collections.synchronizedSet(new java.util.HashSet<String>());
+    /** the address a link was resolved to ahead of time (null when there isn't one, or it's old) */
+    String readyLink(String url) {
+        Object[] r = url == null ? null : ready.get(url);
+        return r != null && System.currentTimeMillis() - (Long) r[0] < 20 * 60000L ? (String) r[1] : null;
+    }
+    /** asks the addons for a video's streams now, and resolves the one most like `like` (the stream used last) */
+    void prepare(final String type, final String id, final JSONObject like, final boolean resolve, final String why) {
+        if (id == null || id.isEmpty() || !anyStreams()) return;
+        String key = type + "|" + id + "|" + (System.currentTimeMillis() / (20 * 60000L));
+        if (!preAsked.add(key)) return;
+        pool.submit(new Runnable() { @Override public void run() {
+            final long t0 = System.currentTimeMillis();
+            final List<JSONObject> all = java.util.Collections.synchronizedList(new ArrayList<JSONObject>());
+            streams(type, id, new StreamsListener() { @Override public void addon(String name, List<JSONObject> got, String err) { all.addAll(got); } });
+            if (all.isEmpty()) { Diag.ev("instant play: nothing found ahead for " + why); return; }
+            JSONObject pick = like(all, like);
+            String extra = "";
+            if (resolve && pick != null) {
+                long r0 = System.currentTimeMillis();
+                String fin = resolve(pick.optString("url"), headersOf(pick));
+                if (fin != null) { ready.put(pick.optString("url"), new Object[] { System.currentTimeMillis(), fin }); extra = " · its link resolved in " + (System.currentTimeMillis() - r0) + " ms"; }
+            }
+            Diag.ev("instant play: " + why + " ready (" + all.size() + " streams in " + (System.currentTimeMillis() - t0) + " ms" + extra + ")");
+        } });
+    }
+    /** of these streams, the one from the same source as `prev` (its binge group, or the same addon and quality) */
+    static JSONObject like(List<JSONObject> l, JSONObject prev) {
+        if (l.isEmpty()) return null;
+        if (prev != null) {
+            JSONObject bh = prev.optJSONObject("behaviorHints"); String bg = bh == null ? "" : bh.optString("bingeGroup");
+            if (!bg.isEmpty()) for (JSONObject x : l) { JSONObject b = x.optJSONObject("behaviorHints"); if (b != null && bg.equals(b.optString("bingeGroup"))) return x; }
+            String a = prev.optString("_addon", prev.optString("addon")), n = prev.optString("name");
+            for (JSONObject x : l) if (x.optString("_addon").equals(a) && x.optString("name").equals(n)) return x;
+            for (JSONObject x : l) if (x.optString("_addon").equals(a)) return x;
+        }
+        return l.get(0);
+    }
+    static java.util.Map<String, String> headersOf(JSONObject s) {
+        java.util.Map<String, String> m = new java.util.HashMap<>();
+        JSONObject bh = s.optJSONObject("behaviorHints"), ph = bh == null ? null : bh.optJSONObject("proxyHeaders"), rq = ph == null ? null : ph.optJSONObject("request");
+        if (rq != null) for (java.util.Iterator<String> it = rq.keys(); it.hasNext(); ) { String k = it.next(); m.put(k, rq.optString(k)); }
+        return m;
+    }
+    /** follows a link's redirects (asking for just its first byte) to the address of the file itself */
+    private static String resolve(String url, java.util.Map<String, String> headers) {
+        String u = url;
+        try {
+            for (int hop = 0; hop < 6; hop++) {
+                java.net.HttpURLConnection c = (java.net.HttpURLConnection) new java.net.URL(u).openConnection();
+                c.setInstanceFollowRedirects(false);
+                c.setConnectTimeout(8000); c.setReadTimeout(15000);
+                c.setRequestProperty("Range", "bytes=0-0");
+                for (java.util.Map.Entry<String, String> e : headers.entrySet()) c.setRequestProperty(e.getKey(), e.getValue());
+                int code = c.getResponseCode();
+                String loc = c.getHeaderField("Location");
+                try { java.io.InputStream in = code >= 400 ? c.getErrorStream() : c.getInputStream(); if (in != null) in.close(); } catch (Exception ignored) { }
+                c.disconnect();
+                if (code >= 300 && code < 400 && loc != null) { u = new java.net.URL(new java.net.URL(u), loc).toString(); continue; }
+                return code < 400 ? u : null;
+            }
+        } catch (Exception e) { return null; }
+        return null;
+    }
+
     /** a stream list that can be marked (failed, last used) without touching the remembered one */
     private static List<JSONObject> copy(List<JSONObject> l) {
         List<JSONObject> out = new ArrayList<>();
