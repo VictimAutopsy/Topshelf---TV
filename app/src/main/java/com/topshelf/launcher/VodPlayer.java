@@ -96,9 +96,6 @@ final class VodPlayer extends FrameLayout {
         LayoutParams capl = new LayoutParams(LayoutParams.MATCH_PARENT, h.px(13.2f), Gravity.BOTTOM);
         capl.bottomMargin = h.px(2.4f);
         bar.addView(capsule, capl);
-        preview = new Preview(getContext());
-        preview.setVisibility(GONE);
-        bar.addView(preview, new LayoutParams(h.px(PW + .5f), h.px(PH + 3.2f)));
         addView(bar, new LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.MATCH_PARENT));
         buildPauseInfo();
         buildOpening();
@@ -531,7 +528,6 @@ final class VodPlayer extends FrameLayout {
         showOpening(start);
         np.playVod(myPid, url, start, null, headers);
         np.layout("fs", 0, 0, 0, 0, 0, 0);
-        thumbs.open(url, headers);
         if (start > 0) carryOnNote = "Carrying on at " + TitleView.clock(start) + " · More › From the start";
         if (fallback == null) askSubs(); else subsAsked = true;
         askSegments(videoId);
@@ -587,7 +583,7 @@ final class VodPlayer extends FrameLayout {
     }
 
     void close() {
-        thumbs.close(); preview.setVisibility(GONE);
+        removeCallbacks(scrubLive); if (scrubbing) { scrubbing = false; NativePlayer sp = h.act.nativePlayer(); if (sp != null) sp.scrubDone(); }
         hidePauseInfo(false); removeCallbacks(pauseInfoLater);
         hideOpening(false); carryOnNote = null;
         save();
@@ -815,7 +811,7 @@ final class VodPlayer extends FrameLayout {
             if (c == KeyEvent.KEYCODE_BACK || c == KeyEvent.KEYCODE_ESCAPE) { upDismissed = true; hideUpNext(); return true; }
         }
         if (c == KeyEvent.KEYCODE_BACK || c == KeyEvent.KEYCODE_ESCAPE) {
-            if (scrubbing) { scrubbing = false; ctl.invalidate(); return true; }
+            if (scrubbing) { removeCallbacks(scrubCommit); scrubbing = false; scrubEnd(false); ctl.invalidate(); return true; }
             if (barShown()) { removeCallbacks(barHide); bar.animate().alpha(0f).setDuration(200).start(); return true; }
             close(); return true;
         }
@@ -829,7 +825,7 @@ final class VodPlayer extends FrameLayout {
             showBar();
             return true;
         }
-        if (c == KeyEvent.KEYCODE_DPAD_UP) { if (row == 1) { row = 0; scrubbing = false; if (np != null) thumbs.warm(np.positionMs()); } }
+        if (c == KeyEvent.KEYCODE_DPAD_UP) { if (row == 1) { row = 0; scrubbing = false; } }
         else if (c == KeyEvent.KEYCODE_DPAD_DOWN) { if (row == 0) { commitScrub(); row = 1; } }
         else if (c == KeyEvent.KEYCODE_DPAD_LEFT || c == KeyEvent.KEYCODE_DPAD_RIGHT) {
             boolean right = c == KeyEvent.KEYCODE_DPAD_RIGHT;
@@ -838,11 +834,9 @@ final class VodPlayer extends FrameLayout {
                 long now = SystemClock.uptimeMillis();
                 scrubRun = now - lastScrubAt < 450 ? scrubRun + 1 : 0; lastScrubAt = now;
                 long step = scrubRun < 4 ? 10000 : scrubRun < 12 ? 30000 : 60000;
-                if (!scrubbing) { scrubbing = true; scrubTo = np.positionMs(); }
+                if (!scrubbing) { scrubbing = true; scrubBegin(np); }
                 scrubTo = Math.max(0, Math.min(dur(np) - 2000, scrubTo + (right ? step : -step)));
-                removeCallbacks(scrubCommit); postDelayed(scrubCommit, thumbs.on() ? 1400 : 900);    // (a moment longer to look at the picture)
-                thumbs.want(scrubTo, right ? 1 : -1);
-                showPreview();
+                removeCallbacks(scrubCommit); postDelayed(scrubCommit, 1300);    // (a moment to look at where you are)
             }
         } else if (ok) {
             if (row == 0) { if (scrubbing) commitScrub(); else togglePause(); }
@@ -860,7 +854,7 @@ final class VodPlayer extends FrameLayout {
         float[] l = h.local(ctl, x, y);
         if (l[0] >= ctl.tx0 - R && l[0] <= ctl.tx1 + R && Math.abs(l[1] - ctl.ty) < 1.8f * R) {
             long d = dur(np);
-            if (np != null && d > 0) { scrubbing = false; np.seekMs((long) (Math.max(0, Math.min(1, (l[0] - ctl.tx0) / Math.max(1, ctl.tx1 - ctl.tx0))) * Math.max(0, d - 2000))); }
+            if (np != null && d > 0) { if (scrubbing) { scrubbing = false; removeCallbacks(scrubCommit); removeCallbacks(scrubLive); np.scrubDone(); if (scrubWasPlaying && !paused) np.setPaused(false); } np.seekMs((long) (Math.max(0, Math.min(1, (l[0] - ctl.tx0) / Math.max(1, ctl.tx1 - ctl.tx0))) * Math.max(0, d - 2000))); }
             row = 0; showBar(); return "done";
         }
         List<String> bs = buttons();
@@ -873,137 +867,39 @@ final class VodPlayer extends FrameLayout {
     private final Runnable scrubCommit = new Runnable() { @Override public void run() { commitScrub(); } };
     private void commitScrub() {
         removeCallbacks(scrubCommit);
-        hidePreview();
         if (!scrubbing) return;
         scrubbing = false;
-        NativePlayer np = h.act.nativePlayer();
-        if (np != null) np.seekMs(scrubTo);
+        scrubEnd(true);
         ctl.invalidate();
     }
-    /* ------------------------------------------------------------------ seek previews (as Plex, Jellyfin and
-       YouTube have): scrubbing the timeline, a picture of where you'd land shows over it. The frames come from the
-       stream itself, one at a time on a worker (Android's frame grabber, the nearest key frame to each spot, ten
-       seconds apart): the one you're on first, then a few more the way you're going, so holding ▶ keeps up. Kept
-       while the film plays (about 60, a few MB); a stream the grabber can't read just has no pictures. */
-    private static final float PW = 22f, PH = PW * 9 / 16f;
-    private Preview preview;
-    private final Thumbs thumbs = new Thumbs();
-    private void showPreview() {
-        if (!thumbs.on() || !scrubbing || row != 0) { hidePreview(); return; }
-        NativePlayer np = h.act.nativePlayer(); long d = dur(np);
-        if (d <= 0 || capsule.getWidth() == 0) return;
-        float kx = ctl.tx0 + (ctl.tx1 - ctl.tx0) * Math.min(1f, scrubTo / (float) d);
-        float x = capsule.getLeft() + ctl.getLeft() + kx - preview.getWidth() / 2f;
-        x = Math.max(h.px(2), Math.min(getWidth() - preview.getWidth() - h.px(2), x));
-        preview.setTranslationX(x);
-        preview.setTranslationY(capsule.getTop() - preview.getHeight() - h.px(.4f));
-        preview.at = scrubTo;
-        if (preview.getVisibility() != VISIBLE) { preview.setVisibility(VISIBLE); preview.setAlpha(0f); preview.animate().alpha(1f).setDuration(150).start(); }
-        preview.invalidate();
+    /* ------------------------------------------------------------------ live scrubbing (as Apple TV and YouTube do):
+       while you scrub, the film itself jumps to each spot, paused and silent, using the TV's own decoder and the
+       stream already open (the nearest key frame: quick even over the internet); a new spot is asked for at most
+       every ~quarter second, the newest one winning. Letting go plays on from the spot; Back goes back to where you
+       were. (It replaced pictures fetched separately, which were slow with big files and came out black in HDR.) */
+    private boolean scrubWasPlaying; private long scrubFrom, liveAsked = -1, liveAt;
+    private void scrubBegin(NativePlayer np) {
+        scrubFrom = np.positionMs(); scrubTo = scrubFrom;
+        scrubWasPlaying = !paused;
+        if (scrubWasPlaying) np.setPaused(true);
+        liveAsked = -1;
+        removeCallbacks(scrubLive); postDelayed(scrubLive, 60);
     }
-    private void hidePreview() { if (preview != null && preview.getVisibility() == VISIBLE) preview.setVisibility(GONE); }
-    private final class Preview extends View {
-        long at;
-        private final Paint p = new Paint(Paint.ANTI_ALIAS_FLAG | Paint.FILTER_BITMAP_FLAG);
-        private final TextPaint t = new TextPaint(Paint.ANTI_ALIAS_FLAG);
-        private final RectF r = new RectF(), ri = new RectF();
-        private final Path clip = new Path();
-        Preview(android.content.Context c) { super(c); t.setTypeface(h.fSemi); t.setTextSize(1.15f * R); t.setTextAlign(Paint.Align.CENTER); t.setColor(Color.WHITE); t.setFontFeatureSettings("tnum"); }
-        @Override protected void onDraw(Canvas c) {
-            float w = getWidth(), pw = PW * R, ph = PH * R, x0 = (w - pw) / 2f;
-            r.set(x0 - .25f * R, 0, x0 + pw + .25f * R, ph + .5f * R);
-            p.setColor(0xF2101116); c.drawRoundRect(r, 1f * R, 1f * R, p);
-            ri.set(x0, .25f * R, x0 + pw, .25f * R + ph);
-            android.graphics.Bitmap b = thumbs.near(at);
-            c.save(); clip.reset(); clip.addRoundRect(ri, .8f * R, .8f * R, Path.Direction.CW); c.clipPath(clip);
-            if (b != null) c.drawBitmap(b, null, ri, p);
-            else { p.setColor(0xFF1A1C22); c.drawRect(ri, p); }
-            c.restore();
-            if (b == null) { t.setColor(0x80FFFFFF); t.setTextSize(1f * R); c.drawText("Getting the picture…", ri.centerX(), ri.centerY() + .35f * R, t); }
-            t.setColor(Color.WHITE); t.setTextSize(1.25f * R);
-            c.drawText(TitleView.clock(at), w / 2f, ph + 2.4f * R, t);
-        }
-    }
-    private final class Thumbs {
-        private static final long STEP = 10000;
-        private final android.util.LruCache<Long, android.graphics.Bitmap> cache = new android.util.LruCache<Long, android.graphics.Bitmap>(48) {
-            @Override protected void entryRemoved(boolean ev, Long k, android.graphics.Bitmap old, android.graphics.Bitmap nu) { if (old != nu && old != null) old.recycle(); }
-        };
-        private android.media.MediaMetadataRetriever mmr;
-        private String url = ""; private Map<String, String> hdr;
-        private volatile int gen; private volatile boolean dead;
-        private volatile long target = -1; private volatile int dir = 1;
-        private int fails; private boolean logged;
-        private Thread worker;
-        private final Object lock = new Object();
-        boolean on() { return !dead && !url.isEmpty() && android.os.Build.VERSION.SDK_INT >= 27; }
-        void open(String u, Map<String, String> headers) {
-            close();
-            url = u == null ? "" : u; hdr = headers == null ? new HashMap<String, String>() : new HashMap<>(headers);
-            dead = !url.startsWith("http"); fails = 0; logged = false;
-        }
-        void close() {
-            gen++; target = -1; url = "";
-            synchronized (lock) { lock.notifyAll(); }
-            final android.media.MediaMetadataRetriever m = mmr; mmr = null; worker = null;
-            if (m != null) new Thread(new Runnable() { @Override public void run() { try { m.release(); } catch (Throwable ignored) { } } }, "seek-pics-close").start();
-            post(new Runnable() { @Override public void run() { cache.evictAll(); } });
-        }
-        /** the nearest picture there is to ms (one the worker made), or null */
-        android.graphics.Bitmap near(long ms) {
-            long k = Math.round(ms / (double) STEP);
-            android.graphics.Bitmap b = cache.get(k);
-            if (b == null) b = cache.get(k - 1); if (b == null) b = cache.get(k + 1);
-            return b;
-        }
-        /** entering the timeline: the spots around where you are, ready before you move */
-        void warm(long ms) { want(ms, 1); }
-        void want(long ms, int d) {
-            if (!on()) return;
-            target = Math.round(ms / (double) STEP); dir = d;
-            synchronized (lock) { lock.notifyAll(); }
-            if (worker == null) {
-                final int g = gen;
-                worker = new Thread(new Runnable() { @Override public void run() { loop(g); } }, "seek-pics");
-                worker.setPriority(Thread.MIN_PRIORITY);
-                worker.start();
-            }
-        }
-        private void loop(final int g) {
-            try {
-                android.media.MediaMetadataRetriever m = new android.media.MediaMetadataRetriever();
-                long t0 = SystemClock.uptimeMillis();
-                try { m.setDataSource(url, hdr); }
-                catch (Throwable e) { dead = true; Diag.ev("seek pictures: the stream can't be read for them (" + e.getClass().getSimpleName() + ")"); try { m.release(); } catch (Throwable ignored) { } return; }
-                if (g != gen) { m.release(); return; }
-                mmr = m;
-                int ahead = 0; long last = Long.MIN_VALUE;
-                while (g == gen && !dead) {
-                    long k = target;
-                    // what's wanted first: the spot itself, then up to 4 more the way you're going
-                    long want = -1;
-                    if (k >= 0 && !has(k)) want = k;
-                    else if (k >= 0) { for (int i = 1; i <= 4; i++) { long n = k + i * dir; if (n >= 0 && !has(n)) { want = n; break; } } }
-                    if (want < 0 || want == last) { synchronized (lock) { try { lock.wait(4000); } catch (InterruptedException e) { return; } } last = Long.MIN_VALUE; continue; }
-                    last = want;
-                    long s0 = SystemClock.uptimeMillis();
-                    android.graphics.Bitmap b = null;
-                    try { b = m.getScaledFrameAtTime(want * STEP * 1000, android.media.MediaMetadataRetriever.OPTION_CLOSEST_SYNC, Math.round(PW * R), Math.round(PH * R)); }
-                    catch (Throwable e) { b = null; }
-                    if (g != gen) { if (b != null) b.recycle(); return; }
-                    if (b == null) {
-                        if (++fails >= 4) { dead = true; Diag.ev("seek pictures: none from this stream (the frame grabber gave up)"); post(new Runnable() { @Override public void run() { hidePreview(); } }); }
-                        continue;
-                    }
-                    fails = 0;
-                    if (!logged) { logged = true; Diag.ev("seek pictures: first after " + (SystemClock.uptimeMillis() - t0) + " ms, " + (SystemClock.uptimeMillis() - s0) + " ms each"); }
-                    final long key = want; final android.graphics.Bitmap fb = b;
-                    post(new Runnable() { @Override public void run() { if (g == gen) { cache.put(key, fb); if (preview.getVisibility() == VISIBLE) preview.invalidate(); } else fb.recycle(); } });
-                    try { Thread.sleep(20); } catch (InterruptedException e) { return; }
-                }
-            } catch (Throwable t) { dead = true; }
-        }
-        private boolean has(long k) { return cache.get(k) != null; }
+    private final Runnable scrubLive = new Runnable() { @Override public void run() {
+        if (!scrubbing) return;
+        NativePlayer np = h.act.nativePlayer();
+        long now = SystemClock.uptimeMillis();
+        if (np != null && scrubTo != liveAsked && now - liveAt >= 260) { np.scrubSeek(scrubTo); liveAsked = scrubTo; liveAt = now; }
+        postDelayed(this, 80);
+    } };
+    /** scrubbing ends: at the chosen spot (exactly), or back where it started; playing again if it was */
+    private void scrubEnd(boolean keep) {
+        removeCallbacks(scrubLive);
+        NativePlayer np = h.act.nativePlayer();
+        if (np == null) return;
+        np.scrubDone();
+        np.seekMs(keep ? scrubTo : scrubFrom);
+        if (scrubWasPlaying && !paused) np.setPaused(false);
     }
 
     private void skip(long ms) { NativePlayer np = h.act.nativePlayer(); long d = dur(np); if (np != null && d > 0) np.seekMs(Math.max(0, Math.min(d - 2000, np.positionMs() + ms))); }

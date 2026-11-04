@@ -548,6 +548,9 @@ final class NativePlayer implements Player.Listener {
     long durationMs() { if (player == null) return 0; long d = player.getDuration(); return d == C.TIME_UNSET ? 0 : d; }
     long bufferedMs() { return player == null ? 0 : player.getBufferedPosition(); }
     void seekMs(long ms) { if (player != null) player.seekTo(Math.max(0, ms)); }
+    /** scrubbing: to the nearest key frame (quick), until scrubDone() puts exact seeking back */
+    void scrubSeek(long ms) { if (player == null) return; player.setSeekParameters(androidx.media3.exoplayer.SeekParameters.CLOSEST_SYNC); player.seekTo(Math.max(0, ms)); }
+    void scrubDone() { if (player != null) player.setSeekParameters(androidx.media3.exoplayer.SeekParameters.DEFAULT); }
     boolean vod() { return "vod".equals(kind); }
 
     // ------------------------------------------------------------------ the TV's own copy (pause & rewind)
