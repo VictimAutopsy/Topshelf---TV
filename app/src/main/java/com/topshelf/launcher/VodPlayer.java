@@ -98,6 +98,7 @@ final class VodPlayer extends FrameLayout {
         bar.addView(capsule, capl);
         addView(bar, new LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.MATCH_PARENT));
         buildPauseInfo();
+        buildOpening();
         skipBtn = h.text(h.fSemi, 1.5f, 0xFF111111);
         GradientDrawable sb = new GradientDrawable(); sb.setCornerRadius(h.px(2.4f)); sb.setColor(0xF2FFFFFF); skipBtn.setBackground(sb);
         skipBtn.setPadding(h.px(2.2f), h.px(1.1f), h.px(2.2f), h.px(1.1f));
@@ -140,6 +141,115 @@ final class VodPlayer extends FrameLayout {
     private android.widget.ImageView piLogo;
     private TextView piKicker, piName, piMeta, piEp, piDesc, piHint;
     private boolean pauseInfoUp;
+    /* ---- the opening screen (like Nuvio's): while the stream opens, the title's backdrop fills the screen, dimmed,
+       with its logo in the middle gently breathing, the episode under it, and a thin line sweeping beneath. It fades
+       away the moment the picture starts. Only Back works meanwhile (it stops, as always). */
+    private FrameLayout opening;
+    private android.widget.ImageView opBg, opLogo;
+    private TextView opName, opEp, opNote;
+    private Sweep opLine;
+    private boolean openingUp;
+    private String carryOnNote;               // (shown once the picture's up)
+    private void buildOpening() {
+        opening = new FrameLayout(getContext());
+        opening.setBackgroundColor(Color.BLACK);
+        opBg = new android.widget.ImageView(getContext()); opBg.setScaleType(android.widget.ImageView.ScaleType.CENTER_CROP);
+        opening.addView(opBg, new LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.MATCH_PARENT));
+        View dim = new View(getContext()); dim.setBackgroundColor(0x99000000);
+        opening.addView(dim, new LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.MATCH_PARENT));
+        View vig = new View(getContext());
+        GradientDrawable vg = new GradientDrawable(); vg.setGradientType(GradientDrawable.RADIAL_GRADIENT);
+        vg.setColors(new int[] { 0x00000000, 0x8C000000 }); vg.setGradientRadius(h.px(78)); vig.setBackground(vg);
+        opening.addView(vig, new LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.MATCH_PARENT));
+        LinearLayout col = new LinearLayout(getContext()); col.setOrientation(LinearLayout.VERTICAL); col.setGravity(Gravity.CENTER_HORIZONTAL);
+        opLogo = new android.widget.ImageView(getContext()); opLogo.setScaleType(android.widget.ImageView.ScaleType.FIT_CENTER); opLogo.setAdjustViewBounds(true);
+        opLogo.setMaxWidth(h.px(40)); opLogo.setMaxHeight(h.px(14));
+        col.addView(opLogo, new LinearLayout.LayoutParams(LayoutParams.WRAP_CONTENT, LayoutParams.WRAP_CONTENT));
+        opName = h.text(h.fSemi, 4.2f, Color.WHITE); opName.setGravity(Gravity.CENTER); opName.setMaxLines(2); opName.setEllipsize(TextUtils.TruncateAt.END);
+        opName.setLetterSpacing(-.02f); opName.setShadowLayer(R, 0, .1f * R, 0x99000000); opName.setMaxWidth(h.px(Math.min(70, h.SW - 10)));
+        col.addView(opName, new LinearLayout.LayoutParams(LayoutParams.WRAP_CONTENT, LayoutParams.WRAP_CONTENT));
+        opEp = h.text(h.fSemi, 1.5f, 0xE6FFFFFF); opEp.setGravity(Gravity.CENTER); opEp.setMaxLines(1); opEp.setEllipsize(TextUtils.TruncateAt.END);
+        opEp.setShadowLayer(.6f * R, 0, .1f * R, 0x99000000); opEp.setMaxWidth(h.px(Math.min(70, h.SW - 10)));
+        LinearLayout.LayoutParams el = new LinearLayout.LayoutParams(LayoutParams.WRAP_CONTENT, LayoutParams.WRAP_CONTENT); el.topMargin = h.px(1.6f);
+        col.addView(opEp, el);
+        opLine = new Sweep(getContext());
+        LinearLayout.LayoutParams sl = new LinearLayout.LayoutParams(h.px(16), h.px(.5f)); sl.topMargin = h.px(3f);
+        col.addView(opLine, sl);
+        opNote = h.text(h.fMed, 1.1f, 0x99FFFFFF); opNote.setGravity(Gravity.CENTER); opNote.setMaxLines(1); opNote.setEllipsize(TextUtils.TruncateAt.END);
+        opNote.setMaxWidth(h.px(Math.min(70, h.SW - 10)));
+        LinearLayout.LayoutParams nl = new LinearLayout.LayoutParams(LayoutParams.WRAP_CONTENT, LayoutParams.WRAP_CONTENT); nl.topMargin = h.px(1.4f);
+        col.addView(opNote, nl);
+        opening.addView(col, new LayoutParams(LayoutParams.WRAP_CONTENT, LayoutParams.WRAP_CONTENT, Gravity.CENTER));
+        opening.setVisibility(GONE);
+        addView(opening, new LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.MATCH_PARENT));
+    }
+    private void showOpening(long carryOnAt) {
+        openingUp = true;
+        opening.animate().cancel(); opening.setAlpha(1f); opening.setVisibility(VISIBLE); opening.bringToFront();
+        String name = item.optString("name");
+        opName.setText(name); opName.setVisibility(VISIBLE);
+        opLogo.setImageDrawable(null); opLogo.setVisibility(GONE);
+        opLogo.animate().cancel(); opLogo.setAlpha(1f); opName.setAlpha(1f);
+        boolean series = "series".equals(item.optString("type"));
+        opEp.setText(series ? label : ""); opEp.setVisibility(series && !label.isEmpty() ? VISIBLE : GONE);
+        opNote.setText(carryOnAt > 0 ? "Carrying on at " + TitleView.clock(carryOnAt) : stream.optString("_addon"));
+        opNote.setVisibility(opNote.getText().length() == 0 ? GONE : VISIBLE);
+        // the backdrop (slowly drifting in), and the logo in place of the name once it's here
+        opBg.setImageDrawable(null); opBg.animate().cancel(); opBg.setScaleX(1.04f); opBg.setScaleY(1.04f); opBg.setAlpha(0f);
+        final String bg = item.optString("background"), logo = item.optString("logo");
+        final int my = pid;
+        if (bg.startsWith("http")) h.imgs.load("op:" + bg, new HomeImages.Source() { @Override public byte[] bytes() throws Exception { return HomeImages.http(bg, null); } }, h.W, h.H,
+                new HomeImages.Done() { @Override public void done(android.graphics.Bitmap b) {
+                    if (b == null || !openingUp || my != pid) return;
+                    opBg.setImageBitmap(b);
+                    opBg.animate().alpha(1f).setDuration(500).start();
+                    opBg.animate().scaleX(1f).scaleY(1f).setDuration(12000).setInterpolator(new android.view.animation.DecelerateInterpolator()).start();
+                } });
+        if (logo.startsWith("http")) h.imgs.load("op:" + logo, new HomeImages.Source() { @Override public byte[] bytes() throws Exception { return HomeImages.http(logo, null); } }, h.px(40), h.px(14),
+                new HomeImages.Done() { @Override public void done(android.graphics.Bitmap b) {
+                    if (b == null || !openingUp || my != pid) return;
+                    opLogo.setImageBitmap(b); opLogo.setVisibility(VISIBLE); opName.setVisibility(GONE);
+                    breathe();
+                } });
+        opLine.start();
+    }
+    private void breathe() {
+        if (!openingUp) return;
+        final View v = opLogo.getVisibility() == VISIBLE ? opLogo : opName;
+        v.animate().alpha(v.getAlpha() > .9f ? .7f : 1f).setDuration(1400).setInterpolator(new android.view.animation.AccelerateDecelerateInterpolator())
+                .withEndAction(new Runnable() { @Override public void run() { breathe(); } }).start();
+    }
+    /** the picture's here: the opening screen fades away (at once when the player closes) */
+    private void hideOpening(boolean fade) {
+        if (!openingUp) return;
+        openingUp = false;
+        opLine.stop();
+        opLogo.animate().cancel(); opName.animate().cancel(); opBg.animate().cancel();
+        if (fade) opening.animate().alpha(0f).setDuration(450).withEndAction(new Runnable() { @Override public void run() { if (!openingUp) { opening.setVisibility(GONE); opBg.setImageDrawable(null); opLogo.setImageDrawable(null); } } }).start();
+        else { opening.animate().cancel(); opening.setVisibility(GONE); opBg.setImageDrawable(null); opLogo.setImageDrawable(null); }
+    }
+    /** a thin line with a bright stretch sweeping across it, over and over */
+    private final class Sweep extends View {
+        private final Paint p = new Paint(Paint.ANTI_ALIAS_FLAG);
+        private final RectF r = new RectF();
+        private long t0; private boolean on;
+        Sweep(android.content.Context c) { super(c); }
+        void start() { on = true; t0 = SystemClock.uptimeMillis(); invalidate(); }
+        void stop() { on = false; }
+        @Override protected void onDraw(Canvas c) {
+            int w = getWidth(), hh = getHeight();
+            float rad = hh / 2f;
+            p.setColor(0x33FFFFFF); r.set(0, 0, w, hh); c.drawRoundRect(r, rad, rad, p);
+            if (!on) return;
+            float f = ((SystemClock.uptimeMillis() - t0) % 1500) / 1500f;
+            float e = f < .5f ? 2 * f * f : 1 - (float) Math.pow(-2 * f + 2, 2) / 2;     // (eases in and out)
+            float seg = w * .35f, x = -seg + (w + seg) * e;
+            p.setColor(Color.WHITE); r.set(Math.max(0, x), 0, Math.min(w, x + seg), hh);
+            if (r.width() > 0) c.drawRoundRect(r, rad, rad, p);
+            postInvalidateOnAnimation();
+        }
+    }
+
     private void buildPauseInfo() {
         pauseInfo = new FrameLayout(getContext());
         View dim = new View(getContext());
@@ -390,13 +500,13 @@ final class VodPlayer extends FrameLayout {
         tTitle.setText(item.optString("name"));
         String bd = TextUtils.join(" ", TitleView.badges((stream.optString("name") + " " + stream.optString("title")).toUpperCase(Locale.US)));
         tSub.setText((label.isEmpty() ? "" : label + "   ·   ") + stream.optString("_addon") + (bd.isEmpty() ? "" : "   ·   " + bd));
-        loading.setText("Loading…"); loading.setVisibility(VISIBLE);
+        loading.setVisibility(GONE);
         cues.setVisibility(GONE);
         // only the picture and this bar: everything else of the app steps aside (it would cover the video)
         hidden.clear();
         for (int i = 0; i < h.getChildCount(); i++) { View v = h.getChildAt(i); if (v != this && !h.overlay(v) && v.getVisibility() == VISIBLE) { hidden.put(v, VISIBLE); v.setVisibility(INVISIBLE); } }
         setVisibility(VISIBLE); bringToFront();
-        showBar();
+        removeCallbacks(barHide); bar.animate().cancel(); bar.setAlpha(0f);      // (the controls come with the picture)
         h.stopTrailers();
         final NativePlayer np = h.act.nativePlayer();
         if (np == null) { h.toast("The TV's video player isn't available"); close(); return; }
@@ -410,9 +520,10 @@ final class VodPlayer extends FrameLayout {
         // (black until the picture comes: nothing of the app shows through meanwhile)
         setBackgroundColor(Color.BLACK);
         final int myPid = ++pid;
+        showOpening(start);
         np.playVod(myPid, url, start, null, headers);
         np.layout("fs", 0, 0, 0, 0, 0, 0);
-        if (start > 0) h.toast("Carrying on at " + TitleView.clock(start) + " · More › From the start");
+        if (start > 0) carryOnNote = "Carrying on at " + TitleView.clock(start) + " · More › From the start";
         if (fallback == null) askSubs(); else subsAsked = true;
         askSegments(videoId);
         removeCallbacks(saveTick); postDelayed(saveTick, 10000);
@@ -452,6 +563,7 @@ final class VodPlayer extends FrameLayout {
 
     void close() {
         hidePauseInfo(false); removeCallbacks(pauseInfoLater);
+        hideOpening(false); carryOnNote = null;
         save();
         scrobble("stop");
         removeCallbacks(saveTick); removeCallbacks(tick); removeCallbacks(barHide); removeCallbacks(noPicture); removeCallbacks(waitLog); removeCallbacks(upTick);
@@ -544,7 +656,10 @@ final class VodPlayer extends FrameLayout {
         if (ev.equals("ready")) { pictured = true; removeCallbacks(noPicture); setBackgroundColor(Color.TRANSPARENT); }
         if (ev.equals("ready") || ev.equals("playing")) {
             ready = true;
-            if (pictured) loading.setVisibility(GONE);
+            if (pictured) {
+                loading.setVisibility(GONE);
+                if (openingUp) { hideOpening(true); showBar(); if (carryOnNote != null) h.toast(carryOnNote); carryOnNote = null; }
+            }
             else { removeCallbacks(noPicture); postDelayed(noPicture, 20000); }
             NativePlayer np = h.act.nativePlayer();
             if (startPct > 0 && np != null && np.durationMs() > 0) {
@@ -640,6 +755,7 @@ final class VodPlayer extends FrameLayout {
     boolean key(KeyEvent e) {
         if (e.getAction() != KeyEvent.ACTION_DOWN) return true;
         int c = e.getKeyCode();
+        if (openingUp) { if (c == KeyEvent.KEYCODE_BACK || c == KeyEvent.KEYCODE_ESCAPE) close(); return true; }
         // the pause screen: OK plays on, Back closes the player as usual, anything else brings the controls back
         if (pauseInfoUp) {
             boolean okK = c == KeyEvent.KEYCODE_DPAD_CENTER || c == KeyEvent.KEYCODE_ENTER || c == KeyEvent.KEYCODE_NUMPAD_ENTER || c == KeyEvent.KEYCODE_BUTTON_A
