@@ -395,7 +395,7 @@ final class Billboard extends FrameLayout {
                 if (ambient.getParent() != trHost) { if (ambient.getParent() != null) ((android.view.ViewGroup) ambient.getParent()).removeView(ambient); trHost.addView(ambient, new LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.MATCH_PARENT)); }
                 ambient.bringToFront();
                 final TrailerPlayer tp = trailer;
-                ambient.start(new AmbientBars.Source() { @Override public android.view.TextureView texture() { return tp == null ? null : tp.texture(); } });
+                if (h.S.optBoolean("ambientBars", true)) ambient.start(new AmbientBars.Source() { @Override public android.view.TextureView texture() { return tp == null ? null : tp.texture(); } });
             }
             @Override public void ended() {
                 if (g != gen) return;
