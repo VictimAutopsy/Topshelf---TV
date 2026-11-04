@@ -17,12 +17,12 @@ import android.view.View;
 /**
  * Ambient light over a trailer's black bars (Featured), the way a Philips Hue or Govee TV light strip works.
  * Many trailers are widescreen films inside a 16:9 video, so black bands sit above and below the picture.
- * About 12 times a second a tiny copy of the frame (40×270) is read; rows that stay black across a couple of
+ * Up to 30 times a second (with the screen's refresh) a tiny copy of the frame (40×270) is read; rows that stay black across a couple of
  * seconds are the bars (a dark scene isn't mistaken for them: the bars must be in every frame, top and bottom
  * alike). Along each edge of the picture sit ten "lights", one per zone: each takes the colour of the picture's
  * outermost rows in its zone (a little richer, as the light strips make it) and glows out into the bar as a soft
  * pool of light, fading towards the screen's edge and blending into its neighbours. They follow the film closely:
- * a quick ease from frame to frame, an instant change at a cut.
+ * a very short ease from frame to frame, an instant change at any clear change of scene.
  */
 final class AmbientBars extends View {
     interface Source { TextureView texture(); }
@@ -47,18 +47,35 @@ final class AmbientBars extends View {
 
     void start(Source s) {
         src = s; on = true; histN = 0; histI = 0; topT = botT = 0; logged = false;
-        removeCallbacks(tick); post(tick);
+        frames = 0; reads = 0; readNs = 0; statAt = System.nanoTime(); every = 2;
+        android.view.Choreographer.getInstance().removeFrameCallback(frame);
+        android.view.Choreographer.getInstance().postFrameCallback(frame);
     }
     void stop() {
-        on = false; src = null; removeCallbacks(tick);
+        on = false; src = null;
+        android.view.Choreographer.getInstance().removeFrameCallback(frame);
         topT = botT = 0; top = bot = 0; invalidate();
     }
 
-    private final Runnable tick = new Runnable() { @Override public void run() {
-        if (!on) return;
-        read();
-        postDelayed(this, 80);          // (about 12 a second: the light keeps up with the film)
-    } };
+    /* read with the screen's own rhythm: every second refresh (30 a second), or every fourth if reading
+       turns out slow on this TV (so the rest of Home stays smooth) */
+    private int frames, reads, every = 2; private long readNs, statAt; private boolean statLogged;
+    private final android.view.Choreographer.FrameCallback frame = new android.view.Choreographer.FrameCallback() {
+        @Override public void doFrame(long t) {
+            if (!on) return;
+            if (++frames % every == 0) {
+                long r0 = System.nanoTime();
+                read();
+                readNs += System.nanoTime() - r0; reads++;
+                if (reads == 30) every = readNs / reads > 6_000_000L ? 4 : 2;
+                if (!statLogged && System.nanoTime() - statAt > 10_000_000_000L && reads > 0) {
+                    statLogged = true;
+                    Diag.ev("featured: ambient light reads " + Math.round(reads / ((System.nanoTime() - statAt) / 1e9)) + " a second, " + String.format(java.util.Locale.US, "%.1f", readNs / reads / 1e6) + " ms each");
+                }
+            }
+            android.view.Choreographer.getInstance().postFrameCallback(this);
+        }
+    };
 
     private void read() {
         TextureView tv = src == null ? null : src.texture();
@@ -89,7 +106,7 @@ final class AmbientBars extends View {
         edge(mt + 2, mt + 6, cTopT);
         edge(SH - mb - 6, SH - mb - 2, cBotT);
         // a cut to a new scene: the light changes with it at once (no easing over from the last one)
-        if (diff(cTop, cTopT) + diff(cBot, cBotT) > 70) { System.arraycopy(cTopT, 0, cTop, 0, cTop.length); System.arraycopy(cBotT, 0, cBot, 0, cBot.length); }
+        if (diff(cTop, cTopT) + diff(cBot, cBotT) > 36) { System.arraycopy(cTopT, 0, cTop, 0, cTop.length); System.arraycopy(cBotT, 0, cBot, 0, cBot.length); }
         invalidate();
     }
     private static float diff(float[] a, float[] b) { float d = 0; for (int i = 0; i < a.length; i++) d += Math.abs(a[i] - b[i]); return d / a.length; }
@@ -113,8 +130,8 @@ final class AmbientBars extends View {
         if (Math.abs(top - topT) > .001f) { top += (topT - top) * .12f; moving = true; } else top = topT;
         if (Math.abs(bot - botT) > .001f) { bot += (botT - bot) * .12f; moving = true; } else bot = botT;
         for (int i = 0; i < ZONES * 3; i++) {
-            if (Math.abs(cTop[i] - cTopT[i]) > .5f) { cTop[i] += (cTopT[i] - cTop[i]) * .4f; moving = true; } else cTop[i] = cTopT[i];
-            if (Math.abs(cBot[i] - cBotT[i]) > .5f) { cBot[i] += (cBotT[i] - cBot[i]) * .4f; moving = true; } else cBot[i] = cBotT[i];
+            if (Math.abs(cTop[i] - cTopT[i]) > .5f) { cTop[i] += (cTopT[i] - cTop[i]) * .65f; moving = true; } else cTop[i] = cTopT[i];
+            if (Math.abs(cBot[i] - cBotT[i]) > .5f) { cBot[i] += (cBotT[i] - cBot[i]) * .65f; moving = true; } else cBot[i] = cBotT[i];
         }
         int w = getWidth(), h = getHeight();
         float th = top * h, bh = bot * h, over = h * .012f;      // (over: ~13 px into the picture, so no line where they meet)
