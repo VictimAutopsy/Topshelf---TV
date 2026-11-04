@@ -221,6 +221,14 @@ final class Ring {
     }
     private JSONObject meta() throws Exception { return new JSONObject().put("api_version", 11).put("device_model", "TopShelf"); }
 
+    /** a one-time ticket for Ring's live-video signalling (see Doorbell's live view) */
+    String liveTicket() throws Exception {
+        JSONObject o = api("POST", "https://app.ring.com/api/v1/clients/signalling/ticket", new JSONObject());
+        String t = o.optString("ticket");
+        if (t.isEmpty()) throw new Exception("no ticket");
+        return t;
+    }
+
     /* The picture of whoever rang. First the one Ring attached to the ring (when it attaches one: it can take a
        few seconds to be ready); otherwise the doorbell is asked for a fresh picture and TopShelf waits for one taken
        after the bell was pressed (as ring-client-api does). A battery doorbell takes it only with "Snapshot capture"

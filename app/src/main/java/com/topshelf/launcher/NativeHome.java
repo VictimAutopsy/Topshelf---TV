@@ -2076,7 +2076,7 @@ final class NativeHome extends FrameLayout {
         NativePlayer np = act.nativePlayer();
         if (np != null && !np.paused() && !doorbellPaused) { np.setPaused(true); doorbellPaused = true; }
         if (doorbellView == null) { doorbellView = new Doorbell(this); addView(doorbellView, new LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.MATCH_PARENT)); }
-        doorbellView.show(device, new Runnable() { @Override public void run() {
+        doorbellView.show(device, deviceId, new Runnable() { @Override public void run() {
             NativePlayer p = act.nativePlayer();
             if (doorbellPaused && p != null) p.setPaused(false);
             doorbellPaused = false;
