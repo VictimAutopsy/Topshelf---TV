@@ -645,6 +645,8 @@ public class Bridge {
     }
     @JavascriptInterface public boolean nhAvailable() { return act.nativeHomeWanted(); }
     /** native | overlay | web — who draws Home right now */
+    /** a video is playing in the app (or was a moment ago): the page's screensaver stays away */
+    @JavascriptInterface public boolean videoBusy() { return MainActivity.videoRecently(); }
     @JavascriptInterface public void nhState(final String state) { nh(new Runnable() { @Override public void run() { act.setHomeOwner(state); } }); }
     /** where TopShelf is, for the score ticker and alerts: away, home, live, quiet ("" without the app's Home) */
     @JavascriptInterface public String nhWhere() { try { NativeHome h = act.nativeHome(); return h == null ? "" : h.tickerWhere(); } catch (Throwable t) { return ""; } }

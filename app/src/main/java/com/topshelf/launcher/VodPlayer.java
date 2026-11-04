@@ -530,6 +530,22 @@ final class VodPlayer extends FrameLayout {
         removeCallbacks(tick); postDelayed(tick, 500);
     }
 
+    /* While a movie or episode plays, nothing of Home may show: the picture is on its own plane *under* the app's
+       window, so any of Home's views that comes back (the screensaver's photos once came up over a playing show,
+       with only its subtitles still on top) hides the video completely. Twice a second, anything of Home that has
+       come back is put away again (and back as it was when the player closes), and the report says what it was. */
+    private int strayLogs;
+    private void keepHomeAway() {
+        if (!shownNow()) return;
+        for (int i = 0; i < h.getChildCount(); i++) {
+            View v = h.getChildAt(i);
+            if (v == this || h.overlay(v) || v.getVisibility() != VISIBLE) continue;
+            if (!hidden.containsKey(v)) hidden.put(v, VISIBLE);
+            v.setVisibility(INVISIBLE);
+            if (strayLogs++ < 6) Diag.ev("vod: put away " + v.getClass().getSimpleName() + " that came up over the video (" + h.screenWhy() + ")");
+        }
+    }
+
     /** some addons ask for particular request headers for their links */
     private static java.util.Map<String, String> streamHeaders(JSONObject s) {
         java.util.Map<String, String> m = new HashMap<>();
@@ -621,6 +637,7 @@ final class VodPlayer extends FrameLayout {
     }
     private final Runnable saveTick = new Runnable() { @Override public void run() { save(); postDelayed(this, 10000); } };
     private final Runnable tick = new Runnable() { @Override public void run() {
+        keepHomeAway();
         if (bar.getAlpha() > .05f) ctl.invalidate();
         checkSkip();
         checkUpNext();

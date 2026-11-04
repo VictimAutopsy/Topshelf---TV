@@ -172,6 +172,7 @@ setInterval(() => {
   const m = saverMinutes();
   if (!m || saverOn() || document.hidden) return;
   if (!['grid', 'vod', 'live', 'top', 'sports'].includes(mode)) return;             // never over video, menus, settings or typing
+  try { if (B.videoBusy && B.videoBusy()) { IDLE.last = Date.now(); return; } } catch (e) {}   // (nor over the app's own player)
   if (Date.now() - IDLE.last > m * 60000) startSaver();
 }, 10000);
 // any input wakes it (and is swallowed, so the first press doesn't also do something)

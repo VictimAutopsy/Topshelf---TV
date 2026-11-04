@@ -2272,6 +2272,8 @@ final class NativeHome extends FrameLayout {
     void vodEvent(int id, String ev, String data) { if (vodPlayer != null) vodPlayer.event(id, ev, data); }
     private boolean titleOpenNow() { return titleView != null && titleView.shownNow(); }
     boolean vodPlayingNow() { return vodPlayer != null && vodPlayer.shownNow(); }
+    /** for the report: Home's state in a few words */
+    String screenWhy() { return "tab " + tab + ", mode " + mode + ", owner " + owner + (saver ? ", screensaver on" : "") + ", rest " + rest; }
 
     // ================================================================== Settings › Addons (a full-screen window)
     private AddonsView addonsView;
@@ -2746,6 +2748,7 @@ final class NativeHome extends FrameLayout {
     // ---- photo mode & screensaver
 
     private void enterShelf() {
+        if (vodPlayingNow()) return;          // (never over a movie or show)
         if (onVod()) showTab("home");
         if (photos.length() == 0 || photo[layer].getDrawable() == null) { toast("No photos loaded yet — see Settings"); return; }
         mode = "shelf";
