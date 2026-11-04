@@ -10,11 +10,21 @@ APK on his phone. He tests changes on the TV and sends "running reports" (diagno
   (diagnostic reports and screenshots the TV uploads), and `signing/` (the signing key and its password).
   Clone it next to this one: `../topshelf-updates`.
 
+## One copy of the code (always)
+
+GitHub is the only real copy. Several chats work on TopShelf, and an older chat may still have its own stale copy.
+- **Before changing anything:** `git pull --rebase origin main` here, and `git -C ../topshelf-updates pull --rebase`
+  (or clone both fresh). Never build from a copy that isn't up to date with GitHub.
+- **Before building:** pull again (another chat may have pushed meanwhile), merge, and build from that.
+- `tools/publish-update.sh` refuses to publish when the source has uncommitted changes, isn't pushed, is behind
+  GitHub, or when the version isn't newer than the published one. Don't work around it: pull, rebuild, push, publish.
+
 ## Build and publish
 
 1. Get an `android.jar` for API 34 (for example `android-34/android.jar` from github.com/Sable/android-platforms).
 2. Tools: `sudo apt install aapt dalvik-exchange zipalign apksigner openjdk-17-jdk` (and node, for the JS check).
-3. Find the last published version: `"code"` in `../topshelf-updates/latest.json`. Use the next number.
+3. Pull both repositories, then find the last published version: `"code"` in `../topshelf-updates/latest.json`.
+   Use the next number.
 4. Build: `bash build-local.sh /path/to/android.jar <nextCode>`. It finds the key in `../topshelf-updates/signing/`.
 5. Commit and push the source here, then publish: `tools/publish-update.sh "what's new, in plain words"`
    (copies the APK and `latest.json` into the updates repository and pushes it; the TV offers the update).
