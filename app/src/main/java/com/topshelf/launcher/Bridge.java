@@ -735,7 +735,7 @@ public class Bridge {
     @JavascriptInterface public String ringStatus() { return act.ring == null ? "{}" : act.ring.status().toString(); }
     @JavascriptInterface public void ringSetup() { nh(new Runnable() { @Override public void run() { act.nativeHome().setupShow("ring"); } }); }
     @JavascriptInterface public void ringDisconnect() { if (act.ring != null) act.ring.disconnect(); }
-    @JavascriptInterface public void ringTest() { nh(new Runnable() { @Override public void run() { act.nativeHome().doorbell("Front Door", "", "test-" + System.currentTimeMillis()); } }); }
+    @JavascriptInterface public void ringTest() { nh(new Runnable() { @Override public void run() { String id = act.ring == null ? "" : act.ring.idFor("Front Door"); act.nativeHome().doorbell("Front Door", "", "test-" + System.currentTimeMillis(), id); } }); }
     @JavascriptInterface public int cwCount() { try { return Progress.continueCount(act); } catch (Throwable t) { return 0; } }
     @JavascriptInterface public void cwClear() { try { Progress.hideAll(act); } catch (Throwable ignored) { } }
     @JavascriptInterface public void nhLiveGroups() { nh(new Runnable() { @Override public void run() { act.nativeHome().liveChanged(true); } }); }

@@ -105,8 +105,8 @@ public class MainActivity extends Activity {
         // the Ring doorbell (Settings › Ring doorbell): a press shows its picture over whatever's playing
         if (isTv()) {
             ring = new Ring(this);
-            ring.listener = new Ring.Listener() { @Override public void ding(final String device, final String snap, final String id) {
-                runOnUiThread(new Runnable() { @Override public void run() { NativeHome h = nativeHome(); if (h != null) h.doorbell(device, snap, id); } });
+            ring.listener = new Ring.Listener() { @Override public void ding(final String device, final String snap, final String id, final String devId) {
+                runOnUiThread(new Runnable() { @Override public void run() { NativeHome h = nativeHome(); if (h != null) h.doorbell(device, snap, id, devId); } });
             } };
             ring.start();
         }

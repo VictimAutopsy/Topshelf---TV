@@ -60,7 +60,7 @@ final class Ring {
     private static final String VAPID = "BDOU99-h67HcA6JeFXHbSNMu7e2yNNu3RzoMj8TM4W88jITfq7ZmPvIM1Iv-4_l2LxQcYwhqby2xGpWwzjfAnG4";
     private static final String DING = "com.ring.pn.live-event.ding";
 
-    interface Listener { void ding(String device, String snapshotUuid, String dingId); }
+    interface Listener { void ding(String device, String snapshotUuid, String dingId, String deviceId); }
 
     private final MainActivity act;
     private final SharedPreferences prefs;
@@ -85,6 +85,12 @@ final class Ring {
             if (d.length() > 0) o.put("name", d.optJSONObject(0).optString("name"));
         } catch (Exception ignored) { }
         return o;
+    }
+    /** a doorbell's id by its name (or the only one there is) */
+    String idFor(String name) {
+        JSONArray a = devices();
+        for (int i = 0; i < a.length(); i++) if (a.optJSONObject(i) != null && a.optJSONObject(i).optString("name").equalsIgnoreCase(name)) return a.optJSONObject(i).optString("id");
+        return a.length() == 1 && a.optJSONObject(0) != null ? a.optJSONObject(0).optString("id") : "";
     }
     JSONArray devices() { try { return new JSONArray(prefs.getString(P + "devices", "[]")); } catch (Exception e) { return new JSONArray(); } }
     void disconnect() {
@@ -215,19 +221,52 @@ final class Ring {
     }
     private JSONObject meta() throws Exception { return new JSONObject().put("api_version", 11).put("device_model", "TopShelf"); }
 
-    /** the picture Ring took when the bell was pressed (it can take a few seconds to be ready) */
-    byte[] snapshot(String uuid) {
-        if (uuid == null || uuid.isEmpty()) return null;
-        String u = uuid.replaceAll(":\\d+$", "");     // (ring-client-api: "uuid:1234" → "uuid")
-        for (int i = 0; i < 8; i++) {
-            try {
-                HttpURLConnection c = open("https://api.ring.com/clients_api/snapshots/uuid?uuid=" + URLEncoder.encode(u, "UTF-8"), "GET");
-                c.setRequestProperty("authorization", "Bearer " + auth());
-                c.setRequestProperty("Accept", "image/jpeg");
-                if (c.getResponseCode() == 200) { byte[] d = readAll(c.getInputStream()); if (d.length > 1000) return d; }
-            } catch (Throwable ignored) { }
-            try { Thread.sleep(1500); } catch (InterruptedException e) { return null; }
+    /* The picture of whoever rang. First the one Ring attached to the ring (when it attaches one: it can take a
+       few seconds to be ready); otherwise the doorbell is asked for a fresh picture and TopShelf waits for one taken
+       after the bell was pressed (as ring-client-api does). A battery doorbell takes it only with "Snapshot capture"
+       on in the Ring app. Every step goes in the report. */
+    byte[] snapshot(String uuid, String deviceId, long rangAt) {
+        String why = "";
+        if (uuid != null && !uuid.isEmpty()) {
+            String u = uuid.replaceAll(":\\d+$", "");     // (ring-client-api: "uuid:1234" → "uuid")
+            int last = 0;
+            for (int i = 0; i < 6; i++) {
+                try {
+                    HttpURLConnection c = open("https://api.ring.com/clients_api/snapshots/uuid?uuid=" + URLEncoder.encode(u, "UTF-8"), "GET");
+                    c.setRequestProperty("authorization", "Bearer " + auth());
+                    c.setRequestProperty("Accept", "image/jpeg");
+                    last = c.getResponseCode();
+                    if (last == 200) { byte[] d = readAll(c.getInputStream()); if (d.length > 1000) { Diag.ev("ring: the ring's picture (" + d.length / 1024 + " KB)"); return d; } last = -d.length; }
+                } catch (Throwable t) { last = -1; }
+                try { Thread.sleep(1500); } catch (InterruptedException e) { return null; }
+            }
+            why = "the ring's picture didn't come (" + (last == -1 ? "no answer" : last < 0 ? "empty" : "HTTP " + last) + ")";
+            Diag.ev("ring: " + why);
         }
+        if (deviceId == null || deviceId.isEmpty()) return null;
+        try {
+            JSONObject ids = new JSONObject().put("doorbot_ids", new JSONArray().put(Long.parseLong(deviceId)));
+            try { api("PUT", "https://api.ring.com/clients_api/snapshots/update_all", new JSONObject(ids.toString()).put("refresh", true)); }
+            catch (Throwable t) { Diag.ev("ring: asking for a fresh picture didn't work (" + t.getMessage() + ")"); }
+            long newest = 0;
+            for (int i = 0; i < 12; i++) {
+                try { Thread.sleep(1500); } catch (InterruptedException e) { return null; }
+                JSONObject ts = api("POST", "https://api.ring.com/clients_api/snapshots/timestamps", ids);
+                JSONArray a = ts.optJSONArray("timestamps");
+                if (a != null) for (int k = 0; k < a.length(); k++) newest = Math.max(newest, a.optJSONObject(k) == null ? 0 : a.optJSONObject(k).optLong("timestamp"));
+                if (newest >= rangAt - 10000) break;
+            }
+            if (newest < rangAt - 10000) {
+                Diag.ev("ring: no fresh picture from the doorbell (newest " + (newest == 0 ? "none" : (System.currentTimeMillis() - newest) / 60000 + " min old") + ") · is Snapshot capture on in the Ring app?");
+                return null;
+            }
+            HttpURLConnection c = open("https://api.ring.com/clients_api/snapshots/image/" + deviceId, "GET");
+            c.setRequestProperty("authorization", "Bearer " + auth());
+            c.setRequestProperty("Accept", "image/jpeg");
+            int st = c.getResponseCode();
+            if (st == 200) { byte[] d = readAll(c.getInputStream()); if (d.length > 1000) { Diag.ev("ring: a fresh picture from the doorbell (" + d.length / 1024 + " KB)"); return d; } }
+            Diag.ev("ring: the fresh picture didn't come (HTTP " + st + ")");
+        } catch (Throwable t) { Diag.ev("ring: the fresh picture didn't come (" + t.getMessage() + ")"); }
         return null;
     }
 
@@ -461,9 +500,11 @@ final class Ring {
             synchronized (seenDings) { if (!seenDings.add(dingId)) return; }
             String name = dev == null ? "Doorbell" : dev.optString("name", "Doorbell");
             String snap = img.optString("snapshot_uuid");
-            Diag.ev("ring: the doorbell (" + name + ")");
+            String devId = dev == null ? "" : dev.optString("id");
+            if (devId.isEmpty()) devId = idFor(name);
+            Diag.ev("ring: the doorbell (" + name + ") · " + (snap.isEmpty() ? "no picture attached" : "picture attached") + (devId.isEmpty() ? " · no device id" : ""));
             Listener l = listener;
-            if (l != null) l.ding(name, snap, dingId);
+            if (l != null) l.ding(name, snap, dingId, devId);
         } catch (Throwable t) { Diag.ev("ring: a message couldn't be read (" + t.getMessage() + ")"); }
     }
     private static JSONObject obj(Object o) {

@@ -1183,7 +1183,7 @@ function buildAllSettings() {
     ...(IS_TV && B.ringStatus ? [{ label: 'Ring doorbell', value: () => { try { const r = JSON.parse(B.ringStatus()); return r.connected ? (r.listening ? 'On' : 'Connecting') + (r.name ? ' · ' + r.name : '') : r.state || 'Not connected'; } catch (e) { return ''; } },
       chevron: true, ok: () => { let r = {}; try { r = JSON.parse(B.ringStatus()); } catch (e) {}
         if (!r.connected) { B.ringSetup(); return; }
-        showMenu([['play', 'Try it (shows the doorbell card)', () => B.ringTest()],
+        showMenu([['play', 'Try it (the doorbell card, with a fresh picture)', () => B.ringTest()],
                   ['tv', 'Sign in again (new QR code)', () => B.ringSetup()],
                   ['hide', 'Disconnect Ring', () => { B.ringDisconnect(); refreshSettings(); toast('Ring disconnected'); }]], null, 'Ring doorbell'); } }] : []),
     ...(IS_TV && B.cwClear ? [{ label: 'Continue watching', value: () => { const n = B.cwCount(); return n ? `${n} title${n === 1 ? '' : 's'} · OK to clear` : 'Empty'; },

@@ -2068,7 +2068,8 @@ final class NativeHome extends FrameLayout {
        carries on playing. */
     private Doorbell doorbellView;
     private boolean doorbellPaused;
-    void doorbell(String device, final String snapshot, String dingId) {
+    void doorbell(String device, final String snapshot, String dingId, final String deviceId) {
+        final long rangAt = System.currentTimeMillis();
         if (!built) return;
         if (!MainActivity.inFront) act.bringToFront();
         if (saver) stopSaver();
@@ -2081,10 +2082,10 @@ final class NativeHome extends FrameLayout {
             doorbellPaused = false;
         } });
         Diag.ev("doorbell shown" + (doorbellPaused ? " · playback paused" : ""));
-        if (snapshot == null || snapshot.isEmpty() || act.ring == null) { doorbellView.picture(null); return; }
+        if ((snapshot == null || snapshot.isEmpty()) && (deviceId == null || deviceId.isEmpty()) || act.ring == null) { doorbellView.picture(null); return; }
         final Doorbell dv = doorbellView;
         new Thread(new Runnable() { @Override public void run() {
-            byte[] d = act.ring.snapshot(snapshot);
+            byte[] d = act.ring.snapshot(snapshot, deviceId, rangAt);
             final Bitmap b = d == null ? null : HomeImages.decode(d, 1280, 720);
             main.post(new Runnable() { @Override public void run() { dv.picture(b); } });
         } }, "doorbell").start();
