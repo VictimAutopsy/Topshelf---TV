@@ -73,6 +73,7 @@ final class Billboard extends FrameLayout {
     private final ImageView[] bg = new ImageView[2];
     private int bgLayer;
     private final FrameLayout teamArt, fightArt, trHost;
+    private final AmbientBars ambient;
     private TrailerPlayer trailer;
     private boolean trOn;
     private int trFor = -1;
@@ -134,6 +135,8 @@ final class Billboard extends FrameLayout {
         trHost = new FrameLayout(getContext());
         trHost.setAlpha(0f);
         addView(trHost, new LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.MATCH_PARENT));
+        // ambient light over a widescreen trailer's black bars (see AmbientBars), riding with the trailer
+        ambient = new AmbientBars(getContext());
         // the shade that keeps the words readable: from the left, and from the bottom
         View sl = new View(getContext());
         sl.setBackground(new GradientDrawable(GradientDrawable.Orientation.LEFT_RIGHT, new int[] { 0xF0000000, 0xB3000000, 0x40000000, 0x00000000 }));
@@ -388,11 +391,17 @@ final class Billboard extends FrameLayout {
                 if (!trOn) trStartAt = System.currentTimeMillis();
                 trOn = true;
                 trHost.animate().alpha(1f).setDuration(700).start();
+                // (on top of the trailer's picture, inside the same frame so it fades with it)
+                if (ambient.getParent() != trHost) { if (ambient.getParent() != null) ((android.view.ViewGroup) ambient.getParent()).removeView(ambient); trHost.addView(ambient, new LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.MATCH_PARENT)); }
+                ambient.bringToFront();
+                final TrailerPlayer tp = trailer;
+                ambient.start(new AmbientBars.Source() { @Override public android.view.TextureView texture() { return tp == null ? null : tp.texture(); } });
             }
             @Override public void ended() {
                 if (g != gen) return;
                 boolean played = trOn;
                 trOn = false; trLoading = false;
+                ambient.stop();
                 trHost.animate().alpha(0f).setDuration(500).start();
                 if (played) slideStart = System.currentTimeMillis() - (SLIDE_MS - 2500);     // (the next one, a moment after; a trailer that never started leaves the slide its usual time)
             }
@@ -401,6 +410,7 @@ final class Billboard extends FrameLayout {
     private void stopTrailer() {
         if (trailer != null && trailer.playing()) trailer.stop();
         trOn = false; trLoading = false;
+        ambient.stop();
         trHost.animate().cancel(); trHost.setAlpha(0f);
     }
 

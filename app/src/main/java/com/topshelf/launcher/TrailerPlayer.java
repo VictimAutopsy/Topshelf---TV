@@ -408,6 +408,8 @@ final class TrailerPlayer {
         p.setPlayWhenReady(true);
     }
 
+    /** the trailer's picture while it plays in TopShelf's own player (null in YouTube's web player) */
+    android.view.TextureView texture() { return direct ? tv : null; }
     /** the picture fills its frame (cropped at the sides or top and bottom, never stretched) */
     private void crop() {
         if (tv == null || vw <= 0 || vh <= 0) return;
