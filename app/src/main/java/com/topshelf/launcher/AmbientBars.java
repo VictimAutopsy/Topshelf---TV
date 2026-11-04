@@ -3,46 +3,41 @@ package com.topshelf.launcher;
 import android.content.Context;
 import android.graphics.Bitmap;
 import android.graphics.Canvas;
-import android.graphics.Color;
 import android.graphics.LinearGradient;
 import android.graphics.Matrix;
 import android.graphics.Paint;
 import android.graphics.PorterDuff;
 import android.graphics.PorterDuffXfermode;
-import android.graphics.RadialGradient;
 import android.graphics.Shader;
 import android.view.TextureView;
 import android.view.View;
 
 /**
- * Ambient light over a trailer's black bars (Featured), the way a Philips Hue or Govee TV light strip works.
- * Many trailers are widescreen films inside a 16:9 video, so black bands sit above and below the picture.
- * Up to 30 times a second (with the screen's refresh) a tiny copy of the frame (40×270) is read; rows that stay black across a couple of
- * seconds are the bars (a dark scene isn't mistaken for them: the bars must be in every frame, top and bottom
- * alike). Along each edge of the picture sit ten "lights", one per zone: each takes the colour of the picture's
- * outermost rows in its zone (a little richer, as the light strips make it) and glows out into the bar as a soft
- * pool of light, fading towards the screen's edge and blending into its neighbours. They follow the film closely:
- * a very short ease from frame to frame, an instant change at any clear change of scene.
+ * Ambient light over a trailer's black bars (Featured). Many trailers are widescreen films inside a 16:9 video,
+ * so black bands sit above and below the picture. Up to 30 times a second (with the screen's refresh) a tiny copy
+ * of the frame (40×270) is read; rows that stay black across a couple of seconds are the bars (a dark scene isn't
+ * mistaken for them: the bars must be in every frame, top and bottom alike). Like a Hue or Govee TV kit, only the
+ * picture's edges are read: the few rows touching each bar, in 20 zones across. Their colours spill out over the bar,
+ * fading to dark towards the screen's edge, and follow the film closely: a very short ease from frame to frame, an
+ * instant change at any clear change of scene.
  */
 final class AmbientBars extends View {
     interface Source { TextureView texture(); }
-    private static final int SW = 40, SH = 270, ZONES = 10;     // (a sample row is ~4 px of a 1080p picture)
+    private static final int SW = 40, SH = 270, ZONES = 20;     // (a sample row is ~4 px of a 1080p picture)
     private Source src;
     private final Bitmap sample = Bitmap.createBitmap(SW, SH, Bitmap.Config.ARGB_8888);
     private final int[] px = new int[SW * SH];
     private final int[] hist = new int[48]; private int histN, histI;       // recent {top, bottom} bar rows, in pairs (~2 s)
     private float top, bot, topT, botT;                                       // bars as fractions of the height (shown, wanted)
     private final float[] cTop = new float[ZONES * 3], cBot = new float[ZONES * 3], cTopT = new float[ZONES * 3], cBotT = new float[ZONES * 3];
-    private final Paint glow = new Paint(Paint.ANTI_ALIAS_FLAG), mask = new Paint(), black = new Paint();
+    private final int[] gTop = new int[ZONES], gBot = new int[ZONES];
+    private final Paint p = new Paint(Paint.ANTI_ALIAS_FLAG), shade = new Paint(), fade = new Paint();
     private final Matrix m = new Matrix();
-    private final float[] hsv = new float[3];
     private boolean on, logged;
 
     AmbientBars(Context c) {
         super(c); setWillNotDraw(false);
-        glow.setXfermode(new PorterDuffXfermode(PorterDuff.Mode.SCREEN));      // (overlapping lights mix as light does)
-        mask.setXfermode(new PorterDuffXfermode(PorterDuff.Mode.DST_IN));
-        black.setColor(Color.BLACK);
+        fade.setXfermode(new PorterDuffXfermode(PorterDuff.Mode.DST_IN));
     }
 
     void start(Source s) {
@@ -135,42 +130,29 @@ final class AmbientBars extends View {
         }
         int w = getWidth(), h = getHeight();
         float th = top * h, bh = bot * h, over = h * .012f;      // (over: ~13 px into the picture, so no line where they meet)
-        if (th > 1) band(c, w, 0, th, cTop, true, over);
-        if (bh > 1) band(c, w, h - bh, h, cBot, false, over);
+        if (th > 1) band(c, w, 0, th, cTop, gTop, true, over);
+        if (bh > 1) band(c, w, h - bh, h, cBot, gBot, false, over);
         if (moving) postInvalidateOnAnimation();
     }
-
-    /** one bar: a light per zone on the picture's edge, glowing out into the bar */
-    private void band(Canvas c, int w, float y0, float y1, float[] col, boolean above, float over) {
-        float edgeY = above ? y1 : y0, depth = y1 - y0;
-        float l0 = above ? y0 : y0 - over, l1 = above ? y1 + over : y1;
-        int sc = c.saveLayer(0, l0, w, l1, null);
-        c.drawRect(0, l0, w, l1, black);
-        float zw = w / (float) ZONES, rx = zw * 1.05f, ry = depth * 1.35f;
-        for (int k = 0; k < ZONES; k++) {
-            int lc = light(col[k * 3], col[k * 3 + 1], col[k * 3 + 2]);
-            float cx = (k + .5f) * zw;
-            glow.setShader(new RadialGradient(cx, edgeY, rx, new int[] { lc, (lc & 0x00FFFFFF) | 0xA6000000, (lc & 0x00FFFFFF) | 0x38000000, lc & 0x00FFFFFF },
-                    new float[] { 0f, .35f, .7f, 1f }, Shader.TileMode.CLAMP));
-            c.save();
-            c.scale(1f, ry / rx, cx, edgeY);                      // (a wide, shallow pool of light)
-            c.drawCircle(cx, edgeY, rx, glow);
-            c.restore();
+    /** one bar: the edge's colours across it, fading to dark away from the picture */
+    private void band(Canvas c, int w, float y0, float y1, float[] col, int[] g, boolean above, float over) {
+        for (int i = 0; i < ZONES; i++) {
+            // (a little lifted and softened: light, not a copy of the picture)
+            g[i] = 0xFF000000 | (clamp(col[i * 3] * .85f + 8) << 16) | (clamp(col[i * 3 + 1] * .85f + 8) << 8) | clamp(col[i * 3 + 2] * .85f + 8);
         }
-        glow.setShader(null);
-        // the light is kept to the bar, and fades out over the first few pixels of the picture
-        float a = above ? l0 : l1, b = above ? l1 : l0, cut = depth / (depth + over);
-        mask.setShader(new LinearGradient(0, a, 0, b, new int[] { 0xFF000000, 0xFF000000, 0xE6000000, 0x00000000 }, new float[] { 0f, cut, cut, 1f }, Shader.TileMode.CLAMP));
-        c.drawRect(0, l0, w, l1, mask);
-        mask.setShader(null);
+        p.setShader(new LinearGradient(0, 0, w, 0, g, null, Shader.TileMode.CLAMP));
+        c.drawRect(0, y0, w, y1, p);
+        shade.setShader(new LinearGradient(0, above ? y1 : y0, 0, above ? y0 : y1, 0x14000000, 0xF2000000, Shader.TileMode.CLAMP));
+        c.drawRect(0, y0, w, y1, shade);
+        shade.setShader(null);
+        // past the bar: the same light, fading out over the edge of the picture (no hard line where they meet)
+        float e0 = above ? y1 : y0 - over, e1 = above ? y1 + over : y0;
+        int sc = c.saveLayer(0, e0, w, e1, null);
+        c.drawRect(0, e0, w, e1, p);
+        fade.setShader(new LinearGradient(0, above ? y1 : y0, 0, above ? y1 + over : y0 - over, 0xEB000000, 0x00000000, Shader.TileMode.CLAMP));
+        c.drawRect(0, e0, w, e1, fade);
         c.restoreToCount(sc);
-    }
-    /** a zone's light: its colour made a little richer (as light strips do), a dark zone stays dark */
-    private int light(float r, float g, float b) {
-        Color.RGBToHSV(clamp(r), clamp(g), clamp(b), hsv);
-        hsv[1] = Math.min(1f, hsv[1] * 1.25f);
-        hsv[2] = Math.min(1f, hsv[2] * 1.1f);
-        return Color.HSVToColor(255, hsv);
+        p.setShader(null);
     }
     private static int clamp(float v) { return Math.max(0, Math.min(255, Math.round(v))); }
 }
