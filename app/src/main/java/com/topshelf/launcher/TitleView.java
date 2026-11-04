@@ -112,7 +112,7 @@ final class TitleView extends FrameLayout {
         if (yt.isEmpty()) { if (full == null && trTries++ < 6) postDelayed(trLater, 1500); return; }    // (the details may name it)
         if (tp == null) tp = new TrailerPlayer(h.act);
         final int g = gen;
-        tp.play(trHost, yt, !h.S.optBoolean("trailerSound", false), 1080, new TrailerPlayer.Listener() {
+        tp.tail(h.S.optInt("trailerTail", 10)).play(trHost, yt, !h.S.optBoolean("trailerSound", false), 1080, new TrailerPlayer.Listener() {
             @Override public void playing() { if (g == gen) trailerEnter(); }
             @Override public void ended() { if (g == gen) { trEndedOnce = true; trailerExit(); } }
         });

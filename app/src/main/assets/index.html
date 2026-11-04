@@ -1141,6 +1141,10 @@ function buildAllSettings() {
     { label: 'Trailer starts after', value: () => (S.trailerDelay || 5) + ' seconds',
       cycle: d => { const o = [2, 3, 5, 8, 12]; const i = o.indexOf(S.trailerDelay || 5); S.trailerDelay = o[((i < 0 ? 2 : i) + (d < 0 ? -1 : 1) + o.length) % o.length]; save(); } },
     { label: 'Trailer sound', value: () => S.trailerSound ? 'On' : 'Off', cycle: () => { S.trailerSound = !S.trailerSound; save(); } },
+    /* YouTube trailers that run on into the channel's outro: stopped where SponsorBlock says it starts, or this many
+       seconds before the end when nobody has marked it (Apple TV's trailers have no outro). */
+    { label: 'Trailer outro', value: () => { const t = typeof S.trailerTail === 'number' ? S.trailerTail : 10; return t ? 'Skip marked outro, else last ' + t + ' s' : 'Skip marked outro only'; },
+      cycle: d => { const o = [0, 5, 10, 15, 20]; const t = typeof S.trailerTail === 'number' ? S.trailerTail : 10; const i = o.indexOf(t); S.trailerTail = o[((i < 0 ? 2 : i) + (d < 0 ? -1 : 1) + o.length) % o.length]; save(); } },
     { label: 'Subtitle size', value: () => ({ s: 'Small', m: 'Medium', l: 'Large', xl: 'Extra large' })[S.subSize || 'm'],
       cycle: d => { S.subSize = step([['s'], ['m'], ['l'], ['xl']], S.subSize || 'm', d); save(); } },
     { label: 'Subtitle background', value: () => S.subBg === 'shadow' ? 'Shadow only' : 'Dark box', cycle: () => { S.subBg = S.subBg === 'shadow' ? 'box' : 'shadow'; save(); } },
@@ -1307,7 +1311,7 @@ const SET_SECTIONS = [
   { name: 'Movies & TV', about: 'Look, where titles come from, trailers and playback', groups: [
     ['Look', ['Movies & TV look', 'Movie & TV poster URL']],
     ['Sources', ['Addons', 'Trakt', /^TMDB key/]],
-    ['Trailers', ['Trailer previews', 'Trailer starts after', 'Header trailer', 'Trailer sound']],
+    ['Trailers', ['Trailer previews', 'Trailer starts after', 'Header trailer', 'Trailer sound', 'Trailer outro']],
     ['Playback', ['Continue watching', 'Next episode', 'Subtitle size', 'Subtitle background', 'Match frame rate']] ] },
   { name: 'Live TV', about: 'Your service, watching, channels and recordings', groups: [
     ['Your service', ['Live TV playlist', 'Xtream login', 'Live TV guide (EPG)', 'Refresh Live TV']],

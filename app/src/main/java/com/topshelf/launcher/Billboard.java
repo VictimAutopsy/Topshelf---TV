@@ -368,18 +368,20 @@ final class Billboard extends FrameLayout {
         backdrop(s, g);
         markSeen(s);
         prefetch((i + 1) % deck.size());
-        if (trWanted(s)) { if (trailer == null) trailer = new TrailerPlayer(h.act); trailer.prefetch(s.m.optString("yt"), 1080, trMuted()); }
+        if (trWanted(s)) { if (trailer == null) trailer = new TrailerPlayer(h.act); trailer.prefetchTitle(s.m, 1080, trMuted()); }
     }
     // ---- trailers
     private boolean trMuted() { return !h.S.optBoolean("trailerSound", false); }
     private boolean trWanted(Slide s) {
-        return s != null && s.m != null && !s.kind.equals("game") && !s.m.optString("yt").isEmpty() && !"off".equals(h.S.optString("trailers", "card"));
+        // (a title with no YouTube trailer may still have Apple's)
+        return s != null && s.m != null && !s.kind.equals("game") && !"off".equals(h.S.optString("trailers", "card"))
+                && (!s.m.optString("yt").isEmpty() || s.m.optString("id").startsWith("tt") && !"".equals(AppleTrailers.cached(s.m.optString("id"))));
     }
     private void startTrailer(Slide s) {
         trFor = gen; trAskAt = System.currentTimeMillis(); trLoading = true;
         final int g = gen;
         if (trailer == null) trailer = new TrailerPlayer(h.act);
-        trailer.play(trHost, s.m.optString("yt"), trMuted(), 1080, new TrailerPlayer.Listener() {
+        trailer.tail(h.S.optInt("trailerTail", 10)).playTitle(trHost, s.m, trMuted(), 1080, new TrailerPlayer.Listener() {
             @Override public void playing() {
                 if (g != gen || !shown) return;
                 trLoading = false;
@@ -389,9 +391,10 @@ final class Billboard extends FrameLayout {
             }
             @Override public void ended() {
                 if (g != gen) return;
+                boolean played = trOn;
                 trOn = false; trLoading = false;
                 trHost.animate().alpha(0f).setDuration(500).start();
-                slideStart = System.currentTimeMillis() - (SLIDE_MS - 2500);     // (the next one, a moment after)
+                if (played) slideStart = System.currentTimeMillis() - (SLIDE_MS - 2500);     // (the next one, a moment after; a trailer that never started leaves the slide its usual time)
             }
         });
     }

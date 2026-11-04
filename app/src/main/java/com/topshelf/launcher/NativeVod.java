@@ -1321,7 +1321,7 @@ final class NativeVod extends FrameLayout {
     private float trW() { return rows.get(r).kind.equals("wide") ? WW : XW; }
     private float trH() { return rows.get(r).kind.equals("wide") ? WH : PH; }
     private float trShift() { Row x = rows.get(r); return x.kind.equals("wide") ? 0 : XW - PW; }
-    private TrailerPlayer player() { if (trailer == null) trailer = new TrailerPlayer(h.act); return trailer; }
+    private TrailerPlayer player() { if (trailer == null) trailer = new TrailerPlayer(h.act); return trailer.tail(h.S.optInt("trailerTail", 10)); }
 
     /** back to plain posters (and no trailer) */
     private void collapse(boolean animate) {

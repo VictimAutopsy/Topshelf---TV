@@ -30,10 +30,14 @@ final class TrailerPlayer {
         "<!doctype html><html><head><meta name=viewport content='width=device-width,initial-scale=1'>" +
         "<style>html,body{margin:0;background:#000;overflow:hidden;height:100%}#p{position:absolute;inset:0}iframe{position:absolute;border:0;pointer-events:none}</style></head>" +
         "<body><div id=p></div><script>" +
-        "var P=null,want=null,muted=true,ready=false,gen=0,nlog=0;function L(m){if(nlog++<14)try{TS.ev(m)}catch(x){}}" +
+        "var P=null,want=null,muted=true,ready=false,gen=0,nlog=0,CUT=0,TAIL=0;function L(m){if(nlog++<14)try{TS.ev(m)}catch(x){}}" +
         "function size(){var f=document.querySelector('iframe');if(!f)return;var W=document.documentElement.clientWidth||innerWidth,H=document.documentElement.clientHeight||innerHeight;if(!W||!H)return;var s=Math.max(W/16,H/9)*1.42;" +
         " f.style.width=16*s+'px';f.style.height=9*s+'px';f.style.left=(W-16*s)/2+'px';f.style.top=(H-9*s)/2+'px';}" +
         "onresize=size;setInterval(function(){if(want)size();},700);" +
+        // (YouTube uploads often run on into a channel outro: the trailer counts as over where it starts, or TAIL s from the end)
+        "setInterval(function(){try{if(!want||!ready||!P||P.getPlayerState()!==1)return;var d=P.getDuration(),t=P.getCurrentTime(),c=CUT>0?CUT:(TAIL>0&&d>TAIL*4?d-TAIL:0);" +
+        " if(c>0&&t>=c){want=null;gen++;P.mute();P.pauseVideo();L('cut at '+Math.round(t)+' of '+Math.round(d)+' s');TS.ended();}}catch(x){}},300);" +
+        "function setCut(v,c){if(want===v)CUT=c;}" +
         "function make(v){P=new YT.Player('p',{host:'https://www.youtube-nocookie.com',videoId:v,width:innerWidth,height:innerHeight," +
         " playerVars:{autoplay:1,mute:1,controls:0,disablekb:1,fs:0,iv_load_policy:3,modestbranding:1,playsinline:1,rel:0,cc_load_policy:0,origin:location.origin}," +
         " events:{onReady:function(e){ready=true;L('ready');size();if(!want){e.target.pauseVideo();return;}if(want!==v)e.target.loadVideoById({videoId:want});if(muted)e.target.mute();else e.target.unMute();e.target.playVideo();" +
@@ -41,7 +45,7 @@ final class TrailerPlayer {
         "  onStateChange:function(e){L('state '+e.data);if(!want){if(e.data===1)e.target.pauseVideo();return;}if(e.data===1){size();var g=++gen;setTimeout(function(){if(want&&g===gen&&P.getPlayerState()===1){size();TS.playing();}},1300);}else if(e.data===0||e.data===2){gen++;TS.ended();}}," +
         "  onError:function(e){L('error '+e.data);TS.ended();}}});}" +
         "function onYouTubeIframeAPIReady(){if(want)make(want);}" +
-        "function play(v,m){want=v;muted=m;L('play '+(window.YT&&YT.Player?(P?(ready?'ready':'starting'):'new'):'no api yet'));if(!window.YT||!YT.Player)return;if(!P){make(v);return;}if(!ready)return;" +
+        "function play(v,m,c,t){want=v;muted=m;CUT=c||0;TAIL=t||0;L('play '+(window.YT&&YT.Player?(P?(ready?'ready':'starting'):'new'):'no api yet'));if(!window.YT||!YT.Player)return;if(!P){make(v);return;}if(!ready)return;" +
         " try{P.loadVideoById({videoId:v});if(m)P.mute();else P.unMute();}catch(e){}}" +
         "function stop(){want=null;try{if(P&&ready){P.mute();P.pauseVideo();}}catch(e){}}" +
         "</script><script src='https://www.youtube.com/iframe_api' onerror=\"L('api did not load')\"></script></body></html>";
@@ -94,6 +98,163 @@ final class TrailerPlayer {
     // ------------------------------------------------------------------ straight from YouTube (the app's own player)
 
     private static final java.util.concurrent.ExecutorService LOOKUP = java.util.concurrent.Executors.newSingleThreadExecutor();
+    private static final java.util.concurrent.ExecutorService SIDE = java.util.concurrent.Executors.newSingleThreadExecutor();   // (Apple and SponsorBlock: never queued behind a slow YouTube lookup)
+
+    // ------------------------------------------------------------------ where a YouTube trailer really ends
+    /* Many YouTube uploads run on past the trailer into the channel's outro (an end card, "subscribe", other
+       videos). SponsorBlock (a free shared list people mark these on) says where the outro starts when someone
+       has marked it; otherwise the last tailSec seconds are skipped (Settings → Trailer outro). Apple's
+       trailers have no outro, so none of this applies to them. */
+    private int tailSec = 10;
+    /** seconds cut from the end of YouTube trailers when SponsorBlock doesn't know the outro (0 = none) */
+    TrailerPlayer tail(int sec) { tailSec = Math.max(0, Math.min(60, sec)); return this; }
+    private static final java.util.Map<String, Long> outros = new java.util.concurrent.ConcurrentHashMap<>();   // id → outro start (ms), -1 = none marked
+    private long cutAt = -1;                 // the current YouTube trailer's outro start (ms), from SponsorBlock
+    private boolean endSent;                 // ended() already said for this trailer
+
+    private void outro(final String ytId) {
+        if (ytId == null || ytId.isEmpty()) return;
+        Long k = outros.get(ytId);
+        if (k != null) { if (ytId.equals(current)) setCut(ytId, k); return; }
+        outros.put(ytId, -2L);           // (asked; no answer yet)
+        SIDE.execute(new Runnable() { @Override public void run() {
+            long at = -1;
+            try {
+                java.net.HttpURLConnection c = (java.net.HttpURLConnection) new java.net.URL("https://sponsor.ajay.app/api/skipSegments?videoID="
+                        + java.net.URLEncoder.encode(ytId, "UTF-8") + "&categories=%5B%22outro%22%5D").openConnection();
+                c.setConnectTimeout(5000); c.setReadTimeout(6000);
+                c.setRequestProperty("User-Agent", "TopShelf");
+                if (c.getResponseCode() == 200) {
+                    java.io.InputStream in = c.getInputStream();
+                    java.io.ByteArrayOutputStream bo = new java.io.ByteArrayOutputStream(); byte[] b = new byte[4096]; int n;
+                    while ((n = in.read(b)) > 0 && bo.size() < 256 * 1024) bo.write(b, 0, n);
+                    in.close();
+                    org.json.JSONArray a = new org.json.JSONArray(new String(bo.toByteArray(), "UTF-8"));
+                    for (int i = 0; i < a.length(); i++) {
+                        org.json.JSONObject o = a.optJSONObject(i);
+                        org.json.JSONArray sg = o == null ? null : o.optJSONArray("segment");
+                        if (sg == null || sg.length() < 2 || !"outro".equals(o.optString("category"))) continue;
+                        double st = sg.optDouble(0), en = sg.optDouble(1), dur = o.optDouble("videoDuration", 0);
+                        // (an outro that runs to the end, after at least 20 s of trailer)
+                        if (st < 20 || dur > 0 && en < dur - 3) continue;
+                        long ms = Math.round(st * 1000);
+                        if (at < 0 || ms < at) at = ms;
+                    }
+                }
+                c.disconnect();
+            } catch (Throwable ignored) { }
+            final long got = at;
+            outros.put(ytId, got);
+            main.post(new Runnable() { @Override public void run() { if (ytId.equals(current)) setCut(ytId, got); } });
+        } });
+    }
+    private void setCut(String ytId, long ms) {
+        cutAt = ms >= 0 ? ms : -1;
+        if (cutAt > 0 && wv != null && loaded && !direct) wv.evaluateJavascript("setCut(" + org.json.JSONObject.quote(ytId) + "," + (cutAt / 1000.0) + ")", null);
+    }
+    /** a YouTube trailer playing in the app's own player stops where its outro starts */
+    private final Runnable tailWatch = new Runnable() { @Override public void run() {
+        if (!direct || apple || exo == null || endSent) return;
+        main.postDelayed(this, 250);
+        if (!framed) return;
+        long d = exo.getDuration(), t = exo.getCurrentPosition();
+        if (d <= 0 || d == androidx.media3.common.C.TIME_UNSET) return;
+        long c = cutAt > 0 ? cutAt : tailSec > 0 && d > tailSec * 4000L ? d - tailSec * 1000L : -1;
+        if (c > 0 && t >= c) {
+            endSent = true;
+            Diag.ev("trailer: ended " + Math.round(t / 1000f) + " of " + Math.round(d / 1000f) + " s, before YouTube's outro (" + (cutAt > 0 ? "SponsorBlock" : "last " + tailSec + " s") + ")");
+            exo.setVolume(0f); exo.setPlayWhenReady(false);
+            if (listener != null) listener.ended();
+        }
+    } };
+
+    // ------------------------------------------------------------------ Apple TV first (the featured screen)
+    private boolean apple;                   // the current trailer is Apple's
+    private String appleImdb, fbYt = "";     // (and the YouTube one to fall back to)
+    private boolean fbMuted;
+    private static int appleLogs;
+
+    /** start finding a title's trailer now: Apple's first, YouTube's only if Apple has none */
+    void prefetchTitle(final org.json.JSONObject m, final int maxH, final boolean muted) {
+        if (m == null) return;
+        final String imdb = m.optString("id"), yt = m.optString("yt");
+        String have = imdb.startsWith("tt") ? AppleTrailers.cached(imdb) : "";
+        if (have == null) SIDE.execute(new Runnable() { @Override public void run() {
+            String u = AppleTrailers.find(m);
+            if (u != null && u.isEmpty() && !yt.isEmpty()) main.post(new Runnable() { @Override public void run() { prefetch(yt, maxH, muted); } });
+        } });
+        else if (have.isEmpty()) prefetch(yt, maxH, muted);
+    }
+
+    /** a title's trailer: Apple TV's when it has one (no outro), else YouTube's (stopped before its outro) */
+    void playTitle(final ViewGroup host, final org.json.JSONObject m, final boolean muted, final int maxH, final Listener l) {
+        final String imdb = m.optString("id"), yt = m.optString("yt");
+        String have = imdb.startsWith("tt") ? AppleTrailers.cached(imdb) : "";
+        if (have != null && have.isEmpty()) { fallback(host, yt, muted, maxH, l, null); return; }
+        directMax = maxH;
+        stopQuiet();
+        listener = l;
+        current = "apple:" + imdb;
+        fbYt = yt; fbMuted = muted;
+        if (have != null) { playApple(host, imdb, have, muted); return; }
+        final int my = ++tok;
+        final Runnable giveUp = new Runnable() { @Override public void run() {
+            if (my != tok) return;
+            fallback(host, yt, muted, maxH, l, "Apple TV took too long");
+        } };
+        main.postDelayed(giveUp, 4000);
+        SIDE.execute(new Runnable() { @Override public void run() {
+            final String u = AppleTrailers.find(m);
+            final String why = AppleTrailers.lastWhy;
+            main.post(new Runnable() { @Override public void run() {
+                if (my != tok) return;
+                main.removeCallbacks(giveUp);
+                if (u != null && !u.isEmpty()) playApple(host, imdb, u, muted);
+                else fallback(host, yt, muted, maxH, l, "no Apple TV trailer: " + (u == null ? "Apple didn't answer, " : "") + why);
+            } });
+        } });
+    }
+    private void fallback(ViewGroup host, String yt, boolean muted, int maxH, Listener l, String why) {
+        if (why != null && appleLogs++ < 6) Diag.ev("trailer: " + why + (yt.isEmpty() ? " (and none on YouTube)" : " — YouTube instead"));
+        if (!yt.isEmpty()) { play(host, yt, muted, maxH, l); return; }
+        stop();
+        if (l != null) l.ended();
+    }
+
+    private void playApple(ViewGroup host, String imdb, String url, boolean muted) {
+        direct = true; apple = true; appleImdb = imdb; endSent = false; cutAt = -1;
+        framed = false; directAt = android.os.SystemClock.uptimeMillis(); directHost = host; directMuted = muted;
+        main.removeCallbacks(watch);
+        main.postDelayed(watch, 8000);
+        note(imdb, "playing Apple TV's trailer");
+        androidx.media3.exoplayer.ExoPlayer p = exo();
+        // (the sharpest version that fits from the first frame, not stepping up from a tiny one; plain HD before
+        //  HDR / Dolby Vision, so a silent preview never switches the TV's picture mode)
+        p.setTrackSelectionParameters(p.getTrackSelectionParameters().buildUpon()
+                .setMaxVideoSize(directMax >= 2160 ? 3840 : directMax >= 1080 ? 1920 : 1280, directMax >= 2160 ? 2160 : directMax >= 1080 ? 1080 : 720)
+                .setForceHighestSupportedBitrate(true)
+                .setPreferredVideoMimeTypes(androidx.media3.common.MimeTypes.VIDEO_H264, androidx.media3.common.MimeTypes.VIDEO_H265).build());
+        tv = new android.view.TextureView(act);
+        tv.setFocusable(false);
+        tv.addOnLayoutChangeListener(new View.OnLayoutChangeListener() { @Override public void onLayoutChange(View v, int l, int t, int r, int b, int ol, int ot, int or, int ob) { crop(); } });
+        host.addView(tv, new FrameLayout.LayoutParams(FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.MATCH_PARENT));
+        if (host.getAlpha() < .01f) host.setAlpha(.01f);
+        vw = vh = 0;
+        p.setVideoTextureView(tv);
+        androidx.media3.datasource.DefaultHttpDataSource.Factory ds = new androidx.media3.datasource.DefaultHttpDataSource.Factory()
+                .setUserAgent("AppleTV/tvOS").setAllowCrossProtocolRedirects(true).setConnectTimeoutMs(8000).setReadTimeoutMs(10000);
+        p.setVolume(muted ? 0f : 1f);
+        p.setMediaSource(new androidx.media3.exoplayer.hls.HlsMediaSource.Factory(ds).createMediaSource(androidx.media3.common.MediaItem.fromUri(url)));
+        p.prepare();
+        p.setPlayWhenReady(true);
+    }
+    /** Apple's stream wouldn't play: YouTube's trailer instead (and Apple's isn't offered again this session) */
+    private void appleFailed(String why) {
+        final ViewGroup host = directHost; final Listener l = listener; final String yt = fbYt; final boolean muted = fbMuted;
+        AppleTrailers.bad(appleImdb);
+        stopDirect();
+        if (host != null) fallback(host, yt, muted, directMax, l, "Apple TV's trailer didn't play (" + why + ")");
+    }
     private androidx.media3.exoplayer.ExoPlayer exo;
     private android.view.TextureView tv;
     private int tok;                         // which play() an answer belongs to
@@ -103,7 +264,9 @@ final class TrailerPlayer {
 
     /** start finding the video's streams now (resting on a title), so it can start the moment it's wanted */
     void prefetch(final String ytId, final int maxH, final boolean muted) {
-        if (ytId == null || ytId.isEmpty() || YtStreams.cached(ytId, maxH, !muted) != null || YtStreams.blocked()) return;
+        if (ytId == null || ytId.isEmpty()) return;
+        if (!outros.containsKey(ytId)) outro(ytId);
+        if (YtStreams.cached(ytId, maxH, !muted) != null || YtStreams.blocked()) return;
         LOOKUP.execute(new Runnable() { @Override public void run() { YtStreams.get(ytId, maxH, !muted); } });
     }
 
@@ -114,6 +277,8 @@ final class TrailerPlayer {
         stopQuiet();
         listener = l;
         current = ytId;
+        cutAt = -1; endSent = false;
+        outro(ytId);
         final int my = ++tok;
         YtStreams.Source have = YtStreams.cached(ytId, maxH, !muted);
         if (have != null) { playDirect(host, ytId, have, muted); return; }
@@ -167,7 +332,7 @@ final class TrailerPlayer {
                 if (listener != null) listener.playing();
             }
             @Override public void onPlaybackStateChanged(int st) {
-                if (st == androidx.media3.common.Player.STATE_ENDED && direct && listener != null) listener.ended();
+                if (st == androidx.media3.common.Player.STATE_ENDED && direct && listener != null && !endSent) { endSent = true; listener.ended(); }
             }
             @Override public void onVideoSizeChanged(androidx.media3.common.VideoSize v) {
                 vw = v.width; vh = v.height; par = v.pixelWidthHeightRatio > 0 ? v.pixelWidthHeightRatio : 1f;
@@ -175,6 +340,7 @@ final class TrailerPlayer {
             }
             @Override public void onPlayerError(androidx.media3.common.PlaybackException e) {
                 if (!direct || current == null) return;
+                if (apple) { appleFailed(e.getErrorCodeName()); return; }
                 // the stream didn't play: YouTube's own player takes over (and the address is asked for afresh next time)
                 final String id = current; final ViewGroup host = tv != null && tv.getParent() instanceof ViewGroup ? (ViewGroup) tv.getParent() : null;
                 final boolean muted = exo.getVolume() == 0f;
@@ -198,6 +364,7 @@ final class TrailerPlayer {
     private boolean retried;           // one fresh lookup after a stream that wouldn't play (an old address)
     private final Runnable watch = new Runnable() { @Override public void run() {
         if (!direct || framed || current == null || directHost == null) return;
+        if (apple) { appleFailed("no picture after 8 s"); return; }
         String st = "?";
         try { int ps = exo.getPlaybackState(); st = ps == 1 ? "idle" : ps == 2 ? "loading" : ps == 3 ? "ready" : "ended"; } catch (Throwable ignored) { }
         long buf = 0; try { buf = exo.getBufferedPosition(); } catch (Throwable ignored) { }
@@ -215,7 +382,10 @@ final class TrailerPlayer {
         main.removeCallbacks(watch);
         main.postDelayed(watch, 8000);
         note(id, "playing straight from YouTube (" + s.what + ")");
+        apple = false; endSent = false;
         androidx.media3.exoplayer.ExoPlayer p = exo();
+        p.setTrackSelectionParameters(p.getTrackSelectionParameters().buildUpon().clearVideoSizeConstraints().setForceHighestSupportedBitrate(false).setPreferredVideoMimeTypes().build());
+        main.removeCallbacks(tailWatch); main.postDelayed(tailWatch, 250);
         tv = new android.view.TextureView(act);
         tv.setFocusable(false);
         tv.addOnLayoutChangeListener(new View.OnLayoutChangeListener() { @Override public void onLayoutChange(View v, int l, int t, int r, int b, int ol, int ot, int or, int ob) { crop(); } });
@@ -252,8 +422,8 @@ final class TrailerPlayer {
     }
 
     private void stopDirect() {
-        direct = false;
-        main.removeCallbacks(watch);
+        direct = false; apple = false;
+        main.removeCallbacks(watch); main.removeCallbacks(tailWatch);
         if (exo != null) { exo.setPlayWhenReady(false); exo.stop(); exo.clearMediaItems(); exo.clearVideoTextureView(tv); }
         if (tv != null && tv.getParent() != null) ((ViewGroup) tv.getParent()).removeView(tv);
         tv = null;
@@ -316,7 +486,8 @@ final class TrailerPlayer {
         }
         w.setVisibility(View.VISIBLE);
         w.onResume();
-        String js = "play(" + org.json.JSONObject.quote(ytId) + "," + muted + ")";
+        endSent = false;
+        String js = "play(" + org.json.JSONObject.quote(ytId) + "," + muted + "," + (cutAt > 0 ? cutAt / 1000.0 : 0) + "," + tailSec + ")";
         if (loaded) w.evaluateJavascript(js, null); else pending = js;
     }
 
