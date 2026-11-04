@@ -1,0 +1,13 @@
+diff --git a/enjarify/dalvikformats.py b/enjarify/dalvikformats.py
+index a02fa55..dabc4c7 100644
+--- a/enjarify/dalvikformats.py
++++ b/enjarify/dalvikformats.py
+@@ -151,6 +151,8 @@ def decode(shorts, pos, opcode):
+         results[-1] = sign(results[-1], 16)
+     elif fmt[2] == 't' and size == 3:
+         results[-1] = sign(results[-1], 32)
++    elif fmt == '31i':
++        results[-1] = sign(results[-1], 32)   # const / const-wide/32 are signed
+ 
+     # Hats depend on actual size expected, so we rely on opcode as a hack
+     if fmt[2] == 'h':

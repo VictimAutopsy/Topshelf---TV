@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">TopShelf</string>
+    <string name="redirect_label">TopShelf home button</string>
+    <string name="redirect_description">Opens TopShelf instead of the Google TV home screen when you press Home, without Google\'s home screen showing first. It only looks at the Home button (no other keys) and watches for Google\'s home screen appearing; it does not read anything on screen.</string>
+</resources>

@@ -1,0 +1,36 @@
+/* ==================== Settings › Home › Look (the page's own screens: the phone held upright) ====================
+   The same looks as the app's: glass (as before), Backlit Shelf, Photo Ink, On Air, Spotlight. The panels
+   themselves are set by styleGlass(); here are the highlights, the type and the corners. --look-light (the
+   shelf's light, warm at night and cool by day), --look-ink and --look-paper (from the photo) are set on the
+   body by applyLook(). */
+
+/* ---- On Air: condensed capitals, square red highlights */
+body.look-air { font-family: "Roboto Condensed", sans-serif-condensed, "Arial Narrow", Inter, sans-serif; }
+body.look-air .tab span, body.look-air .mi span, body.look-air .tablabel { text-transform: uppercase; letter-spacing: .05em; }
+body.look-air .mi.sel, body.look-air .srow.sel, body.look-air .tab.sel, body.look-air .tb.sel {
+  background: #E8412F !important; color: #fff !important; border-radius: 0 !important;
+  clip-path: polygon(0 0, 100% 0, calc(100% - .9rem) 100%, 0 100%);
+}
+body.look-air .tb.sel { clip-path: none; }
+body.look-air .srow.sel .val { color: rgba(255,255,255,.78); }
+body.look-air .tab.active { border-radius: 0; }
+
+/* ---- Backlit Shelf: the shelf's light as the highlight, dark words on it */
+body.look-shelf .mi.sel, body.look-shelf .srow.sel, body.look-shelf .tab.sel, body.look-shelf .tb.sel {
+  background: var(--look-light, #FFC983) !important; color: #1A1410 !important;
+  box-shadow: 0 0 1.6rem color-mix(in srgb, var(--look-light, #FFC983) 45%, transparent);
+}
+body.look-shelf .mi.sel, body.look-shelf .srow.sel { border-radius: .55rem; }
+body.look-shelf .srow.sel .val { color: rgba(26,20,16,.65); }
+
+/* ---- Photo Ink: the photo's pale paper colour, ink-coloured words */
+body.look-ink .mi.sel, body.look-ink .srow.sel, body.look-ink .tab.sel, body.look-ink .tb.sel {
+  background: var(--look-paper, #F4E3C8) !important; color: var(--look-ink, #1F2E45) !important;
+  box-shadow: .35rem .35rem 0 color-mix(in srgb, var(--look-ink, #1F2E45) 60%, #000);
+}
+body.look-ink .mi.sel, body.look-ink .srow.sel { border-radius: .5rem; }
+body.look-ink .srow.sel .val { color: color-mix(in srgb, var(--look-ink, #1F2E45) 70%, transparent); }
+
+/* ---- Spotlight: words straight on the photo, kept readable */
+body.look-spot .mi, body.look-spot .srow, body.look-spot .tab { text-shadow: 0 .1rem .8rem rgba(0,0,0,.7); }
+body.look-spot .mi.sel, body.look-spot .srow.sel, body.look-spot .tab.sel { text-shadow: none; box-shadow: 0 0 2rem rgba(255,255,255,.35); }

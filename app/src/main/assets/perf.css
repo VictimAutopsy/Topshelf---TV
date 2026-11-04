@@ -1,0 +1,91 @@
+/* Same look, less drawing (see perf.js). */
+
+/* loading bars: slide with a transform instead of re-doing page layout every frame,
+   and only while they're on screen */
+#splash .spb i, .lxb i, .ptb i { left: 0; animation-name: spbar2; }
+@keyframes spbar2 { from { transform: translateX(-100%); } to { transform: translateX(250%); } }
+#launch:not(.show) .lxb i, #player:not(.tuning) .ptb i, #splash.out .spb i { animation: none; }
+
+/* background animations only while their screen is showing */
+body:not([data-theme="live"]) .th-live .onair,
+body:not([data-theme="live"]) #lvlabel i { animation-play-state: paused; }
+#hint svg { animation: none; }
+#hint.nudge svg { animation: hintbounce .75s ease-in-out 1; }
+@keyframes hintbounce { 0%, 100% { translate: 0 0; } 45% { translate: 0 .25rem; } }
+
+/* TVs: the photo's slow zoom is stepped by perf.js instead of animated every frame */
+body.tvperf:not(.portrait) .bgimg.kb { animation: none; }
+
+/* TVs: the Live TV studio light drifts in small steps (a soft glow — the steps don't show), so the
+   big guide panel isn't re-blurred every frame */
+body.tvperf .th-live .onair { animation-timing-function: steps(90, end); }
+/* TVs: the Live TV guide and category panels sit over smooth gradients, where a blur changes
+   nothing you can see — keep the glass colour boost, skip the expensive blur */
+body.tvperf.glass-liquid #lguide, body.tvperf.glass-liquid #lcats,
+body.tvperf.glass-frosted #lguide, body.tvperf.glass-frosted #lcats {
+  backdrop-filter: saturate(1.7) !important; -webkit-backdrop-filter: saturate(1.7) !important;
+}
+
+/* baked glass (perf.js): the panel shows its pre-drawn canvas instead of live blurring */
+.glass > canvas.gbake { display: none; position: absolute; inset: 0; width: 100%; height: 100%; border-radius: inherit; z-index: -1; pointer-events: none; }
+.glass.baked > canvas.gbake { display: block; }
+.glass.baked { backdrop-filter: none !important; -webkit-backdrop-filter: none !important; background: transparent !important; }
+
+/* lights that follow focus (see perf.js moveLight): only the panels on screen animate their rim */
+.glass { transition: opacity .5s var(--ease), translate .5s var(--ease), scale .25s var(--spring); }
+#dock, #tabs, #topbar { transition: --la .7s var(--ease), opacity .5s var(--ease), translate .5s var(--ease), scale .25s var(--spring); }
+/* the dock's glow: same soft light, now a layer that slides instead of a gradient re-painted each frame */
+#dock { overflow: hidden; }
+#dock::before {
+  inset: 0 auto 0 0; width: 60rem; border-radius: 0;
+  background: radial-gradient(30rem 11rem at 50% -10%, rgba(255,255,255,.24), rgba(255,255,255,0) 70%);
+  transform: translateX(var(--glowx, -28.2rem)); transition: transform .55s var(--ease); will-change: transform;
+}
+
+/* TVs, Live TV and Sports: these screens' backgrounds are smooth colour gradients, where blurring and
+   bending the light changes nothing you can see — the glass keeps its colour boost, tint and rim of
+   light, without re-running the blur every time the preview video draws a frame */
+body.tvperf[data-theme="live"] :is(#tabs, #topbar, #lguide, #lcats, #ticker),
+body.tvperf[data-theme="sports"] :is(#tabs, #topbar, #ticker) {
+  backdrop-filter: saturate(1.7) !important; -webkit-backdrop-filter: saturate(1.7) !important;
+}
+
+/* loading placeholders: the shimmer is a sliding layer (the graphics chip moves it) instead of a
+   background re-painted every frame — and it only runs on the screen you're looking at */
+.vp.sk, .sp.sk .spi, .tsc.sk { animation: none !important; background: rgba(255,255,255,.05) !important; position: relative; overflow: hidden; }
+.vp.sk::before, .sp.sk .spi::before, .tsc.sk::before {
+  content: ''; position: absolute; inset: 0; pointer-events: none; will-change: transform;
+  background: linear-gradient(100deg, rgba(255,255,255,0) 30%, rgba(255,255,255,.08) 50%, rgba(255,255,255,0) 70%);
+  transform: translateX(-100%); animation: shimmer2 1.5s linear infinite;
+}
+@keyframes shimmer2 { to { transform: translateX(100%); } }
+body:not(.vod) .vp.sk::before, body:not(.sports) .sp.sk .spi::before, body:not([data-theme="home"]) .tsc.sk::before { animation-play-state: paused; }
+
+/* TVs, Movies & TV Shows: only posters in the rows next to your focus get their own layer (hundreds of
+   layers made every frame slow to put together); those rows are ready before you reach them */
+body.tvperf .vp, body.tvperf .vp img { will-change: auto; backface-visibility: visible; }
+body.tvperf .vrow.near .vp { will-change: scale; backface-visibility: hidden; }
+body.tvperf .vrow.near .vp img { backface-visibility: hidden; }
+
+/* diagnostic test only (Settings → Diagnostic report): focus shadows change instantly instead of
+   fading, to measure what the fade costs on this TV */
+body.ab-snap .vp { transition: scale .25s var(--ease), width .4s var(--ease) !important; }
+body.ab-snap .tile { transition: scale .26s var(--ease), translate .2s var(--ease), rotate .5s var(--spring) !important; }
+
+/* Movies / TV Shows posters: the focus shadow and ring used to be re-drawn every frame of the
+   quarter-second fade on both posters (the TV measured this at more than half of each move's time).
+   The same shadow now sits on its own layer behind the poster and simply fades in — drawn once,
+   faded by the graphics chip. The posters round their own corners so the shadow can extend past them. */
+.vp { overflow: visible; transition: scale .25s var(--ease), width .4s var(--ease); }
+.vp.sk { overflow: hidden; }
+.vp img { border-radius: inherit; }
+.vp::after {
+  content: ''; position: absolute; inset: 0; border-radius: inherit; pointer-events: none; z-index: -1;
+  opacity: 0; transition: opacity .25s var(--ease);
+  box-shadow: 0 1.6rem 2.6rem rgba(0,0,0,.6), 0 0 0 .15rem rgba(255,255,255,.85);
+}
+.vp.f::after { opacity: 1; }
+.vp.f, body[data-theme] .vp.f { box-shadow: 0 .5rem 1.4rem rgba(0,0,0,.45); }
+body[data-theme="movies"] .vp::after { box-shadow: 0 1.6rem 2.6rem rgba(0,0,0,.65), 0 0 0 .16rem #ffd08a, 0 0 2.6rem rgba(255,170,60,.45); }
+body[data-theme="series"] .vp::after { box-shadow: 0 1.6rem 2.6rem rgba(0,0,0,.6), 0 0 0 .16rem #9fe4ff, 0 0 2.6rem rgba(100,210,255,.42); }
+body.ab-snap .vp::after { transition: none !important; }

@@ -1,0 +1,298 @@
+/* ==================== Per-tab looks ====================
+   Home keeps the Reddit photo. Every other tab has its own backdrop and accent:
+   Movies = cinema (amber, film grain), TV Shows = binge-night blue, Sports = stadium lights,
+   Live TV = on-air studio. body[data-theme] is set by switchTab(). */
+
+/* The photo only belongs to Home (and photo mode / the screensaver, wherever you are) */
+body:not([data-theme="home"]) #bg { opacity: 0; transition: opacity .6s ease; }
+body.shelf #bg { opacity: 1 !important; filter: none !important; }
+body:not([data-theme="home"]):not(.shelf) #scrim { opacity: 0; }
+
+#themebg {
+  position: absolute; top: 0; bottom: 0; left: calc(-1 * var(--safe-l)); right: calc(-1 * var(--safe-r));
+  overflow: hidden; pointer-events: none;
+}
+#themebg .th { position: absolute; inset: 0; opacity: 0; transition: opacity .7s ease; }
+body.shelf #themebg { opacity: 0; }
+body[data-theme="movies"] #themebg .th-movies, body[data-theme="series"] #themebg .th-series,
+body[data-theme="sports"] #themebg .th-sports, body[data-theme="live"] #themebg .th-live { opacity: 1; }
+
+/* tab titles in the top-left corner */
+.tablabel {
+  position: absolute; left: 5rem; top: 2.5rem; z-index: 3; font-size: 2.8rem; font-weight: 700; letter-spacing: -.03em;
+  text-shadow: 0 .1rem .8rem rgba(0,0,0,.45); pointer-events: none; white-space: nowrap;
+}
+#lvlabel { display: flex; align-items: center; gap: .9rem; }
+/* the chosen tab picks up its tab's colour */
+.tab.active { transition: background .3s, color .3s, scale .2s var(--ease); }
+body[data-theme="movies"] .tab.active { background: rgba(255,176,64,.26); color: #ffe2b3; }
+body[data-theme="series"] .tab.active { background: rgba(100,210,255,.24); color: #d2f2ff; }
+body[data-theme="sports"] .tab.active { background: rgba(52,199,89,.26); color: #d4ffe0; }
+body[data-theme="live"] .tab.active { background: rgba(255,69,58,.28); color: #ffd9d6; }
+.tab.sel { background: #fff !important; color: #111 !important; }
+
+/* ---------------------------------------------------------------- Movies: cinema */
+.th-movies {
+  background:
+    radial-gradient(70% 55% at 50% -12%, rgba(255,176,72,.22), rgba(255,140,60,.06) 45%, transparent 70%),
+    radial-gradient(60% 50% at 50% 115%, rgba(150,40,20,.30), transparent 70%),
+    linear-gradient(#140c07, #070403 60%, #030201);
+}
+/* moving film grain (Movies strongest, TV Shows a touch) */
+#themebg .grain {
+  position: absolute; inset: -50%; opacity: 0; transition: opacity .7s;
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='180' height='180'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='2' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 1  0 0 0 0 1  0 0 0 0 1  0 0 0 .55 0'/></filter><rect width='100%' height='100%' filter='url(%23n)'/></svg>");
+}
+body[data-theme="movies"] #themebg .grain { opacity: .055; }
+body[data-theme="series"] #themebg .grain { opacity: .025; }
+@keyframes grain {
+  0% { transform: translate(0, 0); } 20% { transform: translate(-6%, 4%); } 40% { transform: translate(5%, -7%); }
+  60% { transform: translate(-3%, 8%); } 80% { transform: translate(7%, 2%); } 100% { transform: translate(0, 0); }
+}
+body[data-theme="movies"] #vlabel {
+  font-family: "Noto Serif", Georgia, "Times New Roman", serif; font-weight: 700; font-style: italic; letter-spacing: -.01em;
+  background: linear-gradient(90deg, #ffe0a8, #ffb340 55%, #ff7a3d); -webkit-background-clip: text; background-clip: text; color: transparent;
+}
+/* the title's backdrop sits on the theatre instead of plain black */
+#vbg { background: transparent; z-index: 0; isolation: isolate; }
+body[data-theme="movies"] #vbg::after {
+  background:
+    linear-gradient(to right, rgba(10,5,2,.88) 0%, rgba(10,5,2,.55) 38%, rgba(10,5,2,.05) 70%),
+    linear-gradient(to bottom, rgba(10,5,2,.4) 0%, rgba(0,0,0,0) 20%, rgba(10,5,2,.3) 46%, rgba(8,4,2,.94) 72%);
+}
+body[data-theme="movies"] .vtitle { font-family: "Noto Serif", Georgia, serif; font-weight: 700; letter-spacing: -.01em; }
+body[data-theme="movies"] .vrt { text-transform: uppercase; letter-spacing: .16em; font-size: 1.05rem; color: #ffcf8a; }
+body[data-theme="movies"] .vmeta { color: rgba(255,232,200,.86); }
+body[data-theme="movies"] .vhint { color: rgba(255,207,138,.6); }
+body[data-theme="movies"] .vp { border-radius: .7rem; }
+body[data-theme="movies"] .vp.f { box-shadow: 0 1.6rem 2.6rem rgba(0,0,0,.65), 0 0 0 .16rem #ffd08a, 0 0 2.6rem rgba(255,170,60,.45); }
+body[data-theme="movies"] .vchip { background: rgba(255,179,64,.25); color: #ffd99c; }
+
+/* ---------------------------------------------------------------- TV Shows: binge-night blue */
+.th-series {
+  background:
+    radial-gradient(60% 60% at 95% -5%, rgba(100,210,255,.24), transparent 60%),
+    radial-gradient(70% 60% at -5% 105%, rgba(94,92,230,.30), transparent 65%),
+    linear-gradient(160deg, #0a1428, #050811 60%, #03050a);
+}
+body[data-theme="series"] #vlabel {
+  background: linear-gradient(90deg, #a6ecff, #64d2ff 50%, #8e8cff); -webkit-background-clip: text; background-clip: text; color: transparent;
+}
+body[data-theme="series"] #vbg::after {
+  background:
+    linear-gradient(to right, rgba(4,8,20,.9) 0%, rgba(4,8,20,.55) 38%, rgba(4,8,20,.05) 70%),
+    linear-gradient(to bottom, rgba(4,8,20,.4) 0%, rgba(0,0,0,0) 20%, rgba(4,8,20,.3) 46%, rgba(3,6,14,.94) 72%);
+}
+body[data-theme="series"] .vrt { display: flex; align-items: center; gap: .7rem; font-weight: 700; }
+body[data-theme="series"] .vrt::before { content: ''; width: .35rem; height: 1.25rem; border-radius: .3rem; background: linear-gradient(#64d2ff, #8e8cff); }
+body[data-theme="series"] .vmeta { color: rgba(214,236,255,.86); }
+body[data-theme="series"] .vhint { color: rgba(140,215,255,.6); }
+body[data-theme="series"] .vp { border-radius: 1.4rem; }
+body[data-theme="series"] .vp.f { box-shadow: 0 1.6rem 2.6rem rgba(0,0,0,.6), 0 0 0 .16rem #9fe4ff, 0 0 2.6rem rgba(100,210,255,.42); }
+body[data-theme="series"] .vchip { background: rgba(100,210,255,.22); color: #c2efff; }
+
+/* ---------------------------------------------------------------- Sports: stadium lights */
+.th-sports {
+  background:
+    radial-gradient(40% 45% at 12% -8%, rgba(220,235,255,.30), rgba(160,200,255,.08) 45%, transparent 70%),
+    radial-gradient(40% 45% at 88% -8%, rgba(220,235,255,.30), rgba(160,200,255,.08) 45%, transparent 70%),
+    radial-gradient(90% 50% at 50% 110%, rgba(40,160,80,.35), transparent 70%),
+    linear-gradient(#060c18, #071426 55%, #082016);
+}
+/* mown-turf stripes fading up from the bottom */
+.th-sports::after {
+  content: ''; position: absolute; inset: 0;
+  background: repeating-linear-gradient(90deg, rgba(255,255,255,.035) 0 7rem, rgba(0,0,0,.04) 7rem 14rem);
+  -webkit-mask-image: linear-gradient(to top, #000 0%, transparent 55%); mask-image: linear-gradient(to top, #000 0%, transparent 55%);
+}
+body.sports #bg { filter: none; }
+.spt { text-transform: uppercase; font-style: italic; font-weight: 700; letter-spacing: .02em; }
+.spt::after { content: ''; display: block; width: 4.2rem; height: .32rem; margin-top: .35rem; border-radius: .3rem; background: linear-gradient(90deg, #34c759, #a8ff60); }
+.sprt { text-transform: uppercase; font-style: italic; letter-spacing: .08em; font-size: 1.15rem; color: #c8f7d3; }
+.gc {
+  background:
+    linear-gradient(135deg, color-mix(in srgb, var(--c1, #3a4a66) 30%, transparent), transparent 45%),
+    linear-gradient(315deg, color-mix(in srgb, var(--c2, #3a4a66) 30%, transparent), transparent 45%),
+    linear-gradient(#141c2b, #0b111c);
+  overflow: hidden;
+}
+.gct { position: relative; padding-left: .9rem; }
+.gct::before { content: ''; position: absolute; left: 0; top: .2rem; bottom: .2rem; width: .3rem; border-radius: .3rem; background: var(--tc, rgba(255,255,255,.3)); }
+.gct b { font-size: 1.7rem; font-style: italic; }
+.gc.live { box-shadow: 0 .6rem 1.6rem rgba(0,0,0,.4), inset 0 .22rem 0 #ff453a; }
+.gc.f { box-shadow: 0 1.4rem 2.6rem rgba(0,0,0,.6), 0 0 0 .16rem #fff, 0 0 2.4rem color-mix(in srgb, var(--c2, #34c759) 55%, transparent); }
+.gedit { background: rgba(52,199,89,.08); border-color: rgba(168,255,96,.35); }
+.gtv.on { color: #a8ff60; }
+body.portrait .gct { padding-left: 1.2rem; }
+body.portrait .gct b { font-size: 2.5rem; }
+body.portrait .sprt { font-size: 1.7rem; }
+body.portrait .spt::after { width: 5.4rem; height: .4rem; }
+
+/* ---------------------------------------------------------------- Live TV: on-air studio */
+.th-live {
+  background:
+    radial-gradient(45% 50% at 8% -10%, rgba(255,69,58,.22), transparent 70%),
+    radial-gradient(55% 55% at 100% 110%, rgba(110,60,230,.22), transparent 70%),
+    linear-gradient(#0b0a10, #060509 60%, #040306);
+}
+/* a slow, soft "studio light" drifting behind the guide */
+.th-live .onair {
+  position: absolute; width: 60%; height: 70%; left: 20%; top: 10%; border-radius: 50%;
+  background: radial-gradient(closest-side, rgba(255,69,58,.10), transparent);
+  animation: studio 18s ease-in-out infinite alternate;
+}
+@keyframes studio { from { transform: translate(-18%, -6%) scale(1); } to { transform: translate(22%, 10%) scale(1.15); } }
+body.live #bg { filter: none; }
+#lvlabel i { width: 1.1rem; height: 1.1rem; border-radius: 50%; background: #ff453a; box-shadow: 0 0 1.2rem rgba(255,69,58,.8); animation: livepulse 1.6s ease-in-out infinite; }
+.lp.live:not(.f) { background: linear-gradient(90deg, rgba(255,69,58,.20), rgba(255,255,255,.10) 3rem); box-shadow: inset .25rem 0 0 rgba(255,69,58,.85); }
+.lp.f { box-shadow: 0 .5rem 1.4rem rgba(0,0,0,.35), 0 0 1.6rem rgba(255,69,58,.35); }
+.lch.cur { background: rgb(64,40,46); }
+.lcat.cur { background: rgba(255,69,58,.18); }
+.lcb { background: rgba(255,69,58,.18); }
+#ltimes, .lday, #lchcol { background: rgb(22,18,26); }
+.lch { background: rgb(34,30,40); }
+body.live:not(.playing-fs) #player.pv { box-shadow: 0 5rem 12rem rgba(0,0,0,.5), 0 0 0 .5rem rgba(255,255,255,.2); }
+
+/* Live TV in the same style as the other tabs (and as the TV draws it): no boxed pane — the show
+   you're on, the preview and the guide sit straight on the backdrop; the focused show gets a ring and
+   a glow like posters and game cards. */
+#lguide { background: none !important; backdrop-filter: none !important; -webkit-backdrop-filter: none !important; box-shadow: none !important; }
+#lguide.glass::after { -webkit-mask: none; mask: none; padding: 0; }
+body:not(.portrait) #lguide { border-radius: 0; overflow: visible; }
+body:not(.portrait) #linfo { left: 2rem; top: .6rem; height: 16.4rem; }
+#lvlabel { background: linear-gradient(90deg, #fff, #ff8a80); -webkit-background-clip: text; background-clip: text; color: transparent; }
+.lic { color: #ff8a80; font-weight: 600; font-size: 1.05rem; letter-spacing: .04em; }
+.lic span { background: none; padding: 0; margin-left: 0; font-size: inherit; }
+.lic span::before { content: '  ·  '; white-space: pre; }
+.lic .lon { margin-right: .9rem; }
+.lit { font-size: 3.2rem; margin-top: .6rem; text-shadow: 0 .2rem 1.2rem rgba(0,0,0,.5); }
+.lim { color: rgba(255,220,216,.86); font-weight: 500; font-size: 1.2rem; }
+.lid { font-size: 1.15rem; color: rgba(255,255,255,.78); -webkit-line-clamp: 2; }
+.lih { margin-top: .9rem; font-size: 1rem; font-weight: 500; letter-spacing: .02em; color: rgba(255,138,128,.6); }
+body.portrait .lit { font-size: 2.3rem; }
+body.portrait .lih { display: none; }
+#ltimes, .lday, #lchcol { background: rgb(10,8,13); box-shadow: none; }
+.lch { background: rgba(255,255,255,.08); }
+.lch.cur { background: rgba(255,255,255,.18); }
+.lp { background: rgba(255,255,255,.1); }
+.lp.none { background: rgba(255,255,255,.07); }
+.lp.live:not(.f) { background: linear-gradient(90deg, rgba(255,69,58,.35), rgba(255,69,58,0) 10rem), rgba(255,255,255,.17); box-shadow: inset .3rem 0 0 #e0352b; }
+.lp.f { background: rgba(255,255,255,.28); color: #fff; box-shadow: 0 0 0 .17rem #fff, 0 0 1.6rem rgba(255,69,58,.6); }
+.lp.f .lpm { color: rgba(255,217,214,.85); }
+.lp.f .lbell { color: #ffd60a; }
+
+/* ---------------------------------------------------------------- phone held upright */
+body.portrait .tablabel { left: 3rem; top: calc(2.6rem + var(--safe-t)); font-size: 3.6rem; }
+body.portrait #lvlabel i { width: 1.4rem; height: 1.4rem; }
+/* upright, the title sits over the backdrop's top-left on Movies / TV */
+body.portrait #vlabel { top: calc(2.6rem + var(--safe-t)); }
+
+
+/* ---------------------------------------------------------------- polish: light, motion, depth */
+
+/* Ambient light: the focused title's main colour glows behind the rows (set from the backdrop). */
+/* two glow layers that crossfade (opacity only, so the TV's graphics chip does the work) */
+.vamb { position: absolute; inset: 0; z-index: 5; pointer-events: none; opacity: 0; transition: opacity 1.4s ease; will-change: opacity; }
+.vamb.on { opacity: 1; }
+#vbg::before {
+  content: ''; position: absolute; inset: 0; z-index: 5; pointer-events: none;
+  background: radial-gradient(75% 55% at 50% 108%, rgba(255,170,80,.22), transparent 72%);
+  transition: opacity 1s; opacity: 1;
+}
+body[data-theme="series"] #vbg::before { background: radial-gradient(75% 55% at 50% 108%, rgba(100,200,255,.2), transparent 72%); }
+#vbg:has(.vamb.on)::before { opacity: 0; }
+.vbgi { z-index: 1; will-change: opacity; backface-visibility: hidden; transform: translateZ(0); }
+#vbg::after { z-index: 4; }
+#vtrbg { z-index: 3; }
+
+/* the title block fades up gently when it changes */
+#vhero.in { animation: heroin .32s var(--ease); }
+@keyframes heroin { from { opacity: .7; translate: 0 .35rem; } to { opacity: 1; translate: 0 0; } }
+
+/* posters and cards are kept on the graphics chip so growing on focus never re-draws (no blink) */
+.vp, .tsc, .gc { will-change: scale; backface-visibility: hidden; }
+.vp img, .tsc .tsb { backface-visibility: hidden; }
+.gc { isolation: isolate; }
+/* a trailer's player stays invisible until its picture is actually moving */
+.vtr:not(.play) iframe { visibility: hidden; }
+
+/* each tab's content rises in when you switch to it */
+.tabin { animation: tabin .55s var(--ease) both; }
+@keyframes tabin { from { opacity: 0; translate: 0 1.6rem; } to { opacity: 1; translate: 0 0; } }
+.tabin2 { animation: tabin .6s var(--ease) .06s both; }
+
+/* Categories: a plain list in the guide's place at the left (the guide steps aside to the right),
+   its rows like the channel tiles — no floating glass panel (same as the TV) */
+body:not(.portrait) #lcats {
+  background: none !important; backdrop-filter: none !important; -webkit-backdrop-filter: none !important; box-shadow: none !important;
+  left: 5rem; top: 26.2rem; bottom: 3.6rem; width: 23rem; border-radius: 0; overflow: visible; translate: -3rem 0;
+}
+body:not(.portrait) #lcats.glass::after { display: none; }
+body:not(.portrait).lcats-open #lcats { translate: 0 0; }
+body:not(.portrait) #lcats .lh { left: .4rem; top: .75rem; font-size: 1rem; }
+body:not(.portrait) #lcatlist { left: -.5rem; right: -.5rem; top: 3.2rem; bottom: 0; padding: .3rem .5rem; }
+body:not(.portrait) #lcatmore { display: none; }
+body:not(.portrait) #lguide::after { display: none; }
+body:not(.portrait) #lgscroll { transition: translate .4s var(--ease), opacity .35s; }
+body:not(.portrait).lcats-open #lgscroll { translate: 29.6rem 0; opacity: .3; }
+.lcat { background: rgba(255,255,255,.08); border-radius: 1.2rem; margin: 0 0 .4rem; }
+.lcat.cur { background: rgba(255,69,58,.22); color: #fff; }
+.lcat.f { background: rgba(255,255,255,.28); color: #fff; box-shadow: 0 0 0 .17rem #fff, 0 0 1.6rem rgba(255,69,58,.6); }
+.lcat.f b { color: rgba(255,255,255,.7); }
+
+/* the guide runs from edge to edge (like the other tabs' rows): the channel tiles start at the screen's
+   left edge with their contents lined up with the rest of the tab, the shows run off the right edge */
+body:not(.portrait) #lgscroll { left: -3rem; right: -3rem; bottom: -2.2rem; border-radius: 0; }
+body:not(.portrait) .lch { padding-left: 5.9rem; border-radius: 0 1.2rem 1.2rem 0; }
+body:not(.portrait) .lch.on { box-shadow: inset .35rem 0 0 #e0352b; }
+body:not(.portrait) .lday { padding-left: 5rem; }
+
+/* The preview isn't a boxed window: like the artwork behind Movies' featured title, it sits at the top
+   right, flush with the screen's edge, and melts into the page on its left and bottom edges. */
+body:not(.portrait) #player:not(.fs) {
+  transform: translate(calc(var(--sw) * 1rem - 36.3rem), 6.3rem) scale(calc(36.3 / var(--sw)));
+  border-radius: 0;
+}
+body:not(.portrait).live:not(.playing-fs) #player.pv {
+  box-shadow: none;
+  -webkit-mask-image: linear-gradient(to right, transparent, rgba(0,0,0,.55) 16%, #000 36%), linear-gradient(to bottom, rgba(0,0,0,.4), #000 13%, #000 63%, rgba(0,0,0,.55) 82%, transparent);
+  -webkit-mask-composite: source-in; mask-composite: intersect;
+}
+
+/* The guide as rows, in the same spirit as the other tabs' rows: quiet tiles with room between them,
+   the show you're on raised with a ring and a glow, shows on now marked with a thin red progress bar
+   (like the one under the featured title) instead of red tints and a line through every row, and
+   "Now" marked once, in the time bar. */
+#lnow { display: none !important; }
+#lnowchip {
+  position: absolute; top: .45rem; translate: -50% 0; z-index: 3; padding: .2rem .7rem; border-radius: 1rem;
+  background: #e0352b; color: #fff; font-size: .85rem; font-weight: 700; letter-spacing: .04em; text-transform: uppercase;
+  box-shadow: 0 0 1rem rgba(224,53,43,.5);
+}
+.lslot { border-left: none; padding-left: 0; color: rgba(255,255,255,.5); font-size: 1rem; top: .6rem; }
+.lp { background: rgba(255,255,255,.06); border-radius: 1rem; }
+.lp .lpt { color: rgba(255,255,255,.86); }
+.lp.live:not(.f) { background: rgba(255,255,255,.12); box-shadow: none; }
+.lp.live .lpt { color: #fff; }
+.lp.past { opacity: .45; }
+.lp.none { background: rgba(255,255,255,.035); }
+.lpp { position: absolute; left: 1rem; bottom: .55rem; height: .22rem; max-width: calc(100% - 2rem); border-radius: .2rem; background: #e0352b; box-shadow: 0 0 .6rem rgba(224,53,43,.55); }
+.lp.f { background: rgba(255,255,255,.2); border-radius: 1rem; }
+body:not(.portrait) .lch { background: none; border-radius: 0 1.2rem 1.2rem 0; }
+.lch { background: none; }
+.lch.cur { background: rgba(255,255,255,.1); }
+.lch.on { box-shadow: none !important; }
+.lch.on .lname { color: #ff8a80; }
+.lch.on .lnum { color: #ff8a80; }
+body:not(.portrait) .lch.cur, .lch.cur { background: rgba(255,255,255,.1); }
+
+/* The show (or category) you're on is raised instead of glowing: it grows a little, lifts, and casts a
+   shadow, like a card picked up off the page. */
+.lp { transition: transform .2s var(--ease), box-shadow .2s var(--ease), background .15s; }
+.lp.f { background: #34333d; transform: translateY(-.2rem) scale(1.04); z-index: 3;
+  box-shadow: 0 0 0 .14rem rgba(255,255,255,.85), 0 .9rem 1.8rem rgba(0,0,0,.7); }
+#lbody { margin-top: .5rem; }
+.lcat { position: relative; transition: transform .2s var(--ease), box-shadow .2s var(--ease), background .15s; }
+.lcat.f { background: #34333d; transform: translateY(-.2rem) scale(1.04); z-index: 3;
+  box-shadow: 0 0 0 .14rem rgba(255,255,255,.85), 0 .9rem 1.8rem rgba(0,0,0,.7); }
+body:not(.portrait) #linfo { width: calc(var(--sw) * 1rem - 36.3rem - 7.5rem); max-width: 80rem; }

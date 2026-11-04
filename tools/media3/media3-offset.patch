@@ -1,0 +1,23 @@
+diff --git a/libraries/exoplayer/src/main/java/androidx/media3/exoplayer/MediaPeriodQueue.java b/libraries/exoplayer/src/main/java/androidx/media3/exoplayer/MediaPeriodQueue.java
+index 35c3637..3c2ca35 100644
+--- a/libraries/exoplayer/src/main/java/androidx/media3/exoplayer/MediaPeriodQueue.java
++++ b/libraries/exoplayer/src/main/java/androidx/media3/exoplayer/MediaPeriodQueue.java
+@@ -41,7 +41,7 @@ import java.util.List;
+  * loading media period at the end of the queue, with methods for controlling loading and updating
+  * the queue. Also has a reference to the media period currently being read.
+  */
+-/* package */ final class MediaPeriodQueue {
++public final class MediaPeriodQueue {
+ 
+   /**
+    * Initial renderer position offset used for the first item in the queue, in microseconds.
+@@ -61,7 +61,8 @@ import java.util.List;
+    *       original timestamp of the media is still visible.
+    * </ul>
+    */
+-  public static final long INITIAL_RENDERER_POSITION_OFFSET_US = 1_000_000_000_000L;
++  // TopShelf: not final, so the app can choose a smaller offset (some MediaTek decoders stall with huge timestamps)
++  public static long INITIAL_RENDERER_POSITION_OFFSET_US = 1_000_000_000_000L;
+ 
+   /**
+    * Limits the maximum number of periods to buffer ahead of the current playing period. The

@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- notification icon: the TopShelf screen-on-a-shelf mark, as a white silhouette -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp" android:height="24dp" android:viewportWidth="24" android:viewportHeight="24">
+    <path android:fillColor="#FFFFFFFF"
+        android:pathData="M5,3h14a2,2 0 0,1 2,2v8a2,2 0 0,1 -2,2h-14a2,2 0 0,1 -2,-2v-8a2,2 0 0,1 2,-2zM10,6.2v5.6l4.6,-2.8zM3,17h5v3h-5zM9.5,17h5v3h-5zM16,17h5v3h-5z"/>
+</vector>

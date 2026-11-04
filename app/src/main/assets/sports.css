@@ -1,0 +1,197 @@
+/* ==================== Sports · design A (the same look as the TV's) ==================== */
+#sports { background: #06070c; }
+#sports::before {
+  content: ''; position: absolute; inset: 0; pointer-events: none;
+  background:
+    radial-gradient(52% 58% at 18% 28%, color-mix(in srgb, var(--b1, #0b3a52) 34%, transparent), transparent 72%),
+    radial-gradient(44% 52% at 46% 16%, color-mix(in srgb, var(--b2, #5a1020) 28%, transparent), transparent 72%),
+    linear-gradient(to bottom, transparent 42%, rgba(6,7,12,.95));
+}
+#sphead { left: 5rem; top: 2.4rem; z-index: 1; }
+#sports .spt { display: flex; align-items: center; gap: 1.2rem; font-size: 3.3rem; font-weight: 700; font-style: normal; text-transform: none; letter-spacing: -.02em; }
+#sports .spt::after { display: none; }
+.splive { font-size: 1.1rem; font-weight: 600; letter-spacing: .1em; padding: .3rem .8rem; border-radius: 1rem; background: rgba(255,59,48,.85); text-shadow: none; }
+#sptabs { display: flex; align-items: center; gap: 1rem; margin-top: 1.3rem; }
+.sptab { font-size: 1.5rem; font-weight: 600; padding: .65rem 1.6rem; border-radius: 2rem; background: rgba(255,255,255,.1); color: rgba(255,255,255,.75); text-shadow: none;
+  transition: scale .2s var(--ease), background .2s, color .2s; cursor: pointer; }
+.sptab.on { background: #fff; color: #111; }
+.sptab.f { box-shadow: 0 0 0 .18rem #8ec5ff; scale: 1.08; }
+#sports .spupd { margin: 0 0 0 .6rem; font-size: 1.2rem; color: rgba(255,255,255,.5); }
+#sports #sprows { top: 12.6rem; padding-top: .8rem; z-index: 1; }
+
+/* the scoreboard, and your fantasy matchup beside it */
+.sptop { display: flex; gap: 2rem; padding: 0 5rem; }
+.sphero, .spfy { position: relative; height: 18.6rem; border-radius: 2.2rem; box-sizing: border-box; overflow: hidden; }
+.sphero .rim, .spfy .rim { position: absolute; inset: 0; border-radius: inherit; pointer-events: none; box-shadow: inset 0 0 0 .08rem rgba(255,255,255,.14); }
+.sphero { flex: 1; min-width: 0; display: flex; flex-direction: column; padding: 1.8rem 2.6rem 1.6rem; cursor: pointer;
+  background: linear-gradient(90deg, color-mix(in srgb, var(--c1) 55%, transparent), transparent 42%, transparent 58%, color-mix(in srgb, var(--c2) 60%, transparent)), rgba(18,23,34,.85);
+  transition: scale .2s var(--ease), box-shadow .2s; }
+.sphero.f { box-shadow: 0 0 0 .22rem #fff; }
+.sphero.in { animation: heroin .3s var(--ease); }
+.shtop { display: flex; align-items: center; gap: 1rem; font-size: 1.45rem; font-weight: 600; color: rgba(255,255,255,.8); white-space: nowrap; overflow: hidden; }
+.shtop > span:last-child { overflow: hidden; text-overflow: ellipsis; }
+.glive { display: inline-block; flex: none; background: #ff3b30; color: #fff; font-size: .8em; font-weight: 700; letter-spacing: .1em; padding: .12rem .55rem; border-radius: .4rem; margin-right: .5rem; }
+.shmid { flex: 1; display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; gap: 1.6rem; min-height: 0; }
+.sht { display: flex; align-items: center; gap: 1.6rem; min-width: 0; }
+.sht.h { flex-direction: row-reverse; text-align: right; }
+.shlg { width: 7.6rem; height: 7.6rem; border-radius: 50%; background: rgba(255,255,255,.12); display: grid; place-items: center; flex: none; }
+.shlg img { width: 78%; height: 78%; object-fit: contain; }
+.shnm { min-width: 0; }
+.shnm b { display: block; font-size: 2.1rem; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.shnm b i { font-style: normal; color: #ffd60a; font-size: .75em; }
+.shnm small { font-size: 1.3rem; color: rgba(255,255,255,.6); }
+.shsc { text-align: center; }
+.shsc b { font-size: 6.4rem; font-weight: 700; letter-spacing: -.02em; line-height: 1; font-variant-numeric: tabular-nums; }
+.shsc small { display: block; margin-top: .3rem; font-size: 1.2rem; font-weight: 600; letter-spacing: .12em; color: rgba(255,255,255,.6); }
+.shsc.pre b { font-size: 2.6rem; }
+.shfoot { display: flex; align-items: center; justify-content: space-between; gap: 2rem; }
+.shinfo { font-size: 1.3rem; font-weight: 600; color: rgba(255,255,255,.7); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.shinfo.mine { color: #f6c344; }
+.shwatch { flex: none; font-size: 1.55rem; font-weight: 600; padding: .75rem 1.8rem; border-radius: 2rem; background: rgba(255,255,255,.15); color: rgba(255,255,255,.85); white-space: nowrap; }
+.shwatch.on { background: #fff; color: #111; }
+
+.spfy { width: 37rem; flex: none; display: flex; flex-direction: column; padding: 1.9rem 2.4rem 1.7rem; cursor: pointer;
+  background: linear-gradient(135deg, rgba(34,26,58,.92), rgba(14,12,24,.85)); }
+.fyk { font-size: 1.15rem; font-weight: 600; letter-spacing: .12em; color: #f6c344; }
+.fyn { font-size: 1.55rem; font-weight: 600; color: rgba(255,255,255,.85); margin-top: .7rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.fyrow { display: flex; align-items: baseline; justify-content: space-between; gap: 1rem; }
+.fypts { font-size: 1.5rem; color: rgba(255,255,255,.6); }
+.fypts b { font-size: 4.6rem; font-weight: 700; letter-spacing: -.02em; color: #fff; }
+.fyproj { font-size: 1.45rem; font-weight: 600; color: #b9a8ff; white-space: nowrap; }
+.fyst { font-size: 1.25rem; color: rgba(255,255,255,.7); }
+.fychips { display: flex; flex-wrap: wrap; gap: .6rem; margin-top: auto; max-height: 2.8rem; overflow: hidden; }
+.fychips span { background: rgba(255,255,255,.12); border-radius: .7rem; padding: .4rem .9rem; font-size: 1.2rem; font-weight: 600; white-space: nowrap; }
+.fyempty { font-size: 1.6rem; font-weight: 600; margin-top: 2rem; line-height: 1.4; }
+.ldot { display: inline-block; width: .55rem; height: .55rem; border-radius: 50%; background: #ff453a; margin-right: .5rem; vertical-align: .12em; }
+
+/* the leagues, as badges (the one that's showing is lit) */
+.sprail { padding: 1.8rem 0 .2rem; }
+.sprailin { display: flex; gap: 2.6rem; padding: .9rem 5rem .4rem 6rem; overflow-x: auto; scrollbar-width: none; touch-action: pan-x pan-y; }
+.sprailin::-webkit-scrollbar { display: none; }
+.spbadge { display: flex; flex-direction: column; align-items: center; gap: .8rem; flex: none; width: 5.4rem; cursor: pointer; }
+.spbadge i { width: 5.4rem; height: 5.4rem; border-radius: 50%; background: rgba(255,255,255,.9); display: grid; place-items: center; font-style: normal; font-size: 2.5rem; line-height: 1;
+  transition: box-shadow .2s, scale .2s var(--ease); }
+.spbadge i.emo { background: #1a2130; }
+.spbadge i img { width: 62%; height: 62%; object-fit: contain; }
+.spbadge > span { font-size: 1.15rem; font-weight: 600; color: rgba(255,255,255,.55); white-space: nowrap; max-width: 8rem; overflow: hidden; text-overflow: ellipsis; }
+.spbadge.on i { background: #fff; box-shadow: 0 0 0 .3rem #fff, 0 0 0 1rem rgba(255,255,255,.2); }
+.spbadge.on i.emo { background: #2a3346; }
+.spbadge.on > span { color: #fff; }
+.spbadge.f i { box-shadow: 0 0 0 .3rem #fff, 0 0 0 1.1rem rgba(255,255,255,.45); scale: 1.06; }
+
+/* the games */
+#sports .sprow { margin: 1.2rem 0 0; }
+#sports .sprt { padding: .4rem 0 0 5rem; font-size: 1.9rem; font-weight: 700; font-style: normal; text-transform: none; letter-spacing: 0; color: #fff; }
+#sports .sprt small { margin-left: 1.2rem; font-size: 1.35rem; font-weight: 500; color: rgba(255,255,255,.55); }
+#sports .sprin { gap: 2rem; padding: 1.2rem 5rem 2rem; }
+#sports .gc { width: 25.6rem; height: 15rem; border-radius: 1.6rem; padding: 1.5rem 1.5rem 1.2rem 1.9rem; overflow: hidden;
+  background: linear-gradient(225deg, color-mix(in srgb, var(--c2, #3a4a66) 18%, transparent), transparent 55%), linear-gradient(#1a2030, #10141e);
+  box-shadow: 0 .6rem 1.6rem rgba(0,0,0,.4); }
+#sports .gc::before { content: ''; position: absolute; left: 0; top: 0; bottom: 0; width: .55rem; background: linear-gradient(var(--c1, #3a4a66), var(--c2, #3a4a66)); }
+#sports .gc.gedit::before { display: none; }
+#sports .gc.gedit { background: rgba(14,26,22,.9); border: .12rem dashed rgba(168,255,96,.35); }
+#sports .gc.f { box-shadow: 0 1.4rem 2.6rem rgba(0,0,0,.6), 0 0 0 .16rem #fff, 0 0 2.4rem color-mix(in srgb, var(--c2, #34c759) 55%, transparent); }
+#sports .gc.live.f { box-shadow: 0 1.4rem 2.6rem rgba(0,0,0,.6), 0 0 0 .16rem #fff, 0 0 2.4rem rgba(255,69,58,.5); }
+#sports .gch .gcl { font-size: 1.15rem; color: rgba(255,255,255,.6); }
+#sports .gcs { font-size: 1.25rem; color: #f6c344; display: flex; align-items: center; }
+#sports .gc.post .gcs { color: rgba(255,255,255,.6); }
+#sports .gc.live .gcs { color: #fff; }
+#sports .gc.live .gcs::before { display: none; }
+#sports .gct { margin-top: .9rem; padding-left: 0; gap: 1.1rem; }
+#sports .gct::before { display: none; }
+#sports .gc.post .gct { opacity: 1; }
+#sports .gct.dim { opacity: .6; }
+.gclg { width: 2.7rem; height: 2.7rem; border-radius: 50%; background: rgba(255,255,255,.08); display: grid; place-items: center; flex: none; }
+#sports .gct .gclg img { width: 82%; height: 82%; object-fit: contain; }
+#sports .gcn { font-size: 1.6rem; }
+#sports .gct b { font-size: 2.1rem; font-style: normal; font-weight: 700; min-width: 0; }
+#sports .gct b.gw { color: #30d158; font-size: 1.4rem; }
+#sports .gcr { font-size: 1.15rem; color: rgba(255,255,255,.55); }
+#sports .gcb { display: flex; align-items: center; justify-content: space-between; gap: 1rem; font-size: 1.1rem; }
+#sports .gtv { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.gmine { color: #f6c344; font-weight: 600; white-space: nowrap; flex: none; }
+
+/* fantasy players' cards */
+#sports .gc.gfy { padding: 1.1rem 1.3rem 1.1rem;
+  background: linear-gradient(200deg, color-mix(in srgb, var(--c1, #3a4a66) 55%, transparent), transparent 60%), linear-gradient(#141c2b, #0b111c); }
+#sports .gc.gfy::before, #sports .gc.gfyt::before { left: 0; right: 0; top: 0; bottom: auto; width: auto; height: .14rem; background: var(--c1, #8e7bff); }
+#sports .gc.gfy.live::before, #sports .gc.gfyt.live::before { height: .22rem; background: #ff453a; }
+#sports .gc.gfy.gedit::before { display: none; }
+.gfyph { position: absolute; right: 0; bottom: 0; height: 86%; opacity: .92; -webkit-mask-image: linear-gradient(to right, transparent, #000 45%); mask-image: linear-gradient(to right, transparent, #000 45%); pointer-events: none; }
+.gfyph.lg { height: 55%; right: 1.2rem; bottom: 2.2rem; }
+#sports .gc.bench .gfyph { opacity: .47; }
+#sports .gfy .gch { justify-content: flex-start; gap: .7rem; position: relative; }
+.gfypos { flex: none; background: color-mix(in srgb, var(--pc) 30%, transparent); color: var(--pc); font-size: .85rem; font-weight: 700; letter-spacing: .04em; padding: .2rem .55rem; border-radius: .4rem; }
+.gfypts { margin-left: auto; text-align: right; background: rgba(0,0,0,.7); border-radius: .6rem; padding: .2rem .6rem; font-size: 1.9rem; font-weight: 700; line-height: 1.15; }
+.gfypts small { display: block; font-size: .85rem; font-weight: 500; color: rgba(255,255,255,.8); }
+.gfypts.live { color: #ffe066; }
+.gfypts.proj { font-size: 1rem; padding: .4rem .6rem; }
+.gfyn, .gfyg, .gfyw { position: relative; max-width: 72%; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.gfyn { font-size: 1.55rem; font-weight: 600; margin-top: .6rem; }
+#sports .gc.bench .gfyn { color: rgba(255,255,255,.7); }
+.gfyg { font-size: 1.05rem; color: rgba(255,255,255,.85); margin-top: .3rem; }
+.gfyw { display: block; font-size: .95rem; font-weight: 600; color: #a8ff60; margin-top: .3rem; }
+.gfyw.post { color: rgba(255,255,255,.6); }
+.gfyw.live { color: #ff6b60; }
+#sports .gc.gfy .gcb, #sports .gc.gfyt .gcb { position: relative; justify-content: flex-start; gap: 0; }
+.gfyst { font-size: .9rem; font-weight: 600; background: rgba(255,214,10,.25); color: #ffe066; padding: .25rem .7rem; border-radius: .5rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.gfyst.bad { background: rgba(255,69,58,.25); color: #ff8a80; }
+.gfyl { font-size: 1rem; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.gfylast { font-size: .95rem; color: rgba(255,255,255,.7); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+#sports .gc.gfyt { padding: 1.1rem 1.3rem; background: repeating-linear-gradient(135deg, rgba(255,255,255,.035) 0 .1rem, transparent .1rem .7rem), linear-gradient(135deg, #2a1f4d, #0e0b1e); }
+.gfyp { font-size: 1.2rem; color: rgba(255,255,255,.7); margin-top: .5rem; }
+.gfyp b { font-size: 4.2rem; font-weight: 700; font-style: italic; color: #fff; }
+.gfyj { font-size: 1.15rem; font-weight: 600; color: #b9a8ff; }
+
+/* ---- a phone held upright: the same pieces, stacked, and the games as a list ---- */
+body.portrait #sphead { left: 3rem; }
+body.portrait #sports .spt { font-size: 3.8rem; }
+body.portrait .splive { font-size: 1.3rem; }
+body.portrait #sptabs { margin-top: 3.2rem; flex-wrap: wrap; gap: 1rem; }
+body.portrait .sptab { font-size: 1.75rem; padding: .9rem 2rem; }
+body.portrait #sports .spupd { flex-basis: 100%; margin: .3rem 0 0; font-size: 1.4rem; }
+body.portrait #sports #sprows { top: calc(21.4rem + var(--safe-t)); bottom: calc(13rem + var(--safe-b)); }
+body.portrait .sptop { flex-direction: column; padding: 0 3rem; gap: 1.6rem; }
+body.portrait .sphero { height: auto; min-height: 25rem; padding: 2.2rem 2.4rem 2rem; border-radius: 2.6rem; }
+body.portrait .shtop { font-size: 1.6rem; }
+body.portrait .shmid { gap: 1rem; margin: 1.8rem 0; }
+body.portrait .sht, body.portrait .sht.h { flex-direction: column; text-align: center; gap: .9rem; }
+body.portrait .shlg { width: 8.6rem; height: 8.6rem; }
+body.portrait .shnm b { font-size: 2.1rem; }
+body.portrait .shnm small { font-size: 1.5rem; }
+body.portrait .shsc b { font-size: 6rem; }
+body.portrait .shsc.pre b { font-size: 2.3rem; }
+body.portrait .shfoot { flex-direction: column-reverse; align-items: stretch; gap: 1.2rem; }
+body.portrait .shwatch { text-align: center; font-size: 1.85rem; padding: 1.15rem; border-radius: 2.4rem; }
+body.portrait .shinfo { font-size: 1.5rem; text-align: center; white-space: normal; }
+body.portrait .spfy { width: auto; height: auto; min-height: 19rem; padding: 2.2rem 2.4rem; border-radius: 2.6rem; }
+body.portrait .fyk { font-size: 1.35rem; }
+body.portrait .fyn { font-size: 1.8rem; }
+body.portrait .fyproj, body.portrait .fyst { font-size: 1.6rem; }
+body.portrait .fychips { max-height: none; margin-top: 1.2rem; }
+body.portrait .fychips span { font-size: 1.45rem; }
+body.portrait .sprailin { padding: .9rem 3rem .4rem; gap: 2.2rem; }
+body.portrait .spbadge { width: 7rem; }
+body.portrait .spbadge i { width: 7rem; height: 7rem; font-size: 3.3rem; }
+body.portrait .spbadge > span { font-size: 1.45rem; max-width: 10rem; }
+body.portrait #sports .sprt { padding-left: 3rem; font-size: 2.3rem; }
+body.portrait #sports .sprt small { font-size: 1.6rem; }
+body.portrait #sports .spstrip { overflow: visible; }
+body.portrait #sports .sprin { flex-direction: column; width: auto; padding: 1rem 3rem 2rem; gap: 1.6rem; }
+body.portrait #sports .gc { width: auto; height: auto; min-height: 20rem; padding: 1.9rem 2rem 1.6rem 2.6rem; border-radius: 2.2rem; }
+body.portrait #sports .gc::before { width: .7rem; }
+body.portrait #sports .gc.f { scale: 1.02; }
+body.portrait .gclg { width: 4.2rem; height: 4.2rem; }
+body.portrait #sports .gcr { font-size: 1.45rem; }
+body.portrait .gmine { font-size: 1.4rem; }
+body.portrait #sports .gc.gfy, body.portrait #sports .gc.gfyt { padding: 1.6rem 1.9rem; min-height: 18rem; }
+body.portrait .gfypos { font-size: 1.15rem; }
+body.portrait .gfypts { font-size: 2.4rem; }
+body.portrait .gfypts small { font-size: 1.1rem; }
+body.portrait .gfyn { font-size: 2.1rem; }
+body.portrait .gfyg { font-size: 1.5rem; }
+body.portrait .gfyw { font-size: 1.35rem; }
+body.portrait .gfyst, body.portrait .gfyl, body.portrait .gfylast { font-size: 1.3rem; }
+body.portrait .gfyp { font-size: 1.6rem; }
+body.portrait .gfyp b { font-size: 5rem; }
+body.portrait .gfyj { font-size: 1.5rem; }

@@ -1,0 +1,146 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <uses-permission android:name="android.permission.INTERNET" />
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <!-- the Home button without Accessibility (see HomeWatchService) -->
+    <uses-permission android:name="android.permission.PACKAGE_USAGE_STATS" />
+    <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE" />
+    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
+    <!-- recordings: start on time, and keep the TV awake and online while recording -->
+    <uses-permission android:name="android.permission.USE_EXACT_ALARM" />
+    <uses-permission android:name="android.permission.WAKE_LOCK" />
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+    <uses-permission android:name="android.permission.ACCESS_WIFI_STATE" />
+    <uses-permission android:name="android.permission.CHANGE_WIFI_MULTICAST_STATE" />
+    <!-- updates from your own GitHub repository (Settings → TopShelf updates); Android asks before installing -->
+    <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
+
+    <uses-feature android:name="android.software.leanback" android:required="false" />
+    <uses-feature android:name="android.hardware.touchscreen" android:required="false" />
+
+    <!-- Lets the launcher see installed apps (Android 11+ package visibility). -->
+    <queries>
+        <intent>
+            <action android:name="android.intent.action.MAIN" />
+            <category android:name="android.intent.category.LEANBACK_LAUNCHER" />
+        </intent>
+        <intent>
+            <action android:name="android.intent.action.MAIN" />
+            <category android:name="android.intent.category.LAUNCHER" />
+        </intent>
+        <intent>
+            <action android:name="android.intent.action.MAIN" />
+            <category android:name="android.intent.category.HOME" />
+        </intent>
+        <!-- so TopShelf can see that Nuvio / Stremio handle their title links -->
+        <intent>
+            <action android:name="android.intent.action.VIEW" />
+            <data android:scheme="nuvio" />
+        </intent>
+        <intent>
+            <action android:name="android.intent.action.VIEW" />
+            <data android:scheme="stremio" />
+        </intent>
+        <!-- speech input for voice search -->
+        <intent>
+            <action android:name="android.speech.action.RECOGNIZE_SPEECH" />
+        </intent>
+        <!-- Google's home screen, so the Home button watcher can recognise it -->
+        <intent><action android:name="android.intent.action.MAIN" /><category android:name="android.intent.category.HOME" /></intent>
+        <package android:name="com.google.android.apps.tv.launcherx" />
+        <package android:name="com.google.android.tvlauncher" />
+        <package android:name="com.google.android.leanbacklauncher" />
+        <package android:name="com.spocky.projengmenu" />
+        <package android:name="me.efesser.flauncher" />
+        <package android:name="ca.dstudio.atvlauncher.free" />
+        <package android:name="ca.dstudio.atvlauncher.pro" />
+        <!-- icon packs and the file / photo pickers -->
+        <intent><action android:name="org.adw.launcher.THEMES" /></intent>
+        <intent><action android:name="com.novalauncher.THEME" /></intent>
+        <intent><action android:name="com.teslacoilsw.launcher.THEME" /></intent>
+        <intent><action android:name="org.adw.launcher.icons.ACTION_PICK_ICON" /></intent>
+        <intent><action android:name="com.gau.go.launcherex.theme" /></intent>
+        <intent><action android:name="com.fede.launcher.THEME_ICONPACK" /></intent>
+        <intent><action android:name="android.intent.action.OPEN_DOCUMENT" /><data android:mimeType="*/*" /></intent>
+        <intent><action android:name="android.intent.action.GET_CONTENT" /><data android:mimeType="*/*" /></intent>
+        <intent><action android:name="android.intent.action.PICK" /><data android:mimeType="image/*" /></intent>
+    </queries>
+
+    <application
+        android:allowBackup="false"
+        android:usesCleartextTraffic="true"
+        android:banner="@drawable/banner"
+        android:icon="@mipmap/ic_launcher"
+        android:label="@string/app_name"
+        android:hardwareAccelerated="true"
+        android:largeHeap="true"
+        android:supportsRtl="true"
+        android:theme="@style/Launcher">
+
+        <activity
+            android:name=".MainActivity"
+            android:exported="true"
+            android:launchMode="singleTask"
+            android:stateNotNeeded="true"
+            android:resizeableActivity="true"
+            android:supportsPictureInPicture="true"
+            android:windowSoftInputMode="adjustNothing"
+            android:configChanges="keyboard|keyboardHidden|navigation|orientation|screenSize|smallestScreenSize|screenLayout|uiMode|density|fontScale|locale|layoutDirection">
+
+            <!-- Shows up in the app list -->
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+                <category android:name="android.intent.category.LEANBACK_LAUNCHER" />
+            </intent-filter>
+
+            <!-- Can be the real home app (used when Google's launcher is disabled) -->
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.HOME" />
+                <category android:name="android.intent.category.DEFAULT" />
+            </intent-filter>
+        </activity>
+
+        <receiver android:name=".ReminderReceiver" android:exported="false" />
+        <receiver android:name=".RecordReceiver" android:exported="false" />
+        <service
+            android:name=".RecordService"
+            android:exported="false"
+            android:foregroundServiceType="specialUse">
+            <property android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
+                android:value="Records live TV programmes the user scheduled" />
+        </service>
+
+        <service
+            android:name=".HomeWatchService"
+            android:exported="false"
+            android:foregroundServiceType="specialUse">
+            <property android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
+                android:value="Brings the launcher back when the TV's Home button opens the stock home screen" />
+        </service>
+        <receiver android:name=".Updater$InstallReceiver" android:exported="false" />
+        <receiver android:name=".BootReceiver" android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.BOOT_COMPLETED" />
+                <action android:name="android.intent.action.MY_PACKAGE_REPLACED" />
+            </intent-filter>
+        </receiver>
+
+        <service
+            android:name=".HomeRedirectService"
+            android:exported="false"
+            android:label="@string/redirect_label"
+            android:permission="android.permission.BIND_ACCESSIBILITY_SERVICE">
+            <intent-filter>
+                <action android:name="android.accessibilityservice.AccessibilityService" />
+            </intent-filter>
+            <meta-data
+                android:name="android.accessibilityservice"
+                android:resource="@xml/home_redirect_service" />
+        </service>
+    </application>
+</manifest>

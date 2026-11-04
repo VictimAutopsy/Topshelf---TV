@@ -1,0 +1,3 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- splash icon: the mark alone (no tile), sized for the 240dp splash icon area with its 160dp visible circle -->
+<inset xmlns:android="http://schemas.android.com/apk/res/android" android:drawable="@drawable/splash_mark" android:inset="26%" />

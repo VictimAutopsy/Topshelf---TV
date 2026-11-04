@@ -1,0 +1,99 @@
+/* ==================== Movies & TV Shows ==================== */
+#vod { position: absolute; inset: 0; opacity: 0; pointer-events: none; transition: opacity .4s; color: #fff; }
+#vod.on { opacity: 1; pointer-events: auto; }
+body.vod #content, body.vod #drawer, body.vod #hint { opacity: 0 !important; pointer-events: none !important; }
+body.vod #bg { opacity: 0; }
+body.vod #scrim { opacity: 0; }
+
+/* backdrop of the focused title, edge to edge */
+#vbg { position: absolute; top: 0; bottom: 0; left: calc(-1 * var(--safe-l)); right: calc(-1 * var(--safe-r)); overflow: hidden; background: #000; }
+.vbgi {
+  position: absolute; inset: 0; background: center 20% / cover no-repeat; opacity: 0; transition: opacity .9s ease;
+}
+.vbgi.show { opacity: 1; }
+#vbg::after {
+  content: ''; position: absolute; inset: 0; pointer-events: none;
+  background:
+    linear-gradient(to right, rgba(0,0,0,.82) 0%, rgba(0,0,0,.55) 38%, rgba(0,0,0,.05) 70%),
+    linear-gradient(to bottom, rgba(0,0,0,.35) 0%, rgba(0,0,0,0) 20%, rgba(0,0,0,.25) 46%, rgba(0,0,0,.92) 72%);
+}
+
+#vhero { position: absolute; left: 5rem; top: 9.6rem; width: min(62rem, 60%); transition: opacity .3s; }
+.vlogo { display: block; max-width: 34rem; max-height: 9.5rem; object-fit: contain; object-position: left bottom; filter: drop-shadow(0 .3rem 1.2rem rgba(0,0,0,.5)); }
+.vtitle { font-size: 3.6rem; font-weight: 700; letter-spacing: -.03em; line-height: 1.05; text-shadow: 0 .2rem 1.2rem rgba(0,0,0,.5); }
+.vmeta { margin-top: 1.1rem; font-size: 1.25rem; font-weight: 500; color: rgba(255,255,255,.82); display: flex; align-items: center; gap: 1rem; flex-wrap: wrap; }
+.vchip { font-size: .95rem; font-weight: 600; padding: .25rem .8rem; border-radius: 1rem; background: rgba(48,209,88,.25); color: #8ff0a4; }
+.vdesc {
+  margin-top: .8rem; font-size: 1.2rem; line-height: 1.45; color: rgba(255,255,255,.78); text-shadow: 0 .1rem .6rem rgba(0,0,0,.5);
+  display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden;
+}
+
+/* rows of posters */
+#vrows {
+  position: absolute; left: 0; right: 0; top: 30.5rem; bottom: 0; overflow-y: auto; overflow-x: hidden;
+  overscroll-behavior: contain; touch-action: pan-y; scrollbar-width: none; overflow-anchor: none;
+  padding-bottom: 30rem; box-sizing: border-box;
+  -webkit-mask-image: linear-gradient(to bottom, transparent 0, #000 1.2rem);
+          mask-image: linear-gradient(to bottom, transparent 0, #000 1.2rem);
+}
+#vrows::-webkit-scrollbar { display: none; }
+.vrow { position: relative; height: 22.4rem; }
+.vrt { position: absolute; left: 5rem; top: .6rem; font-size: 1.35rem; font-weight: 600; color: rgba(255,255,255,.92); text-shadow: 0 .1rem .6rem rgba(0,0,0,.6); }
+.vstrip {
+  position: absolute; left: 0; right: 0; top: 2.6rem; height: 19.6rem; overflow-x: auto; overflow-y: hidden;
+  overscroll-behavior-x: contain; touch-action: pan-x pan-y; scrollbar-width: none; overflow-anchor: none;   /* up/down swipes pass to the page */
+}
+.vstrip::-webkit-scrollbar { display: none; }
+.vsin { position: relative; height: 100%; padding-left: 5rem; display: flex; align-items: center; gap: 1.4rem; box-sizing: border-box; min-width: 100%; }
+.vp {
+  position: relative; flex: none; width: 11rem; height: 16.5rem; border-radius: 1.1rem; overflow: hidden;
+  background: linear-gradient(160deg, #34343c, #1c1c22); box-shadow: 0 .5rem 1.4rem rgba(0,0,0,.45);
+  transition: scale .25s var(--ease), box-shadow .25s var(--ease);
+}
+.vp img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+.vpn {
+  position: absolute; left: .7rem; right: .7rem; bottom: .7rem; font-size: 1rem; font-weight: 600; line-height: 1.2;
+  display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden;
+}
+.vp img + .vpn { display: none; }
+.vp .rim { position: absolute; inset: 0; border-radius: inherit; pointer-events: none;
+  box-shadow: inset 0 .1rem 0 rgba(255,255,255,.35), inset 0 0 0 .07rem rgba(255,255,255,.14); }
+.vbadge {
+  position: absolute; right: .5rem; top: .5rem; font-style: normal; font-size: .8rem; font-weight: 700; padding: .15rem .45rem;
+  border-radius: .5rem; background: rgba(48,209,88,.9); color: #052; letter-spacing: .03em;
+}
+.vp.f { scale: 1.12; z-index: 2; box-shadow: 0 1.6rem 2.6rem rgba(0,0,0,.6), 0 0 0 .15rem rgba(255,255,255,.85); }
+.vempty { color: var(--text-dim); font-size: 1.1rem; padding-left: .2rem; }
+
+.vhint { margin-top: 1rem; font-size: 1rem; font-weight: 500; color: rgba(255,255,255,.55); letter-spacing: .02em; }
+
+/* resting on a title: the poster widens into a backdrop card that plays the trailer */
+.vp { transition: scale .25s var(--ease), box-shadow .25s var(--ease), width .4s var(--ease); }
+.vp.x { width: 29.3rem; }
+.vpx { position: absolute; inset: 0; opacity: 0; transition: opacity .45s ease; pointer-events: none; overflow: hidden; border-radius: inherit; }
+.vp.x .vpx { opacity: 1; }
+.vpxb { position: absolute; inset: 0; background: #111 center 20% / cover no-repeat; }
+.vpxg { position: absolute; inset: 0; background: linear-gradient(to top, rgba(0,0,0,.72) 0%, rgba(0,0,0,0) 45%); }
+.vpxl { position: absolute; left: 1.1rem; bottom: 1rem; max-width: 13rem; max-height: 4.2rem; object-fit: contain; object-position: left bottom;
+  filter: drop-shadow(0 .2rem .8rem rgba(0,0,0,.6)); }
+.vpxt { position: absolute; left: 1.1rem; right: 1.1rem; bottom: 1rem; font-size: 1.5rem; font-weight: 700; letter-spacing: -.02em; text-shadow: 0 .1rem .6rem rgba(0,0,0,.6); }
+.vtr { position: absolute; inset: 0; overflow: hidden; opacity: 0; transition: opacity .7s ease; pointer-events: none; background: #000; }
+.vtr.play { opacity: 1; }
+.vtr:empty { display: none; }
+/* a trailer straight from YouTube: fills its frame, and fades in quickly (nothing to wait out) */
+.vtr video { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; pointer-events: none; }
+.vtr:has(> video) { transition-duration: .35s; }
+/* a trailer playing behind the title: the title and description step aside, and the bars at the top
+   are see-through so the trailer shows behind them (their glass covered it like a solid board) */
+#vod:has(#vtrbg.play) #vhero { opacity: 0; transition: opacity .6s; }
+body:has(#vtrbg.play) :is(#tabs, #topbar) { backdrop-filter: none !important; -webkit-backdrop-filter: none !important; background: rgba(0,0,0,.32) !important; }
+body:has(#vtrbg.play) :is(#tabs, #topbar) > canvas.gbake { display: none !important; }
+
+/* Settings → Header trailer (a wide screen; an upright phone already shows the trailer above the rows) */
+body:not(.portrait) #vrows { transition: translate .4s var(--ease); }
+body:not(.portrait).trtuck #vrows { translate: 0 calc(100% - 5.5rem); transition-duration: .8s; }
+body:not(.portrait) #vbg::after { transition: opacity .8s; }
+body:not(.portrait).trtuck #vbg::after { opacity: .25; }   /* (the shading for the title's text isn't needed then) */
+body:not(.portrait).trfit #vtrbg { inset: 0 0 auto auto; height: 30rem; width: calc(30rem * 16 / 9);
+  -webkit-mask-image: linear-gradient(to right, transparent, #000 30%), linear-gradient(to top, transparent, #000 28%); -webkit-mask-composite: source-in;
+          mask-image: linear-gradient(to right, transparent, #000 30%), linear-gradient(to top, transparent, #000 28%); mask-composite: intersect; }

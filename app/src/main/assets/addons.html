@@ -1,0 +1,120 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Addons · TopShelf</title>
+<style>
+  :root { --bg: #0d0e13; --card: #17181f; --line: #2a2c36; --fg: #f3f3f6; --dim: #a3a5b2; --accent: #7b5cff; --ok: #3ccf7a; --err: #ff6b5e; }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--fg); font: 16px/1.5 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; padding: 20px max(16px, env(safe-area-inset-left)) 40px max(16px, env(safe-area-inset-right)); }
+  main { max-width: 560px; margin: 0 auto; display: grid; gap: 16px; }
+  h1 { font-size: 22px; margin: 4px 0 0; }
+  .sub { color: var(--dim); margin: 0; }
+  section { background: var(--card); border: 1px solid var(--line); border-radius: 16px; padding: 18px; display: grid; gap: 12px; }
+  section.off { opacity: .45; pointer-events: none; }
+  h2 { font-size: 17px; margin: 0; display: flex; gap: 10px; align-items: center; }
+  h2 b { display: inline-grid; place-items: center; width: 26px; height: 26px; border-radius: 50%; background: var(--accent); font-size: 14px; }
+  section.done h2 b { background: var(--ok); }
+  ol { margin: 0; padding-left: 20px; display: grid; gap: 6px; }
+  a { color: #b4a3ff; }
+  code { background: #23252f; padding: 2px 6px; border-radius: 6px; font-size: 14px; word-break: break-all; }
+  label { font-size: 13px; color: var(--dim); display: grid; gap: 4px; }
+  input { width: 100%; font: inherit; color: var(--fg); background: #0f1016; border: 1px solid var(--line); border-radius: 10px; padding: 11px 12px; }
+  input:focus { outline: 2px solid var(--accent); border-color: transparent; }
+  button, .btn { appearance: none; border: 0; font: 600 16px/1 inherit; font-family: inherit; color: #fff; background: var(--accent); border-radius: 12px; padding: 13px 16px; text-align: center; text-decoration: none; cursor: pointer; }
+  button.ghost { background: #262833; font-weight: 500; font-size: 14px; padding: 8px 10px; }
+  .row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+  .msg { font-size: 14px; min-height: 1em; }
+  .msg.err { color: var(--err); } .msg.ok { color: var(--ok); }
+  .note { font-size: 13px; color: var(--dim); }
+  .list { display: grid; gap: 8px; }
+  .ad { display: flex; align-items: center; gap: 12px; padding: 10px 12px; border-radius: 12px; background: #0f1016; border: 1px solid var(--line); }
+  .ad img { width: 40px; height: 40px; border-radius: 10px; object-fit: contain; background: #1d1f29; flex: none; }
+  .ad .n { flex: 1; min-width: 0; }
+  .ad .n b { display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .ad .n span { font-size: 12.5px; color: var(--dim); display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .ad button { padding: 8px 10px; font-size: 13px; }
+  .ad button.rm { background: #3a1d22; color: #ff8a80; }
+  .off { opacity: .5; }
+  .empty { color: var(--dim); font-size: 14px; }
+</style>
+</head>
+<body>
+<main>
+  <div>
+    <h1>Addons</h1>
+    <p class="sub">The same kind of addons Nuvio and Stremio use. On the TV, choose a movie or show in Movies or TV Shows to see the streams your addons find for it (for example from your debrid service), and play them in TopShelf's player.</p>
+  </div>
+
+  <section>
+    <h2>Add an addon</h2>
+    <label>The addon's address (its manifest link — it usually ends in /manifest.json; stremio:// links work too)<input id="url" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="https://…/manifest.json"></label>
+    <button id="add">Add to the TV</button>
+    <div class="msg" id="m1"></div>
+    <p class="note" style="margin:0">Using Nuvio? Open Nuvio on the TV › Settings › Add-ons › <b>Manage from phone</b> to see your addons there, copy each one's link and paste it here. Debrid addons put your debrid key in their link — keep these links private.</p>
+  </section>
+
+  <section>
+    <h2>Copy your addons from Stremio</h2>
+    <p class="note" style="margin:0">Signs in to your Stremio account once, only to read your addon list. Your password isn't kept — not on the TV, not anywhere.</p>
+    <label>Stremio email<input id="em" type="email" autocomplete="username"></label>
+    <label>Stremio password<input id="pw" type="password" autocomplete="current-password"></label>
+    <button id="imp">Copy my addons</button>
+    <div class="msg" id="m2"></div>
+  </section>
+
+  <section>
+    <h2>On the TV <span id="count" class="note" style="font-weight:400"></span></h2>
+    <div class="list" id="list"><div class="empty">Loading…</div></div>
+  </section>
+</main>
+<script>
+const K = new URLSearchParams(location.search).get('k') || '';
+const $ = id => document.getElementById(id);
+async function call(path, body) {
+  const r = await fetch(path, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(Object.assign({ k: K }, body || {})) });
+  const j = await r.json().catch(() => ({ error: 'The TV gave an odd answer' }));
+  if (!r.ok || j.error) throw new Error(j.error || ('HTTP ' + r.status));
+  return j;
+}
+function msg(id, text, kind) { const m = $(id); m.textContent = text; m.className = 'msg' + (kind ? ' ' + kind : ''); }
+const esc = s => String(s || '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+function what(m) {
+  const rs = (m.resources || []).map(r => typeof r === 'string' ? r : r.name);
+  const out = [];
+  if (rs.includes('stream')) out.push('streams');
+  if (rs.includes('subtitles')) out.push('subtitles');
+  if (rs.includes('meta')) out.push('details');
+  return out.join(' · ') || 'catalogs only (not used here)';
+}
+function draw(list) {
+  $('count').textContent = list.length ? '· ' + list.length : '';
+  $('list').innerHTML = list.length ? list.map((a, i) => {
+    const m = a.manifest || {};
+    return `<div class="ad${a.on === false ? ' off' : ''}">${m.logo ? `<img src="${esc(m.logo)}" alt="">` : '<img alt="">'}<div class="n"><b>${esc(m.name || a.url)}</b><span>${esc(what(m))}${m.version ? ' · v' + esc(m.version) : ''}</span></div>` +
+      `<button class="ghost" data-on="${i}">${a.on === false ? 'Off' : 'On'}</button><button class="rm" data-rm="${i}">Remove</button></div>`;
+  }).join('') : '<div class="empty">No addons yet — add one above.</div>';
+  window._list = list;
+}
+async function refresh() { try { draw((await call('/addons/list')).addons || []); } catch (e) { $('list').innerHTML = `<div class="msg err">${esc(e.message)}</div>`; } }
+$('add').addEventListener('click', async () => {
+  const u = $('url').value.trim(); if (!u) return;
+  msg('m1', 'Adding…');
+  try { const j = await call('/addons/add', { url: u }); draw(j.addons || []); msg('m1', 'Added on the TV.', 'ok'); $('url').value = ''; }
+  catch (e) { msg('m1', e.message, 'err'); }
+});
+$('imp').addEventListener('click', async () => {
+  msg('m2', 'Signing in to Stremio…');
+  try { const j = await call('/addons/stremio', { email: $('em').value, password: $('pw').value }); $('pw').value = ''; draw(j.addons || []); msg('m2', 'Copied to the TV.', 'ok'); }
+  catch (e) { $('pw').value = ''; msg('m2', e.message, 'err'); }
+});
+$('list').addEventListener('click', async e => {
+  const l = window._list || [];
+  if (e.target.dataset.rm != null) { const a = l[+e.target.dataset.rm]; if (!a || !confirm('Remove ' + ((a.manifest || {}).name || 'this addon') + '?')) return; draw((await call('/addons/remove', { url: a.url })).addons || []); }
+  else if (e.target.dataset.on != null) { const a = l[+e.target.dataset.on]; if (!a) return; draw((await call('/addons/toggle', { url: a.url, on: a.on === false })).addons || []); }
+});
+refresh();
+</script>
+</body>
+</html>

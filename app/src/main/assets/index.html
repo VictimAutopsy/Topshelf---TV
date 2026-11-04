@@ -1,0 +1,2047 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="referrer" content="no-referrer">
+<meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no">
+<title>TopShelf</title>
+<style>
+@font-face { font-family: Inter; src: url(fonts/Inter-Regular.otf); font-weight: 400; }
+@font-face { font-family: Inter; src: url(fonts/Inter-Medium.otf); font-weight: 500; }
+@font-face { font-family: Inter; src: url(fonts/Inter-SemiBold.otf); font-weight: 600 700; }
+
+:root {
+  --ease: cubic-bezier(.2, .8, .2, 1);
+  --spring: cubic-bezier(.34, 1.4, .5, 1);
+  --tw: 19.4rem;              /* tile width: 5 across a 1920px screen */
+  --th: calc(var(--tw) * 9 / 16);
+  --glass: rgba(42, 42, 46, .58);
+  --glass-hi: rgba(255, 255, 255, .14);
+  --text-dim: rgba(255, 255, 255, .62);
+  --scroll: 0rem;
+}
+/* 1rem = 16px on a 1920x1080 screen, always 16:9 */
+html { font-size: min(calc(100vw / 120), calc(100vh / 67.5)); }
+/* phone held upright: the screen is 64rem wide */
+@media (max-aspect-ratio: 20/21) { html { font-size: min(calc(100vw / 64), calc(100vh / 100)); } }
+html, body {
+  margin: 0; height: 100%; overflow: hidden; overflow: clip;   /* clip: the page itself can never be scrolled */ background: #000; color: #fff;
+  font-family: Inter, "Google Sans", system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased; cursor: none; user-select: none;
+}
+/* The stage fills the whole screen. 1rem is sized so a 16:9 area fits; wider screens (phones)
+   get extra width, which the layout uses (more dock columns, wider guide). */
+:root { --sw: 120; --sh: 67.5; --safe-l: 0px; --safe-r: 0px; --safe-t: 0px; --safe-b: 0px; }
+/* The stage (all controls) stays clear of the camera cutout; the photo and full-screen video
+   reach past it to the real screen edges. */
+#stage {
+  position: absolute; left: var(--safe-l); right: var(--safe-r); top: 0; bottom: 0; overflow: visible; background: #000;
+  touch-action: none; -webkit-tap-highlight-color: transparent;
+}
+
+/* ---------- Background photos ---------- */
+#bg {
+  position: absolute; top: 0; bottom: 0; left: calc(-1 * var(--safe-l)); right: calc(-1 * var(--safe-r));
+  overflow: hidden; transition: filter .6s var(--ease), scale .6s var(--ease);
+}
+.bgimg {
+  position: absolute; inset: -3%; background: center / cover no-repeat;
+  opacity: 0; transition: opacity 1.6s ease; will-change: opacity, transform;
+}
+.bgimg.show { opacity: 1; }
+.bgimg.kb { animation: kb var(--kbdur, 40s) linear forwards; }
+@keyframes kb {
+  from { transform: scale(1.0) translate(0, 0); }
+  to   { transform: scale(1.09) translate(var(--kx, -1%), var(--ky, -1%)); }
+}
+body.still .bgimg.kb, body.deep .bgimg.kb, body.paused .bgimg.kb { animation-play-state: paused; }
+#aurora {
+  position: absolute; inset: 0; opacity: 0; transition: opacity 1.2s ease;
+  background:
+    radial-gradient(60% 70% at 18% 20%, #2b4b9b 0%, transparent 60%),
+    radial-gradient(55% 60% at 85% 15%, #6a2f8a 0%, transparent 60%),
+    radial-gradient(70% 70% at 60% 85%, #0f5c6e 0%, transparent 65%),
+    #0b0d18;
+}
+body.nophotos #aurora { opacity: 1; }
+body.deep #bg { filter: brightness(.6) saturate(1.15); scale: 1.03; }
+body.settings-open #bg { filter: brightness(.7); }
+
+#scrim {
+  position: absolute; top: 0; bottom: 0; left: calc(-1 * var(--safe-l)); right: calc(-1 * var(--safe-r)); pointer-events: none;
+  background: linear-gradient(to bottom,
+    rgba(0,0,0,.42) 0%, rgba(0,0,0,0) 16%, rgba(0,0,0,0) 38%,
+    rgba(0,0,0,.08) 62%, rgba(0,0,0,.45) 100%);
+  transition: opacity .6s var(--ease);
+}
+body.shelf #scrim { opacity: .55; }
+
+/* ---------- Clock & caption ---------- */
+#topbar {
+  position: absolute; top: 2.6rem; right: 6rem; display: flex; align-items: center; gap: 1.1rem; z-index: 30;
+}
+.tb {
+  position: relative; width: 3.8rem; height: 3.8rem; border-radius: 50%; display: grid; place-items: center;
+  color: #fff; background: rgba(40, 40, 44, .42);
+  backdrop-filter: blur(1.2rem) saturate(1.5); -webkit-backdrop-filter: blur(1.2rem) saturate(1.5);
+  box-shadow: 0 .3rem 1rem rgba(0,0,0,.25), inset 0 0 0 1px rgba(255,255,255,.1);
+  transition: scale .22s var(--ease), background .2s, color .2s, opacity .4s;
+}
+.tb svg { width: 1.9rem; height: 1.9rem; }
+.tb .tip {
+  position: absolute; top: 4.7rem; left: 50%; translate: -50% -.3rem; font-size: 1.05rem; font-weight: 500;
+  white-space: nowrap; color: #fff; opacity: 0; transition: opacity .2s, translate .2s; text-shadow: 0 .1rem .6rem rgba(0,0,0,.6);
+}
+.tb.sel { background: #fff; color: #111; scale: 1.14; }
+.tb.sel .tip { opacity: 1; translate: -50% 0; }
+body.shelf .tb, body.shelf #topbar { opacity: 0; pointer-events: none; }
+#clock {
+  margin-left: .8rem; font-size: 2rem; font-weight: 500;
+  letter-spacing: -.01em; text-shadow: 0 .1rem .8rem rgba(0,0,0,.45);
+  font-variant-numeric: tabular-nums; transition: opacity .4s;
+}
+body.clock-off #clock { opacity: 0; }
+
+#caption {
+  position: absolute; left: 6rem; top: 37.6rem; translate: 0 -100%; max-width: 62rem;
+  text-shadow: 0 .1rem 1rem rgba(0,0,0,.55);
+  transition: opacity .5s var(--ease), top .6s var(--ease), translate .5s var(--ease);
+}
+#caption .sub { font-size: 1.05rem; font-weight: 600; letter-spacing: .08em; text-transform: uppercase; color: var(--text-dim); }
+#caption .title {
+  font-size: 2rem; font-weight: 600; letter-spacing: -.015em; line-height: 1.18; margin-top: .45rem;
+  display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
+  transition: font-size .6s var(--ease);
+}
+#caption .by { font-size: 1.1rem; color: var(--text-dim); margin-top: .5rem; }
+#caption.swap { opacity: 0; translate: 0 calc(-100% + .6rem); }
+body.deep #caption { opacity: 0; }
+body.shelf #caption { top: 60rem; }
+/* The photo's title only shows in photo mode, not above the apps. */
+body:not(.shelf) #caption { opacity: 0; }
+body.shelf #caption .title { font-size: 3rem; }
+body.nophotos #caption { opacity: 0; }
+
+#shelfhint {
+  position: absolute; right: 6rem; bottom: 5.4rem; font-size: 1.1rem; color: var(--text-dim);
+  opacity: 0; transition: opacity .5s; text-shadow: 0 .1rem .6rem rgba(0,0,0,.6);
+}
+body.shelf #shelfhint { opacity: 1; }
+#pausebadge {
+  position: absolute; top: 3.2rem; left: 6rem; font-size: 1.1rem; font-weight: 600;
+  padding: .5rem 1rem; border-radius: 2rem; background: var(--glass);
+  backdrop-filter: blur(1.5rem); opacity: 0; transition: opacity .3s;
+}
+body.paused #pausebadge { opacity: 1; }
+
+/* ---------- Home grid ---------- */
+#content {
+  position: absolute; inset: 0; translate: 0 0;
+  transition: translate .55s var(--ease), opacity .45s var(--ease);
+}
+body.shelf #content { opacity: 0; translate: 0 10rem; pointer-events: none; }
+body.deep #content { opacity: 0; translate: 0 6rem; pointer-events: none; }
+
+/* All-apps drawer: hidden below the screen, slides up when you go down from the dock */
+#drawer {
+  position: absolute; left: 3rem; right: 3rem; top: 8.8rem; bottom: 2.2rem; border-radius: 3.4rem;
+  overflow: hidden; translate: 0 calc(100% + 5rem); opacity: 0; z-index: 5;
+}
+body.deep #drawer { translate: 0 0; opacity: 1; }
+body.shelf #drawer { opacity: 0; translate: 0 calc(100% + 5rem); }
+#gridscroll {
+  position: absolute; inset: 0; overflow-x: hidden; overflow-y: auto; overscroll-behavior: contain;
+  touch-action: pan-y; scrollbar-width: none; overflow-anchor: none;
+}
+#gridscroll::-webkit-scrollbar { display: none; }
+#gridwrap { position: relative; width: 100%; }
+#dockcells { position: absolute; inset: 0; pointer-events: none; }
+#dockcells .cell { pointer-events: auto; }
+
+#hint {
+  position: absolute; left: 50%; bottom: .55rem; translate: -50% 0; display: flex; align-items: center; gap: .35rem;
+  font-size: .95rem; font-weight: 500; color: rgba(255,255,255,.72); text-shadow: 0 .1rem .5rem rgba(0,0,0,.6);
+  opacity: 0; transition: opacity .4s; pointer-events: none;
+}
+#hint svg { width: 1rem; height: 1rem; animation: nudge 2.4s ease-in-out infinite; }
+@keyframes nudge { 0%, 70%, 100% { translate: 0 0; } 82% { translate: 0 .25rem; } }
+body.hasdrawer:not(.deep):not(.shelf) #hint { opacity: 1; pointer-events: auto; }
+
+#dock {
+  position: absolute; left: 0; right: 0; top: 39.4rem; height: calc(var(--th) + 6.2rem);
+  background: linear-gradient(to bottom, rgba(255,255,255,.13), rgba(255,255,255,.07));
+  backdrop-filter: blur(2.2rem) saturate(1.7);
+  -webkit-backdrop-filter: blur(2.2rem) saturate(1.7);
+  border-top: 1px solid rgba(255,255,255,.14);
+  transition: opacity .5s var(--ease);
+}
+body.deep #dock, body.deep .cell.r0 { opacity: 0; }
+
+.cell {
+  position: absolute; left: 0; top: 0; width: var(--tw);
+  translate: var(--x) var(--y);
+  transition: translate .38s var(--ease), opacity .3s;
+}
+.tile {
+  position: relative; width: var(--tw); height: var(--th); border-radius: .85rem; overflow: hidden;
+  background: #232326; scale: 1; translate: 0 0;
+  box-shadow: 0 .4rem 1rem rgba(0,0,0,.35);
+  transition: scale .26s var(--ease), box-shadow .26s var(--ease), translate .2s var(--ease);
+  will-change: scale;
+}
+img { -webkit-user-drag: none; user-select: none; pointer-events: none; }
+.tile img.banner { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+.tile img.ico {
+  position: absolute; left: 50%; top: 50%; height: 56%; translate: -50% -50%;
+  filter: drop-shadow(0 .3rem .8rem rgba(0,0,0,.35));
+}
+.tile .glyph {
+  position: absolute; inset: 0; display: grid; place-items: center;
+  font-size: 4.2rem; font-weight: 600; letter-spacing: -.03em; color: rgba(255,255,255,.92);
+}
+.tile .gloss {
+  position: absolute; inset: 0; pointer-events: none; opacity: 0; transition: opacity .3s;
+  background: radial-gradient(130% 85% at 50% -15%, rgba(255,255,255,.28), rgba(255,255,255,0) 60%);
+}
+.tile .shine {
+  position: absolute; inset: -10%; pointer-events: none; translate: -130% 0;
+  background: linear-gradient(115deg, transparent 38%, rgba(255,255,255,.26) 50%, transparent 62%);
+}
+.label {
+  position: absolute; left: -25%; width: 150%; top: calc(var(--th) * 1.06 + .9rem);
+  text-align: center; font-size: 1.3rem; font-weight: 500; white-space: nowrap; overflow: hidden;
+  text-overflow: ellipsis; opacity: 0; translate: 0 -.5rem;
+  text-shadow: 0 .1rem .6rem rgba(0,0,0,.5);
+  transition: opacity .22s var(--ease), translate .22s var(--ease);
+}
+
+.cell.focus { z-index: 10; }
+.cell.focus .tile { scale: 1.12; box-shadow: 0 2.2rem 3rem rgba(0,0,0,.55), 0 0 0 1px rgba(255,255,255,.08); }
+.cell.focus .gloss { opacity: 1; }
+.cell.focus .shine { animation: shine 1s var(--ease) .12s 1 both; }
+.cell.focus .label { opacity: 1; translate: 0 0; }
+@keyframes shine { to { translate: 130% 0; } }
+
+.cell.press .tile { scale: 1.04; transition-duration: .1s; }
+.cell.bump-l .tile { animation: bumpL .32s var(--ease); }
+.cell.bump-r .tile { animation: bumpR .32s var(--ease); }
+.cell.bump-u .tile { animation: bumpU .32s var(--ease); }
+.cell.bump-d .tile { animation: bumpD .32s var(--ease); }
+@keyframes bumpL { 40% { translate: -.7rem 0; } }
+@keyframes bumpR { 40% { translate: .7rem 0; } }
+@keyframes bumpU { 40% { translate: 0 -.6rem; } }
+@keyframes bumpD { 40% { translate: 0 .6rem; } }
+
+.cell.moving { z-index: 20; transition: translate .2s var(--ease); }
+.cell.moving .tile { scale: 1.16; animation: wiggle .26s ease-in-out infinite alternate; }
+.cell.moving .label { opacity: 1; translate: 0 0; }
+@keyframes wiggle { from { rotate: -1.3deg; } to { rotate: 1.3deg; } }
+body.move .cell:not(.moving) { opacity: .55; }
+
+.tile.gear { background: linear-gradient(160deg, #3a3a40, #1d1d21); }
+.tile.gear svg { position: absolute; left: 50%; top: 50%; width: 4.4rem; translate: -50% -50%; opacity: .9; }
+
+/* ---------- Context menu ---------- */
+#menu {
+  position: absolute; min-width: 19rem; padding: .7rem; border-radius: 1.4rem; z-index: 50;
+  background: var(--glass); backdrop-filter: blur(2.6rem) saturate(1.6);
+  -webkit-backdrop-filter: blur(2.6rem) saturate(1.6);
+  box-shadow: 0 2rem 4rem rgba(0,0,0,.5);
+  opacity: 0; scale: .92; pointer-events: none; transform-origin: top left;
+  transition: opacity .2s var(--ease), scale .25s var(--spring);
+}
+#menu.open { opacity: 1; scale: 1; pointer-events: auto; }
+.mi {
+  display: flex; align-items: center; gap: 1rem; padding: 1rem 1.3rem; border-radius: .9rem;
+  font-size: 1.35rem; font-weight: 500; transition: background .15s, color .15s, scale .2s var(--ease);
+}
+.mi svg { width: 1.5rem; height: 1.5rem; flex: none; }
+.mi.sel { background: #fff; color: #111; scale: 1.03; }
+
+/* ---------- Settings sheet ---------- */
+#settings {
+  position: absolute; top: 0; right: 0; bottom: 0; width: 44rem; z-index: 40;
+  background: rgba(28, 28, 31, .72); backdrop-filter: blur(3rem) saturate(1.6);
+  -webkit-backdrop-filter: blur(3rem) saturate(1.6);
+  box-shadow: -2rem 0 5rem rgba(0,0,0,.4);
+  padding: 4.5rem 3rem 3rem; box-sizing: border-box;
+  translate: 105% 0; transition: translate .45s var(--ease);
+}
+body.settings-open #settings { translate: 0 0; }
+#settings h1 { font-size: 2.6rem; font-weight: 600; letter-spacing: -.02em; margin: 0 0 2rem 1.4rem; }
+.srow {
+  display: flex; align-items: center; justify-content: space-between; gap: 1.5rem;
+  padding: 1.15rem 1.4rem; border-radius: 1rem; font-size: 1.35rem; font-weight: 500;
+  transition: background .15s, color .15s, scale .2s var(--ease);
+}
+.srow .val { color: var(--text-dim); display: flex; align-items: center; gap: .6rem; white-space: nowrap; }
+.srow .val .ar { opacity: 0; font-weight: 600; transition: opacity .15s; }
+.srow.sel { background: #fff; color: #111; scale: 1.02; }
+.srow.sel .val { color: rgba(0,0,0,.6); }
+.srow.sel .val .ar { opacity: 1; }
+.srow.sec { padding-top: 1.35rem; padding-bottom: 1.35rem; }
+.srow.sec > span:first-child { font-size: 1.5rem; font-weight: 600; white-space: nowrap; }
+.srow.sec .val { font-size: 1.05rem; white-space: normal; text-align: right; max-width: 18rem; }
+.srow .chev { font-size: 1.6rem; font-weight: 600; margin-left: .4rem; opacity: .6; }
+#settings h1 .sback { display: block; font-size: 1.15rem; font-weight: 500; color: var(--text-dim); margin-bottom: .4rem; letter-spacing: 0; }
+.srow.gap { margin-top: 1.4rem; }
+.shead { font-size: 1.05rem; font-weight: 600; letter-spacing: .08em; text-transform: uppercase; color: var(--text-dim); padding: 1.6rem 1.4rem .5rem; }
+.shead:first-child { padding-top: .2rem; }
+.srow input {
+  font: inherit; font-size: 1.35rem; width: 15rem; padding: .4rem .8rem; border-radius: .6rem;
+  border: 2px solid #0a84ff; outline: none; background: #fff; color: #111;
+}
+#settings .foot { position: absolute; left: 4.4rem; right: 3rem; bottom: 2.4rem; font-size: 1rem; line-height: 1.4; color: var(--text-dim); }
+
+/* ---------- Toast ---------- */
+#toast {
+  position: absolute; left: 50%; bottom: 4rem; translate: -50% 1rem; z-index: 60;
+  padding: 1rem 1.8rem; border-radius: 2rem; font-size: 1.25rem; font-weight: 500;
+  background: var(--glass); backdrop-filter: blur(2rem); -webkit-backdrop-filter: blur(2rem);
+  opacity: 0; transition: opacity .3s, translate .3s var(--ease); pointer-events: none;
+}
+#toast.show { opacity: 1; translate: -50% 0; }
+/* ==================== Liquid Glass ==================== */
+@property --fx { syntax: '<percentage>'; inherits: true; initial-value: 10%; }
+@property --la { syntax: '<angle>'; inherits: true; initial-value: 120deg; }
+.glass {
+  isolation: isolate;
+  box-shadow: 0 1.8rem 4rem rgba(0,0,0,.30), inset 0 0 1.8rem rgba(255,255,255,.06);
+  transition: --fx .55s var(--ease), --la .7s var(--ease), opacity .5s var(--ease), translate .5s var(--ease), scale .25s var(--spring);
+}
+/* bright rim of light around the glass edge; its angle follows your focus */
+.glass::after {
+  content: ''; position: absolute; inset: 0; border-radius: inherit; padding: .13rem; pointer-events: none; z-index: 2;
+  background: linear-gradient(var(--la), rgba(255,255,255,.85), rgba(255,255,255,.16) 20%, rgba(255,255,255,0) 42%,
+              rgba(255,255,255,.05) 68%, rgba(255,255,255,.5)) border-box;
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor; mask-composite: exclude;
+}
+body.glass-solid .glass::after { opacity: .35; }
+
+#dock { left: 3rem; right: 3rem; border-radius: 3.4rem; border-top: none; }
+/* soft specular glow inside the dock that slides to the focused app */
+#dock::before {
+  content: ''; position: absolute; inset: 0; border-radius: inherit; pointer-events: none;
+  background: radial-gradient(30rem 11rem at var(--fx) -10%, rgba(255,255,255,.24), rgba(255,255,255,0) 70%);
+}
+
+#topbar { top: 2.3rem; right: 4.6rem; gap: .5rem; padding: .5rem 1.4rem .5rem .5rem; border-radius: 3rem; }
+.tb { width: 3.8rem; height: 3.8rem; background: transparent; box-shadow: none; backdrop-filter: none; -webkit-backdrop-filter: none; }
+.tb.sel { background: rgba(255,255,255,.95); color: #111; }
+#clock { font-size: 1.75rem; margin-left: .6rem; }
+
+#settings {
+  top: 2rem; right: 2rem; bottom: 2rem; width: 42rem; border-radius: 3rem;
+  padding: 3.6rem 2.6rem 2.6rem; translate: calc(100% + 3rem + var(--safe-r)) 0; box-shadow: 0 2rem 5rem rgba(0,0,0,.45);
+}
+.srow { border-radius: 1.5rem; padding-top: 1rem; padding-bottom: 1rem; }
+#srows {
+  max-height: calc(100% - 9.6rem); overflow-y: auto; overscroll-behavior: contain; touch-action: pan-y;
+  scrollbar-width: none; margin: 0 -1rem; padding: .3rem 1rem; overflow-anchor: none;
+}
+#srows::-webkit-scrollbar { display: none; }
+#settings h1 { margin-bottom: 1.4rem; }
+#settings .foot { left: 4rem; bottom: 2.2rem; }
+#menu { border-radius: 2.2rem; padding: .8rem; }
+.mi { border-radius: 1.4rem; }
+#toast { border-radius: 3rem; }
+#pausebadge { border-radius: 3rem; }
+
+/* glass edges on app tiles */
+.tile .rim {
+  position: absolute; inset: 0; border-radius: inherit; pointer-events: none; z-index: 3;
+  box-shadow: inset 0 .1rem 0 rgba(255,255,255,.38), inset 0 0 0 .07rem rgba(255,255,255,.14), inset 0 -.1rem 0 rgba(0,0,0,.25);
+}
+.cell { perspective: 80rem; }
+.tile { rotate: var(--rot, y 0deg); transition: scale .26s var(--ease), box-shadow .26s var(--ease), translate .2s var(--ease), rotate .5s var(--spring); }
+.cell.focus .tile { box-shadow: 0 2.4rem 3.2rem rgba(0,0,0,.5), 0 0 0 .07rem rgba(255,255,255,.18), 0 0 3rem rgba(255,255,255,.08); }
+.cell.focus.rev .shine { animation-name: shineRev; }
+@keyframes shineRev { from { translate: 130% 0; } to { translate: -130% 0; } }
+</style>
+<link rel="stylesheet" href="live.css">
+<link rel="stylesheet" href="vod.css">
+<link rel="stylesheet" href="extra.css">
+<link rel="stylesheet" href="themes.css">
+<link rel="stylesheet" href="portrait.css">
+<link rel="stylesheet" href="perf.css">
+<link rel="stylesheet" href="sports.css">
+<link rel="stylesheet" href="looks.css">
+</head>
+<body class="nophotos booting" data-theme="home">
+<div id="splash"><div class="spm"><img src="logo.svg" alt=""></div><div class="spw">Top<span>Shelf</span></div><div class="spb"><i></i></div></div>
+<div id="stage">
+  <div id="bg">
+    <div id="aurora"></div>
+    <div class="bgimg"></div>
+    <div class="bgimg"></div>
+  </div>
+  <div id="scrim"></div>
+  <!-- each tab's own backdrop (Home keeps the Reddit photos) -->
+  <div id="themebg"><div class="th th-movies"></div><div class="th th-series"></div><div class="th th-sports"></div><div class="th th-live"><i class="onair"></i></div><div class="grain"></div></div>
+
+  <div id="content">
+    <div id="tshelf"><div class="tsh"></div><div class="tss"><div class="tsin"></div></div></div>
+    <div id="dock" class="glass" data-blur=".3" data-tint="rgba(255,255,255,.05)"></div>
+    <div id="dockcells"></div>
+    <div id="hint">All apps <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg></div>
+  </div>
+  <div id="drawer" class="glass" data-lens="0" data-blur="1.6" data-tint="rgba(20,20,24,.3)"><div id="gridscroll"><div id="gridwrap"></div></div></div>
+  <div id="live">
+    <div id="lvlabel" class="tablabel"><i></i>Live TV</div>
+    <div id="lcats" class="glass" data-lens="0" data-blur="1.8" data-tint="rgba(22,22,28,.62)"><div class="lh">Categories</div><div id="lcatlist"></div><div id="lcatmore">⌄</div></div>
+    <div id="lguide" class="glass" data-lens="0" data-blur="1.4" data-tint="rgba(20,20,24,.34)">
+      <div id="linfo"></div><div id="lgscroll"><div id="lgin"><div id="ltimes"></div><div id="lbody"><div id="lchcol"></div><div id="lrows"><div id="lnow"></div></div></div></div></div><div id="lempty"></div>
+    </div>
+  </div>
+  <div id="sports"><div id="sphead"><div class="spt">Sports</div><div class="spupd"></div></div><div id="sprows"></div></div>
+  <div id="vod"><div id="vlabel" class="tablabel"></div><div id="vbg"><div class="vbgi"></div><div class="vbgi"></div><div class="vamb"></div><div class="vamb"></div><div class="vtr" id="vtrbg"></div></div><div id="vhero"></div><div id="vrows"></div></div>
+  <div id="player"><video id="video" playsinline></video><div id="mvgrid"></div><div id="pstats"></div><div id="lzap"><div class="lzh"></div><div id="lzlist"></div><div class="lzhint"></div></div><div id="ptune"><div class="ptl"></div><div class="ptc"></div><div class="ptp"></div><div class="ptb"><i></i></div></div><div id="perr"></div><div id="nvcues"></div><div id="osd" class="glass" data-blur="2" data-tint="rgba(12,12,16,.72)"></div></div>
+
+  <div id="caption"><div class="sub"></div><div class="title"></div><div class="by"></div></div>
+  <div id="tabs" class="glass" data-blur=".45" data-tint="rgba(255,255,255,.07)">
+    <div class="tab active" data-tab="home"><svg class="ti" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M3 10.5L12 3l9 7.5V20a1 1 0 0 1-1 1h-5v-6h-6v6H4a1 1 0 0 1-1-1z"/></svg><span>Home</span></div><div class="tab" data-tab="movies"><svg class="ti" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="16" rx="2.5"/><path d="M7 4v16M17 4v16M3 9h4M3 15h4M17 9h4M17 15h4"/></svg><span>Movies</span></div><div class="tab" data-tab="series"><svg class="ti" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><rect x="2.5" y="5" width="19" height="13" rx="2.5"/><path d="M8 21h8M8.5 1.8L12 5l3.5-3.2"/></svg><span>TV Shows</span></div><div class="tab" data-tab="sports"><svg class="ti" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 3a9 9 0 0 1 0 18M3.5 9h17M3.5 15h17M12 3c-2.8 2.4-4 5.4-4 9s1.2 6.6 4 9"/></svg><span>Sports</span></div><div class="tab" data-tab="live"><svg class="ti" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="2"/><path d="M16.2 7.8a6 6 0 0 1 0 8.4M7.8 16.2a6 6 0 0 1 0-8.4M19 5a10 10 0 0 1 0 14M5 19A10 10 0 0 1 5 5"/></svg><span>Live TV</span></div>
+  </div>
+  <div id="topbar" class="glass" data-blur=".45" data-tint="rgba(255,255,255,.07)">
+    <div class="tb" data-act="remote" id="tbremote"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="7" y="2.5" width="10" height="19" rx="5"/><circle cx="12" cy="8" r="2"/><path d="M12 13.5v.01M12 17v.01"/></svg><span class="tip">TV remote</span></div>
+    <div class="tb" data-act="search"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><path d="M20.5 20.5L16 16"/></svg><span class="tip">Search</span></div>
+    <div class="tb" data-act="photos"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="16" rx="3"/><circle cx="9" cy="10" r="1.8"/><path d="M21 16l-5-5-9 9"/></svg><span class="tip">Photo mode</span></div>
+    <div class="tb" data-act="settings"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3.2"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg><span class="tip">Settings</span></div>
+    <div id="wx"></div><div id="clock"></div>
+  </div>
+  <div id="pausebadge" class="glass" data-blur=".8" data-tint="rgba(20,20,24,.3)">Slideshow paused</div>
+  <div id="shelfhint"><span class="kh">◀ ▶ browse photos &nbsp;·&nbsp; OK pause &nbsp;·&nbsp; ▼ or Back to return</span><span class="th">Swipe to browse · tap to return</span></div>
+  <div id="ticker" class="glass" data-lens="0" data-blur="1" data-tint="rgba(16,18,26,.55)"></div>
+  <div id="bigclock"><div class="bt"></div><div class="bd"></div></div>
+
+  <div id="menu" class="glass" data-blur="1" data-tint="rgba(24,24,28,.38)"></div>
+  <div id="search" class="glass" data-lens="0" data-blur="1.6" data-tint="rgba(18,18,22,.72)">
+    <div id="shead"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="M20.5 20.5L16 16"/></svg><input id="sq" type="search" placeholder="Search apps, movies, shows and channels" autocapitalize="off" autocomplete="off" spellcheck="false"><div id="smic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="2.5" width="6" height="12" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3.5"/></svg></div><div id="sclose">✕</div></div>
+    <div id="sres"></div>
+  </div>
+  <div id="link" class="glass" data-lens="0" data-blur="1.6" data-tint="rgba(18,18,22,.78)"><div id="lkhead"><b>Phone &amp; TV link</b><div id="lkclose">✕</div></div><div id="lkbody"></div></div>
+  <div id="lkcode" class="glass" data-lens="0" data-blur="1.4" data-tint="rgba(18,18,22,.8)"></div>
+  <div id="perfhud"></div>
+  <div id="sheet" class="glass" data-lens="0" data-blur="1.6" data-tint="rgba(16,16,20,.82)"><div class="shh"></div><div class="shb"></div><div class="shbtns"></div></div>
+  <div id="icpick" class="glass" data-lens="0" data-blur="1.6" data-tint="rgba(18,18,22,.74)"><div id="ictitle"></div><div id="icstrip"></div><div id="ichint"></div><div id="icdone">Cancel</div></div>
+  <div id="spick" class="glass" data-lens="0" data-blur="1.6" data-tint="rgba(18,18,22,.72)">
+    <div id="spickhead"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="M20.5 20.5L16 16"/></svg><input id="spq" type="search" placeholder="Find a team" autocapitalize="off" autocomplete="off" spellcheck="false"><div id="spdone">Done</div></div>
+    <div id="spres"></div>
+  </div>
+  <div id="settings" class="glass" data-lens="0" data-blur="1.3" data-tint="rgba(22,22,26,.5)"><h1>Settings</h1><div id="srows"></div><div class="foot"></div></div>
+  <div id="launch"><div class="lxbg"></div><div class="lxc"><div class="lxi"></div><div class="lxt"></div><div class="lxs"></div><div class="lxb"><i></i></div></div></div>
+  <div id="toast" class="glass" data-blur=".9" data-tint="rgba(24,24,28,.4)"></div>
+</div>
+
+<script>
+'use strict';
+/* =====================================================================
+   TopShelf home screen. Runs inside the Android WebView, where
+   window.TopShelf is the native bridge. In a normal browser a mock
+   bridge is used so the layout can be previewed.
+   ===================================================================== */
+
+const B = window.TopShelf || mockBridge();
+const $ = s => document.querySelector(s);
+const body = document.body;
+
+// ---- Layout (rem; 1rem = 16px at 1080p). Landscape keeps one tile size on every screen;
+// a phone held upright (portrait) gets 3 bigger columns and a tab bar along the bottom. ----
+let GAP = 2.75, TW = 19.4, TH = TW * 9 / 16, DOCK_PANEL_H = TH + 6.2, PITCH = TH + 5.8;
+let SW = 120, SH = 67.5, COLS = 5, M = 6, DOCK_PANEL_Y = 0, DOCK_Y = 0, DRAWER_X = 3, DRAWER_Y = 8.8;
+let PORTRAIT = false, SAFE_T = 0, SAFE_B = 0;      // SAFE_*: camera cutout, in px
+const TABBAR_SPACE = 13;                          // rem kept free for the bottom tab bar (portrait)
+function remProbe() {
+  let p = document.getElementById('remprobe');
+  if (!p) {
+    p = document.createElement('div');
+    p.id = 'remprobe';
+    p.style.cssText = 'position:absolute;left:-9999px;top:0;width:100rem;height:0;visibility:hidden;pointer-events:none';
+    document.body.appendChild(p);
+  }
+  return p.getBoundingClientRect().width / 100 || 16;
+}
+let REM = 0;
+function computeLayout() {
+  const r = REM = remProbe();
+  const st = document.getElementById('stage');
+  const w = (st && st.clientWidth) || window.innerWidth, h = (st && st.clientHeight) || window.innerHeight;
+  PORTRAIT = !!(w && h && h > w * 1.05);
+  document.body.classList.toggle('portrait', PORTRAIT);
+  if (PORTRAIT) {
+    SW = w / r; SH = h / r;
+    COLS = 3; GAP = 2.2;
+    TW = (SW - 8 - (COLS - 1) * GAP) / COLS;
+  } else {
+    SW = w && h ? Math.max(120, w / r) : 120;
+    SH = w && h ? Math.max(67.5, h / r) : 67.5;
+    GAP = 2.75; TW = 19.4;
+    COLS = Math.max(5, Math.min(8, Math.floor((SW - 9 + GAP) / (TW + GAP))));   // at least ~4.5rem side margins
+  }
+  TH = TW * 9 / 16; DOCK_PANEL_H = TH + 6.2; PITCH = TH + 5.8;
+  document.documentElement.style.setProperty('--tw', TW.toFixed(3) + 'rem');
+  M = (SW - COLS * TW - (COLS - 1) * GAP) / 2;     // centre the columns
+  const bottomRes = PORTRAIT ? TABBAR_SPACE + SAFE_B / r : 0;
+  DOCK_PANEL_Y = SH - 2.8 - DOCK_PANEL_H - bottomRes;   // dock sits at the bottom of the screen (above the tab bar)
+  DRAWER_Y = PORTRAIT ? 11 + SAFE_T / r : 8.8;
+  DRAWER_X = Math.max(1.2, Math.min(3, M - 3));     // panels keep ~3rem of glass around the tiles
+  DOCK_Y = DOCK_PANEL_Y + 1.6;                     // top of dock tiles
+  document.documentElement.style.setProperty('--sw', SW.toFixed(3));
+  document.documentElement.style.setProperty('--sh', SH.toFixed(3));
+}
+computeLayout();
+const GRID_Y = 3;                                 // first row inside the drawer
+let gridOff = 0;                                  // how far the drawer is scrolled
+
+// ---- Settings ----
+// photo sources that aren't Reddit (Reddit shut its open feeds in 2026): Wikimedia Commons' featured pictures, Bing
+const PHOTO_SOURCES = { '@landscapes': 'Landscapes', '@mountains': 'Mountains', '@water': 'Lakes & coasts', '@night': 'Night skies', '@cities': 'Cities', '@featured': 'Featured pictures', '@bing': 'Bing photo of the day' };
+function srcLabel(sub) { return PHOTO_SOURCES[sub] ? PHOTO_SOURCES[sub] + (sub === '@bing' ? '' : ' · Wikimedia') : 'r/' + sub; }
+const SUB_PRESETS = ['EarthPorn', 'wallpapers', 'SkyPorn', 'CityPorn', 'spaceporn', 'WidescreenWallpaper', 'ExposurePorn'];
+const SORTS = [['top-week', 'Top this week'], ['top-month', 'Top this month'], ['top-year', 'Top this year'],
+               ['top-all', 'Top of all time'], ['hot', 'Hot right now'], ['new', 'Newest']];
+const EVERY = [[15, '15 seconds'], [30, '30 seconds'], [60, '1 minute'], [120, '2 minutes'], [300, '5 minutes']];
+const HOME_STYLES = [['classic', 'Classic (widgets & apps)'], ['gallery', 'Gallery (just your photo)'], ['billboard', 'Featured (movies, shows & games)']];
+const MENU_STYLES = [['panel', 'Glass panel (original)'], ['rail', 'Icon rail'], ['card', 'Floating card'], ['glance', "Menu + what's on"]];
+const BAR_STYLES = [['classic', 'Two pills (original)'], ['float', 'Floating'], ['strip', 'Glass strip'], ['capsule', 'One capsule']];
+const CLOCKS = [['12', '12-hour'], ['24', '24-hour'], ['off', 'Hidden']];
+
+const DEFAULTS = { sub: '@landscapes', subs: SUB_PRESETS.slice(), sort: 'top-week', every: 30, motion: true, clock: '12', glass: 'liquid' };
+let S = Object.assign({}, DEFAULTS, readJSON('settings', {}));
+let order = readJSON('order', []);
+let hidden = readJSON('hidden', []);
+
+// Apps that land in the dock by default (first launch only), matched on name.
+const DOCK_HINTS = ['youtube', 'nuvio', 'netflix', 'plex', 'disney', 'max', 'prime video', 'hulu', 'stremio',
+                    'apple tv', 'jellyfin', 'kodi', 'spotify', 'paramount', 'peacock', 'twitch'];
+
+// ---- State ----
+let apps = [];        // from Android
+let items = [];       // what's on screen (apps + settings tile)
+let focus = 0;
+let mode = 'grid';
+let tab = 'home';       // home | live
+// modes: grid | shelf | menu | settings | move | edit | top | live | player
+const isVodTab = () => tab === 'movies' || tab === 'series';
+const isVodMode = () => mode === 'vod';
+function baseMode() { return tab === 'live' ? 'live' : isVodTab() ? 'vod' : tab === 'sports' ? 'sports' : 'grid'; }
+let cellEls = new Map();
+const SETTINGS_ITEM = { id: '__settings', label: 'Settings', special: true };
+
+function readJSON(key, fallback) {
+  try { const v = B.getPref(key); return v ? JSON.parse(v) : fallback; } catch (e) { return fallback; }
+}
+function writeJSON(key, v) { try { B.setPref(key, JSON.stringify(v)); } catch (e) {} }
+
+/* =========================== Apps =========================== */
+
+function loadApps() {
+  try { apps = JSON.parse(B.getApps()) || []; } catch (e) { apps = []; }
+  if (!order.length) {
+    // First run: favourites first, then alphabetical.
+    const rank = a => {
+      const l = a.label.toLowerCase();
+      const i = DOCK_HINTS.findIndex(h => l === h || l.startsWith(h + ' ') || l.startsWith(h));
+      return i < 0 ? 999 : i;
+    };
+    apps.sort((a, b) => rank(a) - rank(b) || a.label.localeCompare(b.label));
+    order = apps.map(a => a.id);
+    writeJSON('order', order);
+  }
+  buildItems();
+}
+
+function buildItems() {
+  const byId = new Map(apps.map(a => [a.id, a]));
+  const hid = new Set(hidden);
+  const list = [];
+  for (const id of order) if (byId.has(id)) { if (!hid.has(id)) list.push(byId.get(id)); byId.delete(id); }
+  for (const a of apps) if (byId.has(a.id) && !hid.has(a.id)) list.push(a);   // newly installed apps go last
+  items = list.concat([SETTINGS_ITEM]);
+}
+
+function saveOrder() {
+  const shown = items.filter(i => !i.special).map(i => i.id);
+  const rest = order.filter(id => !shown.includes(id));
+  order = shown.concat(rest);
+  writeJSON('order', order);
+}
+
+function iconUrl(a, banner) {
+  return 'https://topshelf.local/icon/' + encodeURIComponent(a.id) + (banner ? '?b=1' : '');
+}
+
+function shade(hex, amt) {
+  const n = parseInt((hex || '#2a2a2e').slice(1), 16);
+  const f = c => Math.max(0, Math.min(255, Math.round(c + (amt > 0 ? (255 - c) * amt : c * amt))));
+  return `rgb(${f(n >> 16 & 255)},${f(n >> 8 & 255)},${f(n & 255)})`;
+}
+
+const GEAR = '<svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3.2"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg>';
+
+function makeCell(a) {
+  const cell = document.createElement('div');
+  cell.className = 'cell';
+  const tile = document.createElement('div');
+  tile.className = 'tile';
+  if (a.special) {
+    tile.classList.add('gear');
+    tile.innerHTML = GEAR;
+  } else if (typeof customTile === 'function' && customTile(tile, a)) {
+    // a look you picked (Change icon)
+  } else if (a.banner) {
+    const img = new Image();
+    img.className = 'banner';
+    img.decoding = 'async';
+    img.src = iconUrl(a, true);
+    img.onerror = () => { img.remove(); fillIcon(tile, a); };
+    tile.appendChild(img);
+  } else {
+    fillIcon(tile, a);
+  }
+  tile.insertAdjacentHTML('beforeend', '<div class="gloss"></div><div class="shine"></div><div class="rim"></div>');
+  const label = document.createElement('div');
+  label.className = 'label';
+  label.textContent = a.label;
+  cell.append(tile, label);
+  return cell;
+}
+
+function fillIcon(tile, a) {
+  tile.style.background = `linear-gradient(160deg, ${shade(a.tint, .18)}, ${shade(a.tint, -.25)})`;
+  if (a.mock) {
+    tile.insertAdjacentHTML('afterbegin', `<div class="glyph">${esc(a.label.slice(0, 1))}</div>`);
+    return;
+  }
+  const img = new Image();
+  img.className = 'ico';
+  img.decoding = 'async';
+  img.src = iconUrl(a, false);
+  img.onerror = () => { img.remove(); tile.insertAdjacentHTML('afterbegin', `<div class="glyph">${esc(a.label.slice(0, 1))}</div>`); };
+  tile.prepend(img);
+}
+
+function esc(s) { return String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c])); }
+
+// Position inside the cell's own container (the dock, or the drawer's scrolling grid).
+function pos(i) {
+  const r = Math.floor(i / COLS), c = i % COLS;
+  return r === 0 ? { x: M + c * (TW + GAP), y: DOCK_Y }
+                 : { x: M - DRAWER_X + c * (TW + GAP), y: GRID_Y + (r - 1) * PITCH };
+}
+// Scroll the drawer just enough to show a row (remote control); touch scrolls it natively.
+function revealDrawerRow(rr) {
+  const sc = $('#gridscroll'), r = remPx();
+  if (!sc || !sc.clientHeight) return;
+  const top = (GRID_Y + rr * PITCH - 1.5) * r, bot = (GRID_Y + rr * PITCH + PITCH) * r;
+  if (top < sc.scrollTop) sc.scrollTo({ top: Math.max(0, top), behavior: 'smooth' });
+  else if (bot > sc.scrollTop + sc.clientHeight) sc.scrollTo({ top: bot - sc.clientHeight, behavior: 'smooth' });
+}
+// Position on screen (for placing the app menu next to a tile).
+function screenPos(i) {
+  const r = Math.floor(i / COLS), c = i % COLS;
+  gridOff = ($('#gridscroll').scrollTop || 0) / remPx();
+  return { x: M + c * (TW + GAP), y: r === 0 ? DOCK_Y : DRAWER_Y + GRID_Y + (r - 1) * PITCH - gridOff };
+}
+
+function render() {
+  const dockWrap = $('#dockcells'), gridWrap = $('#gridwrap');
+  const keep = new Set(items.map(i => i.id));
+  for (const [id, el] of cellEls) if (!keep.has(id)) { el.remove(); cellEls.delete(id); }
+  items.forEach((a, i) => {
+    let el = cellEls.get(a.id);
+    if (!el) { el = makeCell(a); cellEls.set(a.id, el); }
+    const home = i < COLS ? dockWrap : gridWrap;
+    if (el.parentNode !== home) home.appendChild(el);
+    const p = pos(i);
+    el.classList.toggle('r0', i < COLS);
+    el.style.setProperty('--x', p.x + 'rem');
+    el.style.setProperty('--y', p.y + 'rem');
+  });
+  $('#gridwrap').style.height = (GRID_Y + Math.max(1, Math.ceil((items.length - COLS) / COLS)) * PITCH + 1) + 'rem';
+  focus = Math.max(0, Math.min(focus, items.length - 1));
+  applyFocus();
+}
+
+function applyFocus() {
+  if (typeof moveLight === 'function') moveLight();
+  items.forEach((a, i) => cellEls.get(a.id).classList.toggle('focus', i === focus && tab === 'home' && mode !== 'shelf' && mode !== 'top'));
+  const row = Math.floor(focus / COLS);
+  const deep = row >= 1 && mode !== 'shelf' && tab === 'home';
+  body.classList.toggle('deep', deep);
+  body.classList.toggle('hasdrawer', items.length > COLS);
+  if (deep) revealDrawerRow(row - 1);
+  if (window.tshelfUpdate) tshelfUpdate();
+}
+
+function bump(dir) {
+  const el = cellEls.get(items[focus].id);
+  const cls = 'bump-' + dir;
+  el.classList.remove('bump-l', 'bump-r', 'bump-u', 'bump-d');
+  void el.offsetWidth;
+  el.classList.add(cls);
+  setTimeout(() => el.classList.remove(cls), 340);
+}
+
+function moveFocus(dir) {
+  const n = items.length, c = focus % COLS;
+  let next = focus;
+  if (dir === 'l') { if (c > 0) next = focus - 1; }
+  else if (dir === 'r') { if (c < COLS - 1 && focus + 1 < n) next = focus + 1; }
+  else if (dir === 'u') {
+    if (focus >= COLS) next = focus - COLS;
+    else { if (window.tshelfEnter && tshelfEnter()) return; return enterTop(); }
+  }
+  else if (dir === 'd') {
+    if (focus + COLS < n) next = focus + COLS;
+    else if (Math.floor(focus / COLS) < Math.floor((n - 1) / COLS)) next = n - 1;
+  }
+  if (next === focus) return bump(dir);
+  focus = next;
+  applyFocus();
+  tilt(dir);
+}
+
+function activate() {
+  const a = items[focus];
+  if (!a) return;
+  if (a.special) return openSettings();
+  const el = cellEls.get(a.id);
+  el.classList.add('press');
+  setTimeout(() => el.classList.remove('press'), 160);
+  openApp(a);
+}
+/* Opens an app behind a short launch screen (its icon on a dimmed backdrop). */
+function openApp(a) {
+  if (typeof showLaunch === 'function') showLaunch({ app: a, title: a.label, sub: 'Opening…' });
+  setTimeout(() => {
+    let ok = false;
+    try { ok = B.launch(a.id); } catch (e) {}
+    if (!ok) { if (typeof hideLaunch === 'function') hideLaunch(); toast(`Couldn't open ${a.label}`); }
+  }, 140);
+}
+
+/* ---- Move mode (rearrange) ---- */
+function startMove() {
+  if (items[focus].special) return;
+  mode = 'move';
+  body.classList.add('move');
+  cellEls.get(items[focus].id).classList.add('moving');
+  toast('Use the arrows to move · OK when done');
+}
+function moveItem(dir) {
+  const last = items.length - 2;        // settings tile stays last
+  const c = focus % COLS;
+  let to = focus;
+  if (dir === 'l' && c > 0) to = focus - 1;
+  if (dir === 'r' && c < COLS - 1 && focus + 1 <= last) to = focus + 1;
+  if (dir === 'u' && focus >= COLS) to = focus - COLS;
+  if (dir === 'd') to = Math.min(focus + COLS, last);
+  if (to === focus) return bump(dir);
+  const [it] = items.splice(focus, 1);
+  items.splice(to, 0, it);
+  focus = to;
+  render();
+}
+function endMove() {
+  const el = cellEls.get(items[focus].id);
+  if (el) el.classList.remove('moving');
+  body.classList.remove('move');
+  mode = 'grid';
+  saveOrder();
+  applyFocus();
+}
+
+/* =========================== Context menu =========================== */
+
+const ICONS = {
+  move: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 9l-3 3 3 3M9 5l3-3 3 3M15 19l-3 3-3-3M19 9l3 3-3 3M2 12h20M12 2v20"/></svg>',
+  info: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/></svg>',
+  hide: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17.9 17.9A10.1 10.1 0 0 1 12 20c-7 0-11-8-11-8a18.5 18.5 0 0 1 5.1-5.9M9.9 4.2A9 9 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.2 3.2M1 1l22 22"/><path d="M14.1 14.1a3 3 0 1 1-4.2-4.2"/></svg>',
+  dock: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19V5M5 12l7-7 7 7"/></svg>',
+  open: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 4h6v6M20 4l-9 9M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5"/></svg>',
+  play: '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M7 4.5v15a1 1 0 0 0 1.5.86l12.5-7.5a1 1 0 0 0 0-1.72L8.5 3.64A1 1 0 0 0 7 4.5z"/></svg>',
+  add: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>',
+  check: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>',
+  star: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M12 3l2.8 5.7 6.2.9-4.5 4.4 1.1 6.2L12 17.3 6.4 20.2l1.1-6.2L3 9.6l6.2-.9z"/></svg>',
+  ext: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="14" rx="2.5"/><path d="M10 9.5v5l4-2.5z"/></svg>'
+};
+let menuSel = 0, menuItems = [], menuFrom = 'grid';
+
+/* A small menu of actions (hold OK / long-press). Opens beside `anchor` (an element) on a TV or
+   landscape phone; a phone held upright gets it as a sheet along the bottom. */
+function showMenu(entries, anchor, title) {
+  if (!entries.length) return;
+  menuItems = entries;
+  menuSel = 0;
+  menuFrom = mode === 'menu' ? menuFrom : mode;
+  const m = $('#menu');
+  m.innerHTML = (title ? `<div class="mh">${esc(title)}</div>` : '') +
+    menuItems.map(([k, t], i) => `<div class="mi${i === 0 ? ' sel' : ''}">${ICONS[k] || ''}<span>${esc(t)}</span></div>`).join('');
+  const r = remPx(), st = stageEl.getBoundingClientRect();
+  const w = 22, h = menuItems.length * 4.1 + (title ? 3.4 : 0) + 2.5;
+  let left = SW / 2 - w / 2, top = SH / 2 - h / 2;
+  if (anchor) {
+    const b = anchor.getBoundingClientRect();
+    const ax = (b.left - st.left) / r, ar = (b.right - st.left) / r, ay = (b.top - st.top) / r;
+    left = ar + 1.6; top = ay;
+    if (left + w > SW - 1) { left = ax - w - 1.6; m.style.transformOrigin = 'top right'; } else m.style.transformOrigin = 'top left';
+    if (left < 1) { left = Math.max(1, Math.min(SW - w - 1, (ax + ar) / 2 - w / 2)); top = (b.bottom - st.top) / r + 1; }
+  }
+  top = Math.max(2, Math.min(top, SH - h - 1));
+  m.style.left = left + 'rem';
+  m.style.top = top + 'rem';
+  mode = 'menu';
+  styleGlass(m);
+  m.classList.add('open');
+  body.classList.add('menu-open');
+  try { B.haptic && B.haptic(); } catch (e) {}
+}
+function openMenu() {
+  const a = items[focus];
+  if (!a || a.special) return;
+  showMenu([
+    ['move', 'Move', startMove],
+    ...(focus >= COLS ? [['dock', 'Move to front', () => { const [it] = items.splice(focus, 1); items.unshift(it); focus = 0; render(); saveOrder(); }]] : []),
+    ['brush', 'Change icon', () => setTimeout(() => icOpen(a), 30)],
+    ['info', 'App info', () => B.appInfo(a.id)],
+    ['hide', 'Hide from home', () => hideApp(a)]
+  ], cellEls.get(a.id) && cellEls.get(a.id).querySelector('.tile'), PORTRAIT ? a.label : '');
+}
+function menuMove(d) {
+  menuSel = (menuSel + d + menuItems.length) % menuItems.length;
+  [...$('#menu').querySelectorAll('.mi')].forEach((el, i) => el.classList.toggle('sel', i === menuSel));
+}
+function closeMenu() {
+  $('#menu').classList.remove('open');
+  body.classList.remove('menu-open');
+  mode = menuFrom && menuFrom !== 'menu' ? menuFrom : baseMode();
+  if (isVodTab() && typeof vMark === 'function') vMark();
+  if (tab === 'live' && typeof lvDraw === 'function') lvDraw();
+  if (tab === 'sports' && typeof spMark === 'function') spMark();
+  if (window.tshelfUpdate) tshelfUpdate();
+}
+function menuPick() {
+  const it = menuItems[menuSel];
+  closeMenu();
+  if (it) it[2]();
+}
+function hideApp(a) {
+  hidden = hidden.concat([a.id]);
+  writeJSON('hidden', hidden);
+  buildItems();
+  render();
+  toast(`${a.label} hidden · unhide in Settings`);
+}
+
+/* =========================== Background photos =========================== */
+
+let photos = [], pIndex = -1, slideTimer = null, layer = 0, reqId = 0, lastFetch = 0, paused = false, showToken = 0;
+
+function cleanTitle(t) {
+  return String(t || '')
+    .replace(/\[[^\]]*\]/g, '')
+    .replace(/\((?:oc|[^)]*\d{3,5}\s*[x×]\s*\d{3,5}[^)]*)\)/gi, '')
+    .replace(/\b\d{3,5}\s*[x×]\s*\d{3,5}\b/g, '')
+    .replace(/\bOC\b/g, '')
+    .replace(/\s+([,.!?])/g, '$1')
+    .replace(/[\s,;:|-]+$/g, '')
+    .replace(/\s{2,}/g, ' ')
+    .trim();
+}
+
+let photoStatus = 'Loading…';
+
+function loadPhotos(force) {
+  const now = Date.now();
+  if (!force && now - lastFetch < 45 * 60 * 1000) return;
+  lastFetch = now;
+  let cached = null;
+  try { cached = B.getCachedPhotos(S.sub, S.sort); } catch (e) {}
+  if (cached) { try { setPhotos(JSON.parse(cached), false); } catch (e) {} }
+  photoStatus = 'Loading…';
+  const id = String(++reqId);
+  try { B.fetchPhotos(S.sub, S.sort, id); } catch (e) { window.tsPhotos(id, null, 'bridge error'); }
+}
+
+window.tsRedditSignedIn = () => {
+  toast('Signed in to Reddit');
+  if (!PHOTO_SOURCES[S.sub]) { photos = []; lastFetch = 0; loadPhotos(true); }
+  refreshSettings();
+};
+window.tsPhotos = (id, json, err) => {
+  if (id !== String(reqId)) return;
+  if (json) {
+    const list = JSON.parse(json);
+    let note = ''; try { note = B.photoNote ? B.photoNote() : ''; } catch (e) {}
+    photoStatus = `${list.length} photos${note}`;
+    setPhotos(list, true);
+    refreshSettings();
+    return;
+  }
+  photoStatus = `Failed — ${err || 'unknown error'}`;
+  if (!photos.length) body.classList.add('nophotos');
+  toast(`Couldn't load ${srcLabel(S.sub)} — details in Settings`);
+  refreshSettings();
+};
+
+function setPhotos(list, fresh) {
+  if (!Array.isArray(list) || !list.length) return;
+  const same = photos.length === list.length && photos.every((p, i) => p.img === list[i].img);
+  if (same) return;
+  const hadPhotos = photos.length > 0 && !body.classList.contains('nophotos');
+  photos = list.slice();
+  for (let i = photos.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [photos[i], photos[j]] = [photos[j], photos[i]]; }
+  pIndex = -1;
+  if (!hadPhotos || !fresh) showPhoto(1);
+  else scheduleSlide();
+}
+
+let imgFailures = 0;
+function showPhoto(step, tries = 0) {
+  if (!photos.length) return;
+  if (tries >= Math.min(photos.length, 8)) {
+    photoStatus = `${photos.length} photos found, but the images wouldn't load`;
+    if (body.classList.contains('nophotos')) toast('Photos found but images failed to load — see Settings');
+    refreshSettings();
+    return;
+  }
+  pIndex = (pIndex + step + photos.length) % photos.length;
+  const p = photos[pIndex];
+  const token = ++showToken;
+  // screen-sized copy first (much lighter for the TV), then the original links
+  const urls = [photoSized(p.img), p.img, p.full ? photoSized(p.full) : null, p.full].filter((u, i, a) => u && a.indexOf(u) === i);
+  const tryUrl = url => {
+    const img = new Image();
+    img.decoding = 'async';
+    img.referrerPolicy = 'no-referrer';
+    img.onload = () => {
+      if (token !== showToken) return;          // a newer photo was requested meanwhile
+      const layers = document.querySelectorAll('.bgimg');
+      const next = layers[layer ^ 1], cur = layers[layer];
+      next.style.backgroundImage = `url("${url.replace(/"/g, '%22')}")`;
+      next.style.setProperty('--kbdur', (S.every + 6) + 's');
+      next.style.setProperty('--kx', (Math.random() * 3 - 1.5).toFixed(2) + '%');
+      next.style.setProperty('--ky', (Math.random() * 2 - 1).toFixed(2) + '%');
+      next.classList.remove('kb');
+      void next.offsetWidth;
+      if (S.motion) next.classList.add('kb');
+      next.classList.add('show');
+      cur.classList.remove('show');
+      layer ^= 1;
+      body.classList.remove('nophotos');
+      if (window.onPhotoShown) onPhotoShown();
+      setCaption(p);
+      if ((S.look || 'glass') === 'ink') lookInk(img);       // (Photo Ink: the panels take this photo's colour)
+      scheduleSlide();
+    };
+    img.onerror = () => {
+      if (token !== showToken) return;
+      const nextUrl = urls[urls.indexOf(url) + 1];
+      if (nextUrl) return tryUrl(nextUrl);                     // refused: try the next link
+      showPhoto(step >= 0 ? 1 : -1, tries + 1);
+    };
+    img.src = url;
+  };
+  tryUrl(urls[0]);
+  // preload the one after
+  const after = photos[(pIndex + 1) % photos.length];
+  if (after) { const pre = new Image(); pre.referrerPolicy = 'no-referrer'; pre.src = photoSized(after.img); }
+}
+
+function photoSized(u) {
+  try { return u && B.photoSizing && B.photoSizing() ? 'https://topshelf.local/photo?u=' + encodeURIComponent(u) : u; } catch (e) { return u; }
+}
+
+function refreshSettings() { if (mode === 'settings') { buildSettings(); drawSettings(); } }
+
+function setCaption(p) {
+  const c = $('#caption');
+  c.classList.add('swap');
+  setTimeout(() => {
+    c.querySelector('.sub').textContent = p.src ? p.src : 'r/' + (p.sub || S.sub);
+    c.querySelector('.title').textContent = cleanTitle(p.title);
+    c.querySelector('.by').textContent = p.author ? (p.src ? 'by ' : 'u/') + p.author : '';
+    c.classList.remove('swap');
+  }, 350);
+}
+
+function scheduleSlide() {
+  clearTimeout(slideTimer);
+  if (paused || document.hidden || !photos.length) return;
+  slideTimer = setTimeout(() => showPhoto(1), S.every * 1000);
+}
+
+/* =========================== Top bar (photo mode + settings) =========================== */
+
+let topSel = 0;
+const topEls = () => [...document.querySelectorAll('#tabs .tab, #topbar .tb')].filter(el => el.dataset.act !== 'remote' || (typeof lkOn === 'function' && lkOn()));
+function drawTop() {
+  topEls().forEach((el, i) => el.classList.toggle('sel', mode === 'top' && i === topSel));
+}
+function enterTop() {
+  mode = 'top';
+  topSel = Math.max(0, topEls().findIndex(el => el.dataset.tab === tab));
+  drawTop(); applyFocus();
+  if (tab === 'live') lvDraw();
+  if (isVodTab()) vMark();
+}
+function exitTop() { mode = baseMode(); drawTop(); applyFocus(); if (tab === 'live') { lvDraw(); if (LV.zone === 'guide') lvSchedulePreview(); } if (isVodTab()) vFocus(true); if (tab === 'sports') spMark(); }
+function topActivate(i) {
+  const el = topEls()[i];
+  if (!el) return;
+  if (el.dataset.tab) {                         // OK on a tab: go there and step into its content
+    if (el.dataset.tab === tab) { if (mode === 'top') exitTop(); return; }
+    switchTab(el.dataset.tab, false);
+    return;
+  }
+  if (mode === 'top') exitTop();
+  if (el.dataset.act === 'photos') enterShelf(); else if (el.dataset.act === 'search') openSearch(); else if (el.dataset.act === 'remote') openLink(); else openSettings();
+}
+
+/* =========================== Shelf (photo) mode =========================== */
+
+function enterShelf() {
+  if (!photos.length || body.classList.contains('nophotos')) { toast('No photos loaded yet — see Settings'); return; }
+  mode = 'shelf';
+  body.classList.add('shelf');
+  applyFocus();
+}
+function exitShelf() {
+  mode = baseMode();
+  body.classList.remove('shelf');
+  if (paused) togglePause();
+  applyFocus();
+  if (tab === 'live') lvDraw();
+}
+function togglePause() {
+  paused = !paused;
+  body.classList.toggle('paused', paused);
+  scheduleSlide();
+}
+
+/* =========================== Settings =========================== */
+
+let sRows = [], sSel = 0, editing = null;
+
+function homeLabel() {
+  let st = 'off';
+  try { st = B.homeStatus(); } catch (e) {}
+  let how = ''; try { how = B.homeMode ? B.homeMode() : ''; } catch (e) {}
+  if (st === 'on' && how === 'watcher') return 'On · a picture of Home covers Google\'s screen while TopShelf comes back';
+  return { default: 'TopShelf is home', on: 'On · straight to TopShelf', paused: 'Redirect paused', off: 'Not set up' }[st] || st;
+}
+
+function buildAllSettings() {
+  const subs = Array.from(new Set(Object.keys(PHOTO_SOURCES).concat([S.sub], S.subs || SUB_PRESETS)));
+  sRows = [
+    { label: 'Photos from', value: () => srcLabel(S.sub), cycle: d => { const i = subs.indexOf(S.sub); S.sub = subs[(i + d + subs.length) % subs.length]; changedPhotos(); },
+      edit: { get: () => S.sub, set: setSub } },
+    ...(B.redditSignIn ? [{ label: 'Reddit account', value: () => { let on = false; try { on = B.redditSignedIn(); } catch (e) {} return on ? 'Signed in' : 'Not signed in'; },
+      ok: () => { let on = false; try { on = B.redditSignedIn(); } catch (e) {}
+        if (on) { B.redditSignOut(); toast('Signed out of Reddit'); refreshSettings(); } else { B.redditSignIn(); } } }] : []),
+    { label: 'Photos', value: () => photoStatus.startsWith('Failed') || photoStatus.includes("wouldn't") ? 'Failed (details below)' : photoStatus.split(' · ')[0] + (photoStatus.includes(' · ') ? ' (see below)' : ''),
+      ok: () => { photos = []; lastFetch = 0; body.classList.add('nophotos'); loadPhotos(true); toast('Reloading photos…'); } },
+    { label: 'Show', value: () => SORTS.find(s => s[0] === S.sort)[1], cycle: d => { S.sort = step(SORTS, S.sort, d); changedPhotos(); } },
+    { label: 'Menu', value: () => S.nav === 'top' ? 'Bar across the top' : 'Side menu',
+      cycle: () => { S.nav = S.nav === 'top' ? 'side' : 'top'; save(); toast(S.nav === 'top' ? 'Switching to the bar across the top…' : 'Switching to the side menu…'); } },
+    { label: 'Home style', value: () => (HOME_STYLES.find(x => x[0] === (S.homeStyle || 'classic')) || HOME_STYLES[0])[1],
+      cycle: d => { S.homeStyle = step(HOME_STYLES, S.homeStyle || 'classic', d || 1); save(); toast('Home: ' + HOME_STYLES.find(x => x[0] === S.homeStyle)[1] + '…'); } },
+    ...(S.nav !== 'top' ? [{ label: 'Side menu style', value: () => (MENU_STYLES.find(x => x[0] === (S.menuStyle || 'panel')) || MENU_STYLES[0])[1],
+      cycle: d => { S.menuStyle = step(MENU_STYLES, S.menuStyle || 'panel', d || 1); save(); toast('Side menu: ' + MENU_STYLES.find(x => x[0] === S.menuStyle)[1] + '…'); } }] : []),
+    ...(S.nav === 'top' ? [{ label: 'Bar style', value: () => (BAR_STYLES.find(x => x[0] === (S.barStyle || 'classic')) || BAR_STYLES[0])[1],
+      cycle: d => { S.barStyle = step(BAR_STYLES, S.barStyle || 'classic', d || 1); save(); toast('Bar style: ' + BAR_STYLES.find(x => x[0] === S.barStyle)[1]); } }] : []),
+    ...(IS_TV ? [{ label: 'App bar', value: () => S.dock ? 'Shown' : 'Hidden', cycle: () => { S.dock = !S.dock; save(); } }] : []),
+    { label: 'Change photo every', value: () => EVERY.find(s => s[0] === S.every)[1], cycle: d => { S.every = step(EVERY, S.every, d); save(); scheduleSlide(); } },
+    ...(!IS_TV && B.nhUpright ? [{ label: 'Upright layout', value: () => { let on = false; try { on = !!JSON.parse(B.nhInfo()).upright; } catch (e) {} return on ? 'Same as the TV (beta)' : 'Phone'; },
+      cycle: () => { let on = false; try { on = !!JSON.parse(B.nhInfo()).upright; } catch (e) {} toast(on ? 'Upright, TopShelf goes back to the phone layout' : 'Upright, TopShelf now looks like it does on the TV'); setTimeout(() => B.nhUpright(!on), 600); } }] : []),
+    ...(!IS_TV && B.nhSetOff ? [{ label: 'Sideways layout', value: () => { let off = false; try { off = !!JSON.parse(B.nhInfo()).off; } catch (e) {} return off ? 'Classic' : 'Same as the TV'; },
+      cycle: () => { let off = false; try { off = !!JSON.parse(B.nhInfo()).off; } catch (e) {} B.nhSetOff(!off); toast(off ? 'Turned sideways, TopShelf now looks like it does on the TV' : 'Sideways, TopShelf keeps its classic look'); setTimeout(() => location.reload(), 400); } }] : []),
+    ...(IS_TV && B.nhSetOff ? [{ label: 'Home screen', value: () => (typeof NH !== 'undefined' && NH.on) ? 'Android (smooth)' : 'Web page (older)',
+      cycle: () => { const on = typeof NH !== 'undefined' && NH.on; B.nhSetOff(on); toast(on ? 'Switching to the page version…' : 'Switching to the Android version…'); setTimeout(() => location.reload(), 400); } }] : []),
+    { label: 'Look', value: () => (LOOKS.find(x => x[0] === (S.look || 'glass')) || LOOKS[0])[1], chevron: true,
+      ok: () => showMenu(LOOKS.map(x => ['check', (x[0] === (S.look || 'glass') ? '✓ ' : '') + x[1] + ' · ' + x[2], () => { if ((S.look || 'glass') === x[0]) return; S.look = x[0]; save(); applyGlassMode(); toast(`Look: ${x[1]} · Home redraws in a moment`); }]), null, 'Look') },
+    { label: 'Glass', value: () => (S.look && S.look !== 'glass' ? 'Not used with this look · ' : '') + (({ liquid: 'Liquid', frosted: 'Frosted', solid: 'Solid' })[S.glass] || 'Liquid'),
+      cycle: d => { S.glass = step([['liquid'], ['frosted'], ['solid']], S.glass, d); save(); applyGlassMode(); } },
+    { label: 'Slow zoom', value: () => S.motion ? 'On' : 'Off', cycle: () => { S.motion = !S.motion; save(); applyMotion(); } },
+    { label: 'Clock', value: () => CLOCKS.find(s => s[0] === S.clock)[1], cycle: d => { S.clock = step(CLOCKS, S.clock, d); save(); tick(); } },
+    { label: 'Home widgets', value: () => ({ all: "Time, weather and what's next", clock: 'Just the time', off: 'Off' })[S.widgets || 'all'],
+      cycle: d => { S.widgets = step([['all'], ['clock'], ['off']], S.widgets || 'all', d); save(); } },
+    { id: 'weather', label: 'Weather', value: () => S.wxName || 'Off',
+      edit: { wide: true, type: 'text', ph: 'City or ZIP code (leave empty for off)', get: () => S.wxQuery || '', set: v => wxSetPlace(v) } },
+    { label: 'Temperature', value: () => S.wxUnit === 'c' ? 'Celsius (°C)' : 'Fahrenheit (°F)', cycle: () => { S.wxUnit = S.wxUnit === 'c' ? 'f' : 'c'; save(); wxFetch(true); } },
+    { label: 'Screensaver', value: () => (SAVER_TIMES.find(t => t[0] === saverMinutes()) || SAVER_TIMES[0])[1],
+      cycle: d => { S.saver = step(SAVER_TIMES, S.saver != null ? S.saver : (IS_TV ? 10 : 0), d); save(); } },
+    { label: 'Bedtime', value: () => (BED_TIMES.find(t => t[0] === bedStart()) || BED_TIMES[0])[1] + (bedNow() ? ' · on now' : ''),
+      cycle: d => { S.bedtime = step(BED_TIMES, bedStart(), d); save(); bedApply(); } },
+    ...(IS_TV ? [] : [{ label: 'Screen rotation', value: () => ({ auto: 'Auto (follow phone)', portrait: 'Portrait', landscape: 'Landscape' })[rotation()] || 'Auto',
+      cycle: d => { const v = step([['auto'], ['portrait'], ['landscape']], rotation(), d); try { B.setRotation(v); } catch (e) { S.rotate = v; } } }]),
+    { id: 'posters', label: 'Movie & TV poster URL', gap: true, value: () => S.posterUrl ? urlLabel(S.posterUrl, 'Custom') : 'Default posters',
+      edit: { wide: true, get: () => S.posterUrl || '', set: v => {
+        v = (v || '').trim();
+        if (v && !/\{(imdb_id|imdbId|imdb|id|tmdb_id|tmdbId|tmdb)\}/.test(v)) { toast('That link has no {imdb_id} or {tmdb_id} in it'); return; }
+        S.posterUrl = v; save(); if (typeof vRefreshPosters === 'function') vRefreshPosters();
+        toast(v ? 'Posters will use your poster service' : 'Back to default posters');
+      } } },
+    { label: 'Movies & TV look', value: () => S.vodLook === 'classic' ? 'Classic posters' : 'Shelves',
+      cycle: () => { S.vodLook = S.vodLook === 'classic' ? 'shelves' : 'classic'; save(); } },
+    { id: 'tmdb', label: 'TMDB key', value: () => S.tmdbKey ? 'Added' : 'Not added · more rows',
+      edit: { wide: true, ph: 'Paste your TMDB API key (themoviedb.org › Settings › API)', get: () => S.tmdbKey || '', set: v => {
+        v = (v || '').trim();
+        if (v && !/^[0-9a-f]{32}$/i.test(v) && !/^eyJ[\w-]+\.[\w-]+\.[\w-]+$/.test(v)) { toast("That doesn't look like a TMDB API key"); return; }
+        S.tmdbKey = v; save();
+        toast(v ? 'TMDB rows will appear in Movies & TV Shows' : 'TMDB rows removed');
+      } } },
+    { label: 'Phone & TV link', value: () => IS_TV ? (lkInfo().paired || []).length ? `${lkInfo().paired.length} phone(s) linked` : 'Link your phone' : lkOn() ? `Linked to ${lkTvName()}` : 'Not linked',
+      ok: () => { closeSettings(); openLink(); } },
+    { label: 'Game alerts', value: () => S.gameAlerts === false ? 'Off' : 'On', cycle: () => { S.gameAlerts = S.gameAlerts === false; save(); if (window.spTick) spTick(); } },
+    { label: 'Red zone alerts', value: () => S.gameAlerts === false ? 'Off (game alerts are off)' : S.redZone === false ? 'Off' : 'On · your team inside the 20',
+      cycle: () => { S.redZone = S.redZone === false; save(); } },
+    // on the phone: set it up for the linked TV (its setup page opens in the phone's browser)
+    ...(!IS_TV && typeof lkOn === 'function' && lkOn() ? [
+      { label: 'Fantasy players', value: () => `Pick your players for ${lkTvName()}'s alerts`, chevron: true, ok: async () => {
+          toast(`Asking ${lkTvName()}…`);
+          const r = await lkSend({ type: 'fantasy', page: 'players' });
+          if (!r) return;
+          if (!r.url) { toast(`${lkTvName()} isn't on your home network right now (or needs an update)`); return; }
+          if (B.openWeb) B.openWeb(r.url); else toast('Open ' + r.url + ' in your browser');
+        } },
+      { label: 'Yahoo Fantasy', value: () => `Alerts on ${lkTvName()} · set up here`, chevron: true, ok: async () => {
+          toast(`Asking ${lkTvName()}…`);
+          const r = await lkSend({ type: 'fantasy' });
+          if (!r) return;
+          if (!r.url) { toast(`${lkTvName()} isn't on your home network right now`); return; }
+          if (B.openWeb) B.openWeb(r.url); else toast('Open ' + r.url + ' in your browser');
+        } }
+    ] : []),
+    ...(IS_TV && B.fantasyStatus ? [
+      { label: 'Yahoo Fantasy', value: () => { const f = fyStat(); return !f.connected ? (f.players ? `My players · ${f.players} picked` : f.error && /403/.test(f.error) ? 'Yahoo refused access (403) · pick your players instead' : 'Not connected · alerts for your players') : f.error ? 'Problem: ' + f.error.slice(0, 48) : (f.teams || 'Connected'); },
+        chevron: true, ok: () => { const f = fyStat(); if (!f.connected) {
+            if (!B.fantasyPlayers) { B.fantasySetup(); return; }
+            showMenu([['tv', f.players ? `Change my players (${f.players}) on my phone` : 'Pick my players on my phone', () => B.fantasyPlayers()],
+                      ['open', 'Connect Yahoo (needs Yahoo’s approval)', () => B.fantasySetup()],
+                      ...(f.players ? [['hide', 'Clear my players', () => { B.fantasyClearPlayers(); refreshSettings(); toast('Players cleared'); }]] : [])], null, 'Fantasy alerts');
+            return; }
+          showMenu([['open', 'Check for news now', () => { B.fantasyRefresh(); toast('Checking your players…'); }],
+                    ['tv', 'Set up again (new QR code)', () => B.fantasySetup()],
+                    ['hide', 'Disconnect Yahoo Fantasy', () => { B.fantasyDisconnect(); refreshSettings(); toast('Yahoo Fantasy disconnected'); }]], null, 'Yahoo Fantasy'); } },
+      ...(B.fantasyScoring ? [{ label: 'Fantasy scoring', value: () => ({ half: 'Half PPR (Yahoo default)', ppr: 'PPR (a point a catch)', std: 'Standard (no points a catch)' })[B.fantasyScoring()] || 'Half PPR',
+        cycle: () => { B.fantasyScoringNext(); refreshSettings(); }, ok: () => { B.fantasyScoringNext(); refreshSettings(); } }] : []),
+      ...[['scoring', 'Fantasy · scoring plays'], ['big', 'Fantasy · big plays'], ['injury', 'Fantasy · injury news'], ['final', 'Fantasy · final results']].map(([k, label]) => (
+        { label, value: () => fyStat().on && fyStat().on[k] === false ? 'Off' : 'On', cycle: () => { B.fantasyToggle(k); refreshSettings(); }, ok: () => { B.fantasyToggle(k); refreshSettings(); } }))
+    ] : []),
+    { label: 'Sports & teams', value: () => { const n = Object.values(SP.prefs.teams).reduce((a, l) => a + l.length, 0); return SP.prefs.leagues.length ? `${SP.prefs.leagues.length} sports · ${n} teams` : 'Not set up'; },
+      ok: () => { closeSettings(); spPickOpen(); } },
+    { label: 'Top Shelf', value: () => (TS_MODES.find(t => t[0] === tshelfSetting()) || TS_MODES[0])[1],
+      cycle: d => { S.topShelf = step(TS_MODES, tshelfSetting(), d); save(); tshelfUpdate(); } },
+    { label: 'Trailer previews', value: () => ({ card: 'In the poster', bg: 'Behind the title', off: 'Off' })[S.trailers || 'card'],
+      cycle: d => { S.trailers = step([['card'], ['bg'], ['off']], S.trailers || 'card', d); save(); if (typeof vTrStop === 'function') vTrStop(); } },
+    { label: 'Header trailer', value: () => S.trailerFit === 'fit' ? 'In place of the picture' : 'Rows slide down',
+      cycle: () => { S.trailerFit = S.trailerFit === 'fit' ? 'slide' : 'fit'; save(); if (typeof vTrFitClass === 'function') vTrFitClass(); } },
+    { label: 'Trailer starts after', value: () => (S.trailerDelay || 5) + ' seconds',
+      cycle: d => { const o = [2, 3, 5, 8, 12]; const i = o.indexOf(S.trailerDelay || 5); S.trailerDelay = o[((i < 0 ? 2 : i) + (d < 0 ? -1 : 1) + o.length) % o.length]; save(); } },
+    { label: 'Trailer sound', value: () => S.trailerSound ? 'On' : 'Off', cycle: () => { S.trailerSound = !S.trailerSound; save(); } },
+    { label: 'Subtitle size', value: () => ({ s: 'Small', m: 'Medium', l: 'Large', xl: 'Extra large' })[S.subSize || 'm'],
+      cycle: d => { S.subSize = step([['s'], ['m'], ['l'], ['xl']], S.subSize || 'm', d); save(); } },
+    { label: 'Subtitle background', value: () => S.subBg === 'shadow' ? 'Shadow only' : 'Dark box', cycle: () => { S.subBg = S.subBg === 'shadow' ? 'box' : 'shadow'; save(); } },
+    ...(IS_TV ? [{ label: 'Match frame rate', value: () => S.matchRate === false ? 'Off' : 'On', cycle: () => { S.matchRate = S.matchRate === false; save(); } },
+      { label: 'Next episode', value: () => S.autoNext === false ? 'Ask each time' : 'Automatic', cycle: () => { S.autoNext = S.autoNext === false; save(); } }] : []),
+    { id: 'playlist', label: 'Live TV playlist', value: () => { const m = liveInfo().m3u || ''; return m.includes('|') ? m.split('|').length + ' playlists' : urlLabel(m, 'Not set'); },
+      edit: { wide: true, ph: 'M3U link (several playlists: separate the links with | )', get: () => liveInfo().m3u || '', set: v => { const i = liveInfo(); const c = String(v || '').split('|').map(x => cleanUrl(x)).filter(Boolean).join('|'); B.liveSetUrls(c, i.epg || ''); if (c) liveRefreshNow(); else { lvLoad(); } } } },
+    ...(IS_TV ? [{ label: 'Xtream login', value: () => { const m = (liveInfo().m3u || '').match(/^(https?:\/\/[^/?#|]+)[^|]*get\.php\?[^|]*username=([^&|]+)/i); return m ? decodeURIComponent(m[2]) + ' on ' + m[1].replace(/^https?:\/\//, '') : 'Server, username and password (instead of a link)'; },
+      edit: { wide: true, type: 'text', ph: 'server:port  username  password', get: () => '', set: v => {
+        const p = String(v || '').trim().split(/\s+/);
+        if (p.length < 3) { toast('Type the server, your username and your password, with spaces between them'); return; }
+        let srv = /^https?:\/\//i.test(p[0]) ? p[0] : 'http://' + p[0]; srv = srv.replace(/\/+$/, '').replace(/\/(get|player_api)\.php.*$/i, '');
+        const u = encodeURIComponent(p[1]), pw = encodeURIComponent(p.slice(2).join(' '));
+        B.liveSetUrls(`${srv}/get.php?username=${u}&password=${pw}&type=m3u_plus&output=ts`, `${srv}/xmltv.php?username=${u}&password=${pw}`);
+        liveRefreshNow(); toast('Signing in to your service…'); } } }] : []),
+    { id: 'epg', label: 'Live TV guide (EPG)', value: () => urlLabel(liveInfo().epg, 'From playlist'),
+      edit: { wide: true, get: () => liveInfo().epg || '', set: v => { const i = liveInfo(); B.liveSetUrls(i.m3u || '', cleanUrl(v)); if (i.m3u) liveRefreshNow(); } } },
+    { label: 'Live TV plays in', value: () => S.livePlayer === 'external' ? 'Another app' : 'TopShelf',
+      cycle: () => { S.livePlayer = S.livePlayer === 'external' ? 'builtin' : 'external'; save(); } },
+    { label: 'TopShelf updates', value: () => { if (typeof updInfo !== 'function' || !B.updInfo) return 'Not available'; const i = updInfo(); return !i.token ? 'Not set up' : UPD.latest && UPD.latest.newer ? `${UPD.latest.name} ready — install` : `Up to date (${(B.getVersion && B.getVersion()) || '?'})`; },
+      ok: () => { if (!updReady()) return updSetupSheet(); if (UPD.latest && UPD.latest.newer) { closeSettings(); updInstall(); } else updCheck(true); } },
+    { label: 'Updates access token', value: () => typeof updInfo === 'function' && B.updInfo && updInfo().token ? 'Set ' + (updInfo().tokenHint || '') : 'Not set',
+      edit: { wide: true, type: 'text', ph: 'GitHub fine-grained token (github_pat_…)', get: () => '', set: v => updSetToken(v) } },
+    { label: 'Live TV video', value: () => typeof NV === 'undefined' || !IS_TV ? 'Web page' : S.liveEngine === 'web' ? 'Web page (older)' : NV.ok ? "TV's player" : "TV's player (unavailable)",
+      cycle: () => { if (!IS_TV) return; S.liveEngine = S.liveEngine === 'web' ? 'tv' : 'web'; save(); try { B.nvSetOff(false); NV.ok = S.liveEngine !== 'web' && B.nvOk(); NV.fails = 0; NV.bad.clear(); } catch (e) {} if (LV.playing) { const ch = LV.playing, full = LV.full; lvStop(); lvPlay(ch, full); } } },
+    { label: 'Channel preview', value: () => S.livePreview === false ? 'Off' : 'On',
+      cycle: () => { S.livePreview = S.livePreview === false; save(); if (S.livePreview === false) { lvStop(); lvSetPlayer(''); } } },
+    { label: 'Pause & rewind', value: () => S.timeshift === false ? 'Off' : 'On · last 30 min',
+      cycle: () => { S.timeshift = S.timeshift === false; save(); try { B.nhReload('settings'); } catch (e) {} } },
+    { label: 'Turn on to Live TV', value: () => S.liveWake === false ? 'Off · always Home' : 'On · the channel you were watching',
+      cycle: () => { S.liveWake = S.liveWake === false; save(); } },
+    { label: 'Hidden channels', value: () => { const n = readJSON('liveHiddenChans', []).length; return n ? `${n} hidden` : 'None · hold OK on a channel to hide it'; },
+      ok: () => lvHiddenChansMenu() },
+    { label: 'Channel group order', value: () => readJSON('liveCatOrder', []).length ? 'Your order · OK puts back the playlist\'s' : "Playlist's order · hold OK on a group › Move",
+      ok: () => { if (!readJSON('liveCatOrder', []).length) { toast('In Live TV, hold OK on a group and choose Move'); return; } writeJSON('liveCatOrder', []); try { B.nhLiveGroups && B.nhLiveGroups(); } catch (e) {} refreshSettings(); toast("Groups are back in the playlist's order"); } },
+    ...(IS_TV && B.ringStatus ? [{ label: 'Ring doorbell', value: () => { try { const r = JSON.parse(B.ringStatus()); return r.connected ? (r.listening ? 'On' : 'Connecting') + (r.name ? ' · ' + r.name : '') : r.state || 'Not connected'; } catch (e) { return ''; } },
+      chevron: true, ok: () => { let r = {}; try { r = JSON.parse(B.ringStatus()); } catch (e) {}
+        if (!r.connected) { B.ringSetup(); return; }
+        showMenu([['play', 'Try it (shows the doorbell card)', () => B.ringTest()],
+                  ['tv', 'Sign in again (new QR code)', () => B.ringSetup()],
+                  ['hide', 'Disconnect Ring', () => { B.ringDisconnect(); refreshSettings(); toast('Ring disconnected'); }]], null, 'Ring doorbell'); } }] : []),
+    ...(IS_TV && B.cwClear ? [{ label: 'Continue watching', value: () => { const n = B.cwCount(); return n ? `${n} title${n === 1 ? '' : 's'} · OK to clear` : 'Empty'; },
+      ok: () => { const n = B.cwCount(); if (!n) { toast('Continue watching is already empty'); return; }
+        showMenu([['hide', `Clear all ${n} title${n === 1 ? '' : 's'}`, () => { B.cwClear(); refreshSettings(); toast('Continue watching cleared · watching something brings it back'); }],
+                  ['check', 'Keep them', () => {}]], null, 'Clear Continue watching?'); } }] : []),
+    ...(IS_TV && B.traktStatus ? [{ label: 'Trakt', value: () => { try { const t = JSON.parse(B.traktStatus()); return t.connected ? 'Connected' + (t.user ? ' · ' + t.user : '') + (t.err ? ' · problem: ' + t.err.slice(0, 40) : '') : t.err ? t.err.slice(0, 60) : 'Not connected'; } catch (e) { return ''; } },
+      chevron: true, ok: () => { let t = {}; try { t = JSON.parse(B.traktStatus()); } catch (e) {}
+        if (!t.connected) { B.traktSetup(); return; }
+        showMenu([['open', 'Sync now', () => { B.traktSync(); toast('Syncing with Trakt…'); }],
+                  ['tv', 'Set up again (new QR code)', () => B.traktSetup()],
+                  ['hide', 'Disconnect Trakt', () => { B.traktDisconnect(); refreshSettings(); toast('Trakt disconnected'); }]], null, 'Trakt'); } }] : []),
+    ...(!IS_TV && typeof lkOn === 'function' && lkOn() ? [{ label: 'Trakt', value: () => `For ${lkTvName()} · set up here`, chevron: true, ok: async () => {
+          toast(`Asking ${lkTvName()}…`);
+          const r = await lkSend({ type: 'trakt' });
+          if (!r) return;
+          if (!r.url) { toast(`${lkTvName()} isn't on your home network right now (or needs an update)`); return; }
+          if (B.openWeb) B.openWeb(r.url); else toast('Open ' + r.url + ' in your browser');
+        } }] : []),
+    ...(IS_TV && B.addonsOpen ? [{ label: 'Addons', value: () => { try { const i = JSON.parse(B.addonsInfo()); return i.count ? `${i.on} on${i.count > i.on ? ' · ' + (i.count - i.on) + ' off' : ''}${i.streams ? ' · streams' : ''}` : 'None yet'; } catch (e) { return ''; } },
+      chevron: true, ok: () => { closeSettings(); setTimeout(() => B.addonsOpen(), 250); } }] : []),
+    ...(!IS_TV && typeof lkOn === 'function' && lkOn() ? [{ label: 'Addons', value: () => `On ${lkTvName()} · add and manage`, chevron: true, ok: async () => {
+          toast(`Asking ${lkTvName()}…`);
+          const r = await lkSend({ type: 'addons' });
+          if (!r) return;
+          if (!r.url) { toast(`${lkTvName()} isn't on your home network right now (or needs an update)`); return; }
+          if (B.openWeb) B.openWeb(r.url); else toast('Open ' + r.url + ' in your browser');
+        } }] : []),
+    ...(IS_TV && B.driveStatus ? [
+      { label: 'Google Drive', value: () => { const d = gdStat(); return !d.connected ? (d.err ? 'Signed out' : 'Not set up') : !d.on ? 'Connected · uploads off' : (d.email || 'Connected') + (d.queue ? ' · uploading' : '') + (d.free > 0 ? ` · ${Math.round(d.free / 1073741824)} GB free` : ''); },
+        chevron: true, ok: () => { const d = gdStat(); if (!d.connected) { B.driveSetup(); return; }
+          showMenu([['tv', d.on ? 'Stop uploading recordings' : 'Upload recordings', () => { B.driveToggle('on'); refreshSettings(); }],
+                    ['hide', d.delLocal ? 'Keep a copy on the TV too' : 'Delete from the TV once on Drive', () => { B.driveToggle('delLocal'); refreshSettings(); }],
+                    ['open', 'Set up again (new QR code)', () => B.driveSetup()],
+                    ['hide', 'Disconnect Google Drive', () => { B.driveDisconnect(); refreshSettings(); toast('Google Drive disconnected (recordings already there stay)'); }]], null, 'Google Drive'); } }] : []),
+    ...(!IS_TV && typeof lkOn === 'function' && lkOn() ? [
+      { label: 'Recordings', value: () => `On ${lkTvName()} · see and manage`, chevron: true, ok: () => { closeSettings(); lkRecList(); } },
+      { label: 'Google Drive', value: () => `Recordings on ${lkTvName()} · set up here`, chevron: true, ok: async () => {
+          toast(`Asking ${lkTvName()}…`);
+          const r = await lkSend({ type: 'drive' });
+          if (!r) return;
+          if (!r.url) { toast(`${lkTvName()} isn't on your home network right now`); return; }
+          if (B.openWeb) B.openWeb(r.url); else toast('Open ' + r.url + ' in your browser');
+        } }] : []),
+    ...(IS_TV && B.recInfo ? [{ label: 'Recordings', value: () => { try { const i = JSON.parse(B.recInfo()); return `${i.done || 0} recorded · ${(i.next || 0) + (i.now || 0)} coming up · ${i.storage}`; } catch (e) { return ''; } },
+      ok: () => toast('Recordings are in Live TV › Categories › Recordings. A USB drive is used when one is plugged in.') }] : []),
+    { label: 'Reminders', value: () => REMS.list.length ? `${REMS.list.length} upcoming` : 'None', ok: () => remMenu() },
+    { label: 'Channel groups', value: () => { const n = lvHiddenCats().size; return n ? `${n} hidden` : 'All shown'; }, chevron: true, ok: () => settingsSub('groups') },
+    { label: 'Refresh Live TV', value: () => LV.refreshing ? (LV.progress || 'Loading…') : shortStatus(liveInfo().status), ok: () => liveRefreshNow() },
+    { label: 'Backup & restore', gap: true, value: () => IS_TV ? 'Save or restore settings' : 'Save, restore or copy to TV', ok: () => bkMenu() },
+    { label: 'Icon pack', value: () => icPackLabel(), cycle: d => icPackCycle(d), ok: () => icPackCycle(1) },
+    ...(!IS_TV && lkOn() ? [{ label: 'TV app icons', value: () => 'Send a photo to ' + lkTvName(), ok: () => { closeSettings(); icTvApps(); } }] : []),
+    { label: 'Reset custom icons', value: () => { const n = Object.keys(ICN).length; return n ? `${n} customized` : ''; }, ok: () => icResetAll() },
+    { label: 'Home button', value: homeLabel, ok: homeButton, cycle: homeButton },
+    { label: hidden.length ? `Show ${hidden.length} hidden app${hidden.length > 1 ? 's' : ''}` : 'No hidden apps', value: () => '',
+      ok: () => { if (!hidden.length) return; hidden = []; writeJSON('hidden', hidden); buildItems(); render(); buildSettings(); drawSettings(); toast('All apps shown'); } },
+    { label: 'Reset app order', value: () => '', ok: () => { order = []; writeJSON('order', []); loadApps(); focus = 0; render(); toast('App order reset'); } },
+    ...(B.displayInfo ? [{ label: 'Screen', value: () => { try { return B.displayInfo().replace('x', '×').replace(' @', ' · ') ; } catch (e) { return ''; } }, ok: () => {} }] : []),
+    ...(IS_TV && B.tryRenderScale ? [{ label: 'Picture sharpness', value: () => renderScaleName(B.getRenderScale()), cycle: d => renderScaleStep(d), ok: () => renderScaleStep(1) }] : []),
+    { label: 'Speed test', value: () => 'Measure this TV', ok: () => setTimeout(speedTest, 200) },
+    ...(IS_TV ? [{ label: 'Diagnostic report', value: () => 'Run a test', ok: () => setTimeout(() => diagRun('tv'), 200) }] : []),
+    ...(!IS_TV && typeof lkOn === 'function' && lkOn() ? [{ label: 'Report a glitch on the TV', value: () => `When ${lkTvName()}'s screen looks wrong`,
+      ok: async () => { const r = await lkSend({ type: 'glitch' }); if (r) toast(r.ok ? `${lkTvName()} is sending what just happened` : `${lkTvName()} needs an update first`); } }] : []),
+    ...(IS_TV && B.reportGlitch ? [{ label: 'Report a glitch', value: () => 'Send what just happened', ok: () => { closeSettings(); setTimeout(() => B.reportGlitch(''), 400); toast('Sending what just happened…'); } }] : []),
+    ...(!IS_TV && lkOn() ? [{ label: 'TV diagnostic report', value: () => 'Test ' + lkTvName() + ' and send the report', ok: () => showMenu([
+        ['play', 'Run a new test on the TV', () => diagFromPhone(false)],
+        ['save', 'Get the last report from the TV', () => diagFromPhone(true)]], null, 'TV diagnostic report') }] : []),
+    { label: 'Show frame rate', value: () => HUD.on ? 'On' : 'Off', cycle: () => { hudToggle(); }, ok: () => { hudToggle(); refreshSettings(); } },
+    { label: 'Open Google TV home', gap: true, value: () => '', ok: () => { closeSettings(); B.openStockHome(); } },
+    { label: 'Android settings', value: () => '', ok: () => { closeSettings(); B.openSettings(); } }
+  ];
+}
+const IS_TV = (() => { try { return !!(B.isTv && B.isTv()); } catch (e) { return false; } })();
+function rotation() { try { return B.getRotation ? B.getRotation() : (S.rotate || 'auto'); } catch (e) { return 'auto'; } }
+function liveInfo() { try { return JSON.parse(B.liveInfo()) || {}; } catch (e) { return {}; } }
+function cleanUrl(v) {
+  v = (v || '').replace(/\s+/g, '');                                   // pasted links can carry spaces/line breaks
+  v = v.replace(/^(?:https?:?\/*)+(?=https?:\/\/)/i, '');               // "http://https://…" → "https://…"
+  v = v.replace(/^(https?)\/\//i, '$1://').replace(/^(https?):\/(?!\/)/i, '$1://');   // "https//…", "https:/…"
+  if (v && !/^https?:\/\//i.test(v) && /\./.test(v)) v = 'http://' + v;
+  return /^https?:\/\/$/i.test(v) ? '' : v;
+}
+function urlLabel(u, none) {
+  if (!u) return none;
+  try { const x = new URL(u); return x.host; } catch (e) { return u.slice(0, 24); }
+}
+function shortStatus(st) { return !st ? '' : (st.length > 34 ? st.slice(0, 33) + '…' : st); }
+function setSub(raw) {
+  const v = (raw || '').trim().replace(/^\/?r\//i, '').replace(/[^A-Za-z0-9_]/g, '');
+  if (v && v.toLowerCase() !== S.sub.toLowerCase()) {
+    S.sub = v;
+    S.subs = Array.from(new Set([v].concat(S.subs || SUB_PRESETS))).slice(0, 12);
+    changedPhotos();
+  }
+}
+function step(list, cur, d) { const i = list.findIndex(s => s[0] === cur); return list[(Math.max(0, i) + d + list.length) % list.length][0]; }
+function save() { writeJSON('settings', S); }
+function gdStat() { try { return JSON.parse(B.driveStatus()); } catch (e) { return {}; } }
+function changedPhotos() { save(); photos = []; lastFetch = 0; loadPhotos(true); }
+function applyMotion() { body.classList.toggle('still', !S.motion); }
+
+function homeButton() {
+  let st = 'off';
+  try { st = B.homeStatus(); } catch (e) {}
+  if (st === 'off') { toast('Turn on “TopShelf home button” in Accessibility'); B.openAccessibilitySettings(); return; }
+  if (st === 'default') { toast('TopShelf is already the home app'); return; }
+  B.setRedirect(st !== 'on');
+  drawSettings();
+}
+
+/* Settings come in sections (a short list first; OK opens one, Back returns to the list). */
+const SET = { sec: null, from: 0 };
+/* The sections, and inside each the groups of settings in the order they're shown (by each row's
+   label: text, or a pattern for the ones whose label changes). A setting no group names lands in
+   System › Other, so nothing goes missing. */
+/* Settings › Home › Look: TopShelf's own looks for its panels (and glass, as before) */
+const LOOKS = [['glass', 'Glass', 'the blurred photo'], ['shelf', 'Backlit Shelf', 'lit edges, warm at night'], ['ink', 'Photo Ink', 'colours from the photo'],
+               ['air', 'On Air', 'broadcast graphics'], ['spot', 'Spotlight', 'no panels, just shade']];
+const SET_SECTIONS = [
+  { name: 'Home', about: 'Photos, look, apps, clock and weather', groups: [
+    ['Photos', ['Photos from', 'Reddit account', 'Show', 'Change photo every', 'Photos', 'Slow zoom']],
+    ['Look', ['Look', 'Home style', 'Menu', 'Side menu style', 'Bar style', 'Glass', 'App bar', 'Top Shelf', 'Home screen', 'Sideways layout', 'Upright layout']],
+    ['Apps', ['Icon pack', 'TV app icons', 'Reset custom icons', /hidden app/, 'Reset app order']],
+    ['Clock & weather', ['Clock', 'Home widgets', 'Weather', 'Temperature']] ] },
+  { name: 'Movies & TV', about: 'Look, where titles come from, trailers and playback', groups: [
+    ['Look', ['Movies & TV look', 'Movie & TV poster URL']],
+    ['Sources', ['Addons', 'Trakt', /^TMDB key/]],
+    ['Trailers', ['Trailer previews', 'Trailer starts after', 'Header trailer', 'Trailer sound']],
+    ['Playback', ['Continue watching', 'Next episode', 'Subtitle size', 'Subtitle background', 'Match frame rate']] ] },
+  { name: 'Live TV', about: 'Your service, watching, channels and recordings', groups: [
+    ['Your service', ['Live TV playlist', 'Xtream login', 'Live TV guide (EPG)', 'Refresh Live TV']],
+    ['Watching', ['Channel preview', 'Pause & rewind', 'Turn on to Live TV', 'Live TV plays in', 'Live TV video']],
+    ['Channels', ['Channel groups', 'Channel group order', 'Hidden channels', 'Reminders']],
+    ['Recording', ['Recordings', 'Google Drive']] ] },
+  { name: 'Sports', about: 'Your teams, game alerts and fantasy', groups: [
+    ['', ['Sports & teams', 'Game alerts', 'Red zone alerts']],
+    ['Fantasy', ['Yahoo Fantasy', 'Fantasy players', 'Fantasy scoring', /^Fantasy · /]] ] },
+  { name: 'Screen & sleep', about: 'Screensaver, bedtime and picture', groups: [
+    ['', ['Screensaver', 'Bedtime']],
+    ['Picture', ['Picture sharpness', 'Screen', 'Screen rotation']] ] },
+  { name: 'Remote & phone', about: 'The Home button and your phone', groups: [
+    ['', ['Home button', 'Phone & TV link', 'Ring doorbell']],
+    ['The TV, from your phone', ['Report a glitch on the TV', 'TV diagnostic report']] ] },
+  { name: 'System', about: 'Updates, backup and help', groups: [
+    ['Updates', ['TopShelf updates', 'Updates access token']],
+    ['Your settings', ['Backup & restore']],
+    ['Help', ['Diagnostic report', 'Report a glitch', 'Speed test']],
+    ['Advanced', ['Show frame rate', 'Open Google TV home', 'Android settings']] ] }
+];
+const setMatch = (it, label) => typeof it === 'string' ? it === label : it.test(label);
+/* where a row goes: [section, group] (unnamed rows: System › Other) */
+function settingsPlace(label) {
+  for (let i = 0; i < SET_SECTIONS.length; i++) {
+    const gs = SET_SECTIONS[i].groups;
+    for (let g = 0; g < gs.length; g++) if (gs[g][1].some(it => setMatch(it, label))) return [i, g];
+  }
+  return [SET_SECTIONS.length - 1, -1];
+}
+/* a section's rows: each group under its heading, in the order the group names them */
+function settingsSectionRows(i) {
+  const out = [];
+  const add = (head, rs) => { if (!rs.length) return; if (head) out.push({ head: true, label: head, value: () => '' }); rs.forEach(r => out.push(Object.assign({}, r, { gap: false }))); };
+  SET_SECTIONS[i].groups.forEach(([head, items], g) => {
+    const rs = [];
+    for (const it of items) for (const r of SET.all) if (setMatch(it, r.label) && settingsPlace(r.label)[1] === g && settingsPlace(r.label)[0] === i && !rs.includes(r)) rs.push(r);
+    add(head, rs);
+  });
+  if (i === SET_SECTIONS.length - 1) add('Other', SET.all.filter(r => settingsPlace(r.label)[1] === -1));
+  return out;
+}
+function settingsFootPhotos() {
+  let v = 'dev'; try { v = B.getVersion(); } catch (e) {}
+  $('#settings .foot').textContent = photoStatus.startsWith('Failed') || photoStatus.includes("wouldn't") || photoStatus.includes(' · ')
+    ? `TopShelf ${v} · ${photoStatus}` : `TopShelf ${v} · OK on “Photos from” to type a subreddit · OK on “Photos” to reload`;
+}
+function fyStat() { try { return JSON.parse(B.fantasyStatus() || '{}'); } catch (e) { return {}; } }
+function settingsSectionOf(row) { return settingsPlace(row.label)[0]; }
+function buildSettings() {
+  buildAllSettings();
+  SET.all = sRows;
+  if (SET.sec == null) {
+    sRows = SET_SECTIONS.map((x, i) => ({ section: i, label: x.name, chevron: true,
+      value: () => i === SET_SECTIONS.length - 1 && typeof UPD !== 'undefined' && UPD.latest && UPD.latest.newer ? `Update ${UPD.latest.name} ready` : x.about,
+      ok: () => settingsEnter(i) }));
+  } else if (SET.sub === 'groups') {
+    sRows = lgRows();
+  } else {
+    sRows = settingsSectionRows(SET.sec);
+  }
+  sSel = Math.min(sSel, Math.max(0, sRows.length - 1));
+  while (sRows[sSel] && sRows[sSel].head && sSel < sRows.length - 1) sSel++;      // (a heading is never chosen)
+  const h = $('#settings h1');
+  if (h) h.innerHTML = SET.sec == null ? 'Settings' : SET.sub ? `<span class="sback">‹ ${esc(SET_SECTIONS[SET.sec].name)}</span>${esc(settingsSubName())}` : `<span class="sback">‹ Settings</span>${esc(SET_SECTIONS[SET.sec].name)}`;
+  const f = $('#settings .foot');
+  if (f && SET.sec !== 0) { let v = 'dev'; try { v = B.getVersion(); } catch (e) {} f.textContent = `TopShelf ${v} · ${SET.sec == null ? 'OK opens a section · Back closes' : 'Back returns to all settings'}`; }
+  else if (f) settingsFootPhotos();
+}
+/* a page inside a section (Live TV › Channel groups) */
+function settingsSubName() { return SET.sub === 'groups' ? 'Channel groups' : ''; }
+function settingsSub(id) {
+  SET.subFrom = sSel; SET.sub = id; sSel = 0;
+  if (id === 'groups') { LG.q = ''; LG.dirty = false; }
+  buildSettings(); drawSettings();
+}
+function settingsEnter(i) {
+  SET.from = sSel; SET.sec = i; sSel = 0;
+  buildSettings(); drawSettings();
+}
+function settingsBack() {
+  if (editing !== null) return cancelEdit();
+  if (SET.sub) {
+    if (SET.sub === 'groups' && typeof lgDone === 'function') lgDone();
+    SET.sub = null; sSel = SET.subFrom || 0;
+    buildSettings(); drawSettings();
+    return;
+  }
+  if (SET.sec == null) return closeSettings();
+  SET.sec = null; sSel = SET.from || 0;
+  buildSettings(); drawSettings();
+}
+/* jump straight to a row (e.g. "Live TV playlist" when no playlist is set) */
+function settingsShowRow(id) {
+  buildAllSettings();
+  const r = sRows.find(x => x.id === id);
+  SET.sub = null;
+  SET.sec = r ? settingsSectionOf(r) : null;
+  buildSettings();
+  const i = sRows.findIndex(x => x.id === id);
+  if (i >= 0) sSel = i;
+  drawSettings();
+}
+
+function drawSettings() {
+  $('#srows').innerHTML = sRows.map((r, i) => {
+    if (r.head) return `<div class="shead">${esc(r.label)}</div>`;
+    const v = typeof r.value === 'function' ? r.value() : '';
+    const isEdit = editing === i;
+    const val = isEdit ? `<input id="edinput"${r.edit.wide ? ` class="wide" type="${r.edit.type || 'url'}"` : ''} value="${esc(r.edit.get())}" placeholder="${r.edit.ph ? esc(r.edit.ph) : r.id === 'posters' ? 'Paste your Poster URL (with {imdb_id})' : r.edit.wide ? 'Paste link (http://…)' : ''}" autocapitalize="off" autocomplete="off" spellcheck="false">`
+      : (r.cycle && v ? `<span class="ar">‹</span>${esc(v)}<span class="ar">›</span>` : esc(v) + (r.chevron ? '<span class="chev">›</span>' : ''));
+    return `<div class="srow${i === sSel ? ' sel' : ''}${r.gap ? ' gap' : ''}${r.chevron ? ' sec' : ''}"><span>${esc(r.label)}</span><span class="val">${val}</span></div>`;
+  }).join('');
+  const sel = $('#srows').children[sSel];
+  if (sel && typeof lvRevealIn === 'function') lvRevealIn($('#srows'), sel);
+}
+
+function openSettings() {
+  SET.sec = null; SET.sub = null;
+  sSel = 0;
+  buildSettings();
+  drawSettings();
+  mode = 'settings';
+  body.classList.add('settings-open');
+}
+function closeSettings() {
+  if (editing !== null) cancelEdit();
+  if (SET.sub === 'groups' && typeof lgDone === 'function') lgDone();
+  SET.sub = null;
+  mode = baseMode();
+  body.classList.remove('settings-open');
+  if (tab === 'live') lvDraw();
+  if (isVodTab()) vMark();
+  if (tab === 'sports') spMark();
+}
+function settingsKey(k) {
+  const r = sRows[sSel];
+  if (k === 'u' || k === 'd') {
+    // up and down step over the group headings
+    for (let n = 0; n < sRows.length; n++) { sSel = (sSel + (k === 'd' ? 1 : -1) + sRows.length) % sRows.length; if (!sRows[sSel].head) break; }
+  }
+  else if (k === 'l' && r.cycle) r.cycle(-1);
+  else if (k === 'r' && r.cycle) r.cycle(1);
+  else if (k === 'ok') { if (r.edit) startEdit(sSel); else if (r.ok) r.ok(); else if (r.cycle) r.cycle(1); }
+  if (mode === 'settings' && editing === null) drawSettings();
+}
+
+function startEdit(i) {
+  editing = i;
+  drawSettings();
+  const inp = $('#edinput');
+  inp.focus({ preventScroll: true });
+  const n = inp.value.length;
+  if (inp.value.startsWith('http') && inp.value.length > 8) inp.select(); else inp.setSelectionRange(n, n);
+  mode = 'edit';
+}
+function commitEdit() {
+  const inp = $('#edinput');
+  const r = sRows[editing];
+  const v = inp ? inp.value : '';
+  editing = null;
+  mode = 'settings';
+  if (inp) inp.blur();
+  if (r && r.edit) r.edit.set(v);
+  buildSettings();
+  drawSettings();
+}
+function cancelEdit() {
+  const inp = $('#edinput');
+  if (inp) inp.blur();
+  editing = null;
+  mode = 'settings';
+  drawSettings();
+}
+
+/* =========================== Clock & toast =========================== */
+
+function tick() {
+  body.classList.toggle('clock-off', S.clock === 'off');
+  const d = new Date();
+  let h = d.getHours(), m = String(d.getMinutes()).padStart(2, '0');
+  if (S.clock === '12') { h = h % 12 || 12; }
+  else h = String(h).padStart(2, '0');
+  $('#clock').textContent = `${h}:${m}`;
+  const bc = $('#bigclock');
+  bc.querySelector('.bt').textContent = `${h}:${m}`;
+  bc.querySelector('.bd').textContent = d.toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric' }) + (window.wxLine ? wxLine() : '');
+}
+let toastTimer;
+function toast(msg) {
+  const t = $('#toast');
+  t.textContent = msg;
+  styleGlass(t);
+  t.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => t.classList.remove('show'), 3200);
+}
+window.tsToast = toast;
+
+/* =========================== Keys =========================== */
+
+const KEYMAP = { ArrowLeft: 'l', ArrowRight: 'r', ArrowUp: 'u', ArrowDown: 'd', Enter: 'ok', NumpadEnter: 'ok', ' ': 'ok',
+                 Escape: 'back', Backspace: 'back', GoBack: 'back', BrowserBack: 'back', ContextMenu: 'menu' };
+let lastArrow = 0, okTimer = null, okLong = false, okDown = false;
+
+document.addEventListener('keydown', e => {
+  let k = KEYMAP[e.key] || (e.keyCode === 23 ? 'ok' : null);
+  if (mode === 'edit') {
+    if (k === 'ok') { e.preventDefault(); commitEdit(); }
+    else if (e.key === 'Escape') { e.preventDefault(); cancelEdit(); }
+    return;                                   // let the keyboard type
+  }
+  if (mode === 'search') return searchKeyDown(k, e);
+  if (mode === 'tshelf') return tshelfKey(k, e);
+  if (mode === 'spick') return spPickKey(k, e);
+  if (mode === 'link') return linkKey(k, e);
+  if (mode === 'icpick') return icKey(k, e);
+  if (mode === 'sheet') return sheetKey(k, e);
+  if (mode === 'sports') return spKeyDown(k, e);
+  if (mode === 'multi') { if (k) e.preventDefault(); return mvKeyDown(k, e); }
+  if (!k) return;
+  e.preventDefault();
+  if (k === 'back') return window.tsBack();
+  if (k === 'menu') return window.tsMenu();
+  if (isVodMode()) return vodKeyDown(k, e);
+  if (mode === 'live' || mode === 'player') return liveKeyDown(k, e);
+
+  if (k === 'ok') {
+    if (mode === 'grid') {                   // short press = open, long press = menu
+      if (okDown) return;
+      okDown = true; okLong = false;
+      okTimer = setTimeout(() => { okLong = true; openMenu(); }, 600);
+      return;
+    }
+    if (e.repeat) return;
+    if (mode === 'menu') return menuPick();
+    if (mode === 'settings') return settingsKey('ok');
+    if (mode === 'move') return endMove();
+    if (mode === 'shelf') return togglePause();
+    if (mode === 'top') return topActivate(topSel);
+    return;
+  }
+
+  const now = performance.now();
+  if (e.repeat && now - lastArrow < 110) return;
+  lastArrow = now;
+  if (mode === 'grid') moveFocus(k);
+  else if (mode === 'move') moveItem(k);
+  else if (mode === 'menu') { if (k === 'u') menuMove(-1); else if (k === 'd') menuMove(1); else closeMenu(); }
+  else if (mode === 'settings') settingsKey(k);
+  else if (mode === 'top') {
+    if (k === 'l' || k === 'r') {
+      const n = k === 'l' ? topSel - 1 : topSel + 1; if (n < 0 || n >= topEls().length) return; topSel = n; drawTop();
+      // resting on a tab opens it, with the top bar still selected
+      clearTimeout(window.topHoverT);
+      const el = topEls()[topSel];
+      if (el && el.dataset.tab && el.dataset.tab !== tab) { const id = el.dataset.tab; window.topHoverT = setTimeout(() => { if (mode === 'top' && topEls()[topSel] === el) switchTab(id, true); }, 350); }
+    }
+    else if (k === 'd') { clearTimeout(window.topHoverT); exitTop(); }
+  }
+  else if (mode === 'shelf') {
+    if (k === 'l') showPhoto(-1);
+    else if (k === 'r') showPhoto(1);
+    else if (k === 'd') exitShelf();
+  }
+});
+
+document.addEventListener('keyup', e => {
+  const k = KEYMAP[e.key] || (e.keyCode === 23 ? 'ok' : null);
+  if (k === 'ok' && typeof LV !== 'undefined' && mode !== 'live' && mode !== 'player') LV.okDown = false;   // a hold that opened a menu
+  if (mode === 'search') return searchKeyUp(k, e);
+  if (mode === 'tshelf') return tshelfKeyUp(k, e);
+  if (mode === 'sports') return spKeyUp(k, e);
+  if (mode === 'multi') return mvKeyUp(k);
+  if (mode === 'spick') return;
+  if (isVodMode()) return;
+  if (mode === 'live' || mode === 'player') { liveKeyUp(k); return; }
+  if (k !== 'ok' || !okDown) return;
+  okDown = false;
+  clearTimeout(okTimer);
+  if (!okLong && mode === 'grid') activate();
+});
+
+/* ---- Called by Android ---- */
+window.tsBack = () => {
+  if (mode === 'edit') return cancelEdit();
+  if (mode === 'search') return searchBack();
+  if (mode === 'tshelf') return tshelfLeave();
+  if (mode === 'spick') return spPickClose();
+  if (mode === 'link') return closeLink();
+  if (mode === 'icpick') return icKey('back', { preventDefault() {} });
+  if (mode === 'sheet') return sheetClose();
+  if (mode === 'sports') return spBack();
+  if (mode === 'multi') return mvBack();
+  if (mode === 'menu') return closeMenu();
+  if (mode === 'settings') return settingsBack();
+  if (mode === 'move') return endMove();
+  if (mode === 'shelf') return exitShelf();
+  if (mode === 'top') return exitTop();
+  if (isVodMode()) return vodBack();
+  if (mode === 'live' || mode === 'player') return liveBack();
+  if (focus >= COLS) { focus = focus % COLS; applyFocus(); return; }   // jump back up to the dock
+  bump('u');
+};
+window.tsMenu = () => {
+  if (isVodMode()) return;
+  if (mode === 'live' || mode === 'player') { if (LV.list[LV.row]) lvToggleFav(LV.row); return; }
+  if (mode === 'top') { exitTop(); openSettings(); }
+  else if (mode === 'grid') { if (items[focus].special) openSettings(); else openMenu(); }
+  else if (mode === 'menu') closeMenu();
+};
+window.tsHome = () => {
+  if (mode === 'edit') cancelEdit();
+  if (mode === 'multi') mvClose(false);
+  if (mode === 'search') closeSearch();
+  if (tab !== 'home') switchTab('home');
+  if (mode === 'menu') closeMenu();
+  if (mode === 'settings') closeSettings();
+  if (mode === 'move') endMove();
+  if (mode === 'shelf') exitShelf();
+  if (mode === 'top') exitTop();
+  focus = 0;
+  applyFocus();
+};
+window.tsResume = () => {
+  if (window.onAppResume) onAppResume();
+  tick();
+  if (mode === 'settings') { buildSettings(); drawSettings(); }
+  loadPhotos(false);
+  scheduleSlide();
+};
+window.tsPause = () => { if (window.onAppPause) onAppPause(); clearTimeout(slideTimer); if (window.livePause) livePause(); if (typeof vTrStop === 'function') vTrStop(); };
+window.tsAppsChanged = () => {
+  const cur = items[focus] && items[focus].id;
+  loadApps();
+  render();
+  const i = items.findIndex(a => a.id === cur);
+  if (i >= 0) { focus = i; applyFocus(); }
+};
+document.addEventListener('visibilitychange', () => { if (document.hidden) { clearTimeout(slideTimer); if (typeof vTrStop === 'function') vTrStop(); } else scheduleSlide(); });
+
+/* =========================== Touch (phones & tablets) =========================== */
+// Tap opens, hold opens the app menu, swipe up/down moves between rows,
+// tap the photo (or swipe down from the dock) for photo mode.
+const stageEl = $('#stage');
+let tp = null, holdTimer = null, held = false, lastScrollTs = 0, lastTapXFrac = .5;
+let lastDragEnd = -1e9, dragged = false;
+/* Only momentum from a real finger drag counts as "the list is moving" (not our own animated scrolls). */
+function noteScroll() { const n = performance.now(); if (tp || n - lastDragEnd < 2500) lastScrollTs = n; }
+['#gridscroll', '#srows', '#sres'].forEach(s => $(s).addEventListener('scroll', noteScroll, { passive: true }));
+
+function remPx() { return REM || (REM = remProbe()); }
+function cellIndexOf(t) {
+  const c = t && t.closest ? t.closest('.cell') : null;
+  return c ? items.findIndex(a => cellEls.get(a.id) === c) : -1;
+}
+stageEl.addEventListener('dragstart', e => e.preventDefault());
+stageEl.addEventListener('pointerdown', e => {
+  tp = { x: e.clientX, y: e.clientY, target: e.target, flinging: performance.now() - lastScrollTs < 140, ts: e.timeStamp };
+  const sb = stageEl.getBoundingClientRect();
+  lastTapXFrac = (e.clientX - sb.left) / sb.width;
+  held = false;
+  clearTimeout(holdTimer);
+  const i = cellIndexOf(e.target);
+  if (i >= 0 && mode === 'grid' && !items[i].special) {
+    holdTimer = setTimeout(() => { held = true; focus = i; applyFocus(); openMenu(); }, 550);
+  } else if (mode === 'search' && e.target.closest && e.target.closest('.si')) {
+    const tgt = e.target;
+    holdTimer = setTimeout(() => { held = searchHold(tgt); }, 600);
+  } else if (isVodTab() && mode === 'vod' && e.target.closest && e.target.closest('.vp')) {
+    const tgt = e.target;
+    holdTimer = setTimeout(() => { held = vodHold(tgt); }, 600);
+  } else if (mode === 'multi' && e.target.closest && e.target.closest('.mvt') && !LV.zap) {
+    const tgt = e.target;
+    holdTimer = setTimeout(() => { held = mvHold(tgt); }, 600);
+  } else if (tab === 'live' && mode === 'player' && e.target.closest && e.target.closest('#player') && !e.target.closest('#osd')) {
+    holdTimer = setTimeout(() => { held = true; lvPlayerMenu(); }, 600);
+  } else if (tab === 'live' && mode === 'live' && e.target.closest && e.target.closest('.lcat')) {
+    const ci = +e.target.closest('.lcat').dataset.cat;
+    holdTimer = setTimeout(() => { held = true; lvCatMenu(ci); }, 600);
+  } else if (tab === 'sports' && mode === 'sports' && e.target.closest && e.target.closest('#sprows .gc')) {
+    const tgt = e.target;
+    holdTimer = setTimeout(() => { held = true; spAt(tgt); spOpen(spCur(), tgt.closest('.gc')); }, 600);
+  } else if (tab === 'home' && mode === 'grid' && e.target.closest && e.target.closest('.tsc')) {
+    const tgt = e.target;
+    holdTimer = setTimeout(() => { held = tshelfHold(tgt); }, 600);
+  } else if (tab === 'live' && mode === 'live' && liveRowOf(e.target) >= 0) {
+    const r = liveRowOf(e.target);
+    holdTimer = setTimeout(() => { held = true; lvMenu(r, e.target); }, 600);
+  }
+});
+stageEl.addEventListener('pointermove', e => {
+  if (tp && Math.hypot(e.clientX - tp.x, e.clientY - tp.y) > 12) { clearTimeout(holdTimer); dragged = true; }
+});
+stageEl.addEventListener('pointercancel', () => { clearTimeout(holdTimer); tp = null; });
+stageEl.addEventListener('pointerup', e => {
+  clearTimeout(holdTimer);
+  if (dragged) { lastDragEnd = performance.now(); dragged = false; }
+  // A busy page can run the hold timer late: if the finger really lifted quickly, it was a tap after all.
+  if (tp && held && e.timeStamp - tp.ts < 450) {
+    held = false;
+    if (mode === 'menu') closeMenu();
+  }
+  if (!tp || held) { tp = null; return; }
+  const dx = e.clientX - tp.x, dy = e.clientY - tp.y, t = tp.target, flinging = tp.flinging;
+  tp = null;
+  if (flinging && Math.hypot(dx, dy) < 12) return;     // that tap just caught a moving list
+  const r = remPx();
+  if (Math.abs(dx) > 4 * r || Math.abs(dy) > 4 * r) {
+    swipe(Math.abs(dx) > Math.abs(dy) ? (dx < 0 ? 'l' : 'r') : (dy < 0 ? 'u' : 'd'), t, Math.max(Math.abs(dx), Math.abs(dy)) / r);
+  } else {
+    const box = stageEl.getBoundingClientRect();
+    tap(t, (e.clientY - box.top) / r);
+  }
+});
+
+function swipe(dir, t, distRem) {           // dir = the way the finger moved
+  if (mode === 'search' || mode === 'menu' || mode === 'spick' || mode === 'link' || mode === 'icpick' || mode === 'sheet') return;
+  if (isVodTab() || tab === 'sports') return;   // lists scroll natively there
+  if (tab === 'live' && (mode === 'live' || mode === 'player' || mode === 'multi')) { liveSwipe(dir, t, distRem); return; }
+  if (mode === 'shelf') {
+    if (dir === 'l') showPhoto(1); else if (dir === 'r') showPhoto(-1); else exitShelf();
+    return;
+  }
+  if (mode !== 'grid') return;
+  const row = Math.floor(focus / COLS);
+  if (dir === 'u') moveFocus('d');
+  else if (dir === 'd') { if (row === 0) enterShelf(); else moveFocus('u'); }
+}
+
+function tap(t, yRem) {
+  if (mode === 'search') return searchTap(t);
+  if (mode === 'spick') return spPickTap(t);
+  if (mode === 'link') return linkTap(t);
+  if (mode === 'icpick') return icTap(t);
+  if (mode === 'sheet') return sheetTap(t);
+  if (mode === 'menu') {
+    const mi = t.closest('.mi');
+    if (mi) { menuSel = [...$('#menu').querySelectorAll('.mi')].indexOf(mi); menuPick(); } else if (!t.closest('#menu')) closeMenu();
+    return;
+  }
+  if (mode === 'settings' || mode === 'edit') {
+    if (!t.closest('#settings')) return closeSettings();
+    if (t.closest('.sback')) return settingsBack();
+    const row = t.closest('.srow');
+    if (!row || mode === 'edit') return;
+    sSel = [...$('#srows').children].indexOf(row);
+    const r = sRows[sSel];
+    if (sSel !== 0 && r.cycle && t.closest('.val')) r.cycle(1);
+    else if (r.edit) startEdit(sSel);
+    else if (r.ok) r.ok();
+    else if (r.cycle) r.cycle(1);
+    if (mode === 'settings') drawSettings();
+    return;
+  }
+  if (mode === 'shelf') return exitShelf();
+  if (mode === 'move') return endMove();
+  const tb = t.closest('.tb, .tab');
+  if (tb) { if (mode === 'top') exitTop(); return topActivate(topEls().indexOf(tb)); }
+  if (mode === 'top') exitTop();
+  if (tab === 'live') { liveTap(t); return; }
+  if (isVodTab()) { vodTap(t); return; }
+  if (tab === 'sports') { spTap(t); return; }
+  if (t.closest('#hint')) { if (items.length > COLS) { focus = COLS; applyFocus(); } return; }
+  if (t.closest('.tsc')) { tshelfTap(t); return; }
+  const i = cellIndexOf(t);
+  if (i >= 0) { focus = i; applyFocus(); activate(); return; }
+  if (body.classList.contains('deep')) {             // tapped outside the drawer: close it
+    if (!t.closest('#drawer')) { focus = focus % COLS; applyFocus(); }
+    return;
+  }
+  if (yRem < DOCK_PANEL_Y - 1) enterShelf();
+}
+
+/* =========================== Liquid Glass =========================== */
+// Each glass panel gets an SVG displacement filter used as its backdrop-filter: the photo
+// behind the panel is bent toward the middle near the rounded edges, like thick glass.
+const SVG_NS = 'http://www.w3.org/2000/svg';
+const glassDefs = (() => {
+  const svg = document.createElementNS(SVG_NS, 'svg');
+  svg.setAttribute('width', '0'); svg.setAttribute('height', '0');
+  svg.style.position = 'absolute';
+  const defs = document.createElementNS(SVG_NS, 'defs');
+  svg.appendChild(defs);
+  document.body.appendChild(svg);
+  return defs;
+})();
+const glassKeys = new WeakMap();
+
+const LENSMAPS = new Map();
+function lensMap(w, h, r, bezel) {
+  const k = 0.5, cw = Math.max(2, Math.round(w * k)), ch = Math.max(2, Math.round(h * k));
+  const c = document.createElement('canvas');
+  c.width = cw; c.height = ch;
+  const ctx = c.getContext('2d');
+  const img = ctx.createImageData(cw, ch), D = img.data;
+  const hw = w / 2, hh = h / 2, rr = Math.min(r, hw, hh);
+  for (let y = 0; y < ch; y++) {
+    for (let x = 0; x < cw; x++) {
+      const px = (x + .5) / k - hw, py = (y + .5) / k - hh;
+      const qx = Math.abs(px) - (hw - rr), qy = Math.abs(py) - (hh - rr);
+      let nx, ny, dist;
+      if (qx > 0 && qy > 0) { const l = Math.hypot(qx, qy) || 1; dist = rr - l; nx = qx / l; ny = qy / l; }
+      else if (qx > qy) { dist = rr - qx; nx = 1; ny = 0; }
+      else { dist = rr - qy; nx = 0; ny = 1; }
+      nx *= px < 0 ? -1 : 1; ny *= py < 0 ? -1 : 1;
+      let m = 0;
+      if (dist >= 0 && dist < bezel) { const t = 1 - dist / bezel; m = t * t; }
+      const i = (y * cw + x) * 4;
+      D[i] = 128 - nx * m * 127; D[i + 1] = 128 - ny * m * 127; D[i + 2] = 128; D[i + 3] = 255;
+    }
+  }
+  ctx.putImageData(img, 0, 0);
+  return c.toDataURL();
+}
+
+function liquid(el, blurRem) {
+  const w = el.offsetWidth, h = el.offsetHeight;
+  if (!w || !h) return false;
+  const rem = remPx();
+  const r = parseFloat(getComputedStyle(el).borderTopLeftRadius) || rem * 2;
+  const id = 'lq-' + el.id;
+  const key = `${w}x${h}x${r}`;
+  if (glassKeys.get(el) !== key) {
+    glassKeys.set(el, key);
+    let f = document.getElementById(id);
+    if (!f) { f = document.createElementNS(SVG_NS, 'filter'); f.id = id; glassDefs.appendChild(f); }
+    for (const [a, v] of [['x', 0], ['y', 0], ['width', w], ['height', h], ['filterUnits', 'userSpaceOnUse'],
+                          ['primitiveUnits', 'userSpaceOnUse'], ['color-interpolation-filters', 'sRGB']]) f.setAttribute(a, v);
+    const bezel = Math.min(r * 1.2, h * 0.45, rem * 3);
+    const q = v => Math.ceil(v / 64) * 64;
+    const mk = `${q(w)}x${q(h)}x${Math.round(r)}x${Math.round(bezel)}`;
+    const map = LENSMAPS.get(mk) || (LENSMAPS.set(mk, lensMap(q(w), q(h), r, bezel)), LENSMAPS.get(mk));
+    f.innerHTML = `<feImage href="${map}" x="0" y="0" width="${w}" height="${h}" preserveAspectRatio="none" result="map"/>` +
+                  `<feDisplacementMap in="SourceGraphic" in2="map" scale="${Math.round(rem * 3.4)}" xChannelSelector="R" yChannelSelector="G"/>`;
+  }
+  const bf = `url(#${id}) blur(${(blurRem * rem).toFixed(1)}px) saturate(1.9) brightness(1.06)`;
+  el.style.backdropFilter = bf;
+  el.style.webkitBackdropFilter = bf;
+  return true;
+}
+
+/* Settings › Home › Look on the page's own panels (the phone held upright): the same five looks as the app */
+function lookPanel(el) {
+  const lk = S.look || 'glass';
+  if (lk === 'glass') { if (el.dataset.looked) { el.style.boxShadow = ''; el.style.borderRadius = ''; delete el.dataset.looked; } return false; }
+  el.dataset.looked = '1';
+  el.style.backdropFilter = el.style.webkitBackdropFilter = 'none';
+  if (lk === 'air') { el.style.background = 'rgba(11,11,13,.94)'; el.style.borderRadius = '0'; el.style.boxShadow = 'inset .42rem 0 0 #E8412F'; }
+  else if (lk === 'shelf') {
+    el.style.background = 'rgba(21,18,23,.97)'; el.style.borderRadius = '.55rem';
+    el.style.boxShadow = 'inset 0 .24rem 0 var(--look-light, #FFC983), inset 0 4.6rem 3.4rem -3.2rem color-mix(in srgb, var(--look-light, #FFC983) 55%, transparent), inset 0 -.12rem 0 color-mix(in srgb, var(--look-light, #FFC983) 45%, transparent)';
+  }
+  else if (lk === 'ink') { el.style.background = 'var(--look-ink, #1F2E45)'; el.style.borderRadius = '.9rem'; el.style.boxShadow = '.5rem .5rem 0 color-mix(in srgb, var(--look-ink, #1F2E45) 45%, #000), inset 0 0 0 .12rem color-mix(in srgb, var(--look-paper, #F4E3C8) 35%, transparent)'; }
+  else if (lk === 'spot') { el.style.background = 'radial-gradient(ellipse at 50% 45%, rgba(6,8,16,.84), rgba(6,8,16,.62) 55%, rgba(6,8,16,.2))'; el.style.boxShadow = 'none'; }
+  return true;
+}
+/* the look's colours: the shelf's light by the time of day, the ink and paper from the photo on screen */
+function applyLook() {
+  const lk = S.look || 'glass';
+  ['glass', 'shelf', 'ink', 'air', 'spot'].forEach(x => body.classList.toggle('look-' + x, x === lk));
+  const hr = new Date().getHours();
+  body.style.setProperty('--look-light', hr >= 7 && hr < 17 ? '#D3E4FF' : '#FFC983');
+  if (lk === 'ink') lookInk();
+}
+let lookImg = null;
+function lookInk(img) {
+  if (img) lookImg = img; else img = lookImg;
+  try {
+    if (!img || !img.naturalWidth) return;
+    const cv = document.createElement('canvas'); cv.width = 32; cv.height = 18;
+    const x = cv.getContext('2d'); x.drawImage(img, 0, 0, 32, 18);
+    const d = x.getImageData(0, 0, 32, 18).data;         // (throws for a picture from a site that doesn't allow it: the default ink stays)
+    let cx = 0, cy = 0, ws = 0, ss = 0, n = 0;
+    for (let i = 0; i < d.length; i += 4) {
+      const r = d[i] / 255, g = d[i + 1] / 255, b = d[i + 2] / 255, mx = Math.max(r, g, b), mn = Math.min(r, g, b), v = mx, s = mx ? (mx - mn) / mx : 0;
+      let hh = 0; if (mx !== mn) hh = mx === r ? ((g - b) / (mx - mn)) % 6 : mx === g ? (b - r) / (mx - mn) + 2 : (r - g) / (mx - mn) + 4;
+      hh *= 60; const w = s * (.35 + v);
+      cx += Math.cos(hh * Math.PI / 180) * w; cy += Math.sin(hh * Math.PI / 180) * w; ws += w; ss += s; n++;
+    }
+    const hue = ws < .001 ? 220 : (Math.atan2(cy, cx) * 180 / Math.PI + 360) % 360;
+    const sat = Math.max(.45, Math.min(.8, ss / n * 1.3 * 1.25));
+    body.style.setProperty('--look-ink', `hsl(${hue.toFixed(0)} ${(sat * 100 * .62).toFixed(0)}% 24%)`);
+    body.style.setProperty('--look-paper', `hsl(${hue.toFixed(0)} 40% 92%)`);
+  } catch (e) {}
+}
+function styleGlass(el) {
+  if (lookPanel(el)) return;
+  const blur = parseFloat(el.dataset.blur || '.4');
+  const tint = el.dataset.tint || 'rgba(255,255,255,.06)';
+  if (S.glass === 'solid') {
+    el.style.backdropFilter = el.style.webkitBackdropFilter = 'none';
+    el.style.background = 'rgba(30,30,34,.94)';
+    return;
+  }
+  el.style.background = tint;
+  try { if (S.glass === 'liquid' && el.dataset.lens !== '0' && liquid(el, blur)) return; } catch (e) { /* fall back to frosted */ }
+  const bf = `blur(${Math.max(blur, 1.4)}rem) saturate(1.7)`;
+  el.style.backdropFilter = el.style.webkitBackdropFilter = bf;
+}
+
+function applyGlassMode() {
+  applyLook();
+  body.classList.remove('glass-liquid', 'glass-frosted', 'glass-solid');
+  body.classList.add('glass-' + S.glass);
+  document.querySelectorAll('.glass').forEach(styleGlass);
+}
+/* Re-measure whenever the screen area changes size. Android's web view can start before it
+   knows its real size, so this also runs right after start-up. */
+let lastLayoutKey = '';
+function relayout() {
+  computeLayout();
+  const key = SW.toFixed(2) + 'x' + SH.toFixed(2);
+  if (key === lastLayoutKey) return;
+  lastLayoutKey = key;
+  const turned = lastPortrait !== PORTRAIT;
+  lastPortrait = PORTRAIT;
+  placeDock();
+  render();
+  applyGlassMode();
+  if (turned) { if (mode === 'menu') closeMenu(); if (window.onTurn) onTurn(); }
+  if (typeof tab !== 'undefined' && tab === 'live' && window.lvRenderWindow) lvRenderWindow();
+}
+let lastPortrait = null;
+function placeDock() {
+  $('#dock').style.top = DOCK_PANEL_Y + 'rem';
+  for (const id of ['#dock', '#drawer']) { $(id).style.left = $(id).style.right = DRAWER_X + 'rem'; }
+  $('#hint').style.top = PORTRAIT ? (DOCK_PANEL_Y - 3.2) + 'rem' : '';
+  const ts = $('#tshelf');
+  ts.style.top = (DOCK_PANEL_Y - (PORTRAIT ? 28 : 18.2)) + 'rem';
+  ts.style.left = ts.style.right = DRAWER_X + 'rem';
+}
+function applyInsets(l, r, t, b) {
+  const root = document.documentElement.style;
+  root.setProperty('--safe-l', (+l || 0) + 'px');
+  root.setProperty('--safe-r', (+r || 0) + 'px');
+  root.setProperty('--safe-t', (+t || 0) + 'px');
+  root.setProperty('--safe-b', (+b || 0) + 'px');
+  SAFE_T = +t || 0; SAFE_B = +b || 0;
+  lastLayoutKey = '';
+  requestAnimationFrame(relayout);
+}
+window.tsInsets = (l, r, t, b) => applyInsets(l, r, t, b);
+try { const v = (B.safeInsets ? B.safeInsets() : '0,0,0,0').split(','); applyInsets(v[0], v[1], v[2], v[3]); } catch (e) {}
+window.addEventListener('resize', () => requestAnimationFrame(relayout));
+// belt and braces: if anything ever nudges the page itself, put it back
+window.addEventListener('scroll', () => { if (window.scrollX || window.scrollY) window.scrollTo(0, 0); });
+document.getElementById('stage').addEventListener('scroll', e => { const s = e.currentTarget; if (s.scrollLeft || s.scrollTop) { s.scrollLeft = 0; s.scrollTop = 0; } });
+if (window.ResizeObserver) new ResizeObserver(() => requestAnimationFrame(relayout)).observe(document.getElementById('stage'));
+window.addEventListener('load', relayout);
+[100, 500, 1500].forEach(ms => setTimeout(relayout, ms));
+
+/* Light follows focus: the dock's glow and every rim highlight swing toward the focused app. */
+function moveLight() {
+  const col = focus % COLS;
+  const dock = $('#dock');
+  dock.style.setProperty('--fx', (10 + col * 80 / Math.max(1, COLS - 1)) + '%');
+  document.documentElement.style.setProperty('--la', (100 + col * 88 / Math.max(1, COLS - 1)) + 'deg');
+}
+
+/* A small tvOS-style tilt toward the direction you moved, springing back to flat. */
+function tilt(dir) {
+  const el = cellEls.get(items[focus].id);
+  if (!el) return;
+  const rot = { l: 'y -5deg', r: 'y 5deg', u: 'x 5deg', d: 'x -5deg' }[dir];
+  el.classList.toggle('rev', dir === 'l');
+  if (!rot) return;
+  el.style.setProperty('--rot', rot);
+  setTimeout(() => el.style.setProperty('--rot', 'y 0deg'), 140);
+}
+
+/* =========================== Start =========================== */
+
+placeDock();
+applyMotion();
+applyGlassMode();
+tick();
+setInterval(tick, 5000);
+loadApps();
+render();
+loadPhotos(true);
+
+/* =========================== Browser preview =========================== */
+function mockBridge() {
+  const store = {};
+  try { Object.assign(store, JSON.parse(localStorage.getItem('topshelf-mock') || '{}')); } catch (e) {}
+  const persist = () => { try { localStorage.setItem('topshelf-mock', JSON.stringify(store)); } catch (e) {} };
+  const names = [['YouTube', '#c4302b'], ['Nuvio', '#5b3fd1'], ['Netflix', '#8f0a12'], ['Plex', '#c98b06'], ['Disney+', '#123b8f'],
+    ['Max', '#2d2fd6'], ['Prime Video', '#0f79af'], ['Spotify', '#178a42'], ['Hulu', '#11865a'], ['Twitch', '#6441a5'],
+    ['Kodi', '#1f6f99'], ['Photos', '#c2410c'], ['Play Store', '#0b8043'], ['Files', '#3b5bdb'], ['Stremio', '#4b3b8f'], ['Chrome', '#1a73e8']];
+  const list = names.map(([label, tint], i) => ({ id: 'mock/' + i, pkg: 'mock' + i, label, banner: false, tint, mock: true }));
+  return {
+    getApps: () => JSON.stringify(list),
+    launch: id => { toast('Would open ' + (list.find(a => a.id === id) || {}).label); return true; },
+    appInfo: () => toast('Would open App info'),
+    openSettings: () => toast('Would open Android settings'),
+    openAccessibilitySettings: () => {},
+    openStockHome: () => toast('Would open Google TV home'),
+    homeStatus: () => 'off',
+    setRedirect: () => {},
+    getPref: k => store[k] || null,
+    setPref: (k, v) => { store[k] = v; persist(); },
+    getVersion: () => 'preview',
+    getCachedPhotos: () => null,
+    liveInfo: () => JSON.stringify({ m3u: store.m3u || '', epg: store.epg || '', status: '', updated: 0 }),
+    liveSetUrls: (m, e) => { store.m3u = m; store.epg = e; persist(); },
+    liveChannels: () => '[]',
+    livePrograms: () => '{}',
+    liveRefresh: () => setTimeout(() => window.tsLiveDone(false, 'Failed: preview has no Android bridge'), 300),
+    openExternal: () => toast('Would open another player'),
+    openInStremioApp: () => '', openTrailer: () => toast('Would open the trailer'), safeInsets: () => '0,0',
+    fetchPhotos: (sub, sort, id) => setTimeout(() => window.tsPhotos(id, null, 'no Android bridge'), 0)
+  };
+}
+</script>
+<script src="lib/hls.min.js"></script>
+<script src="lib/mpegts.js"></script>
+<script src="live.js"></script>
+<script src="vod.js"></script>
+<script src="search.js"></script>
+<script src="extras.js"></script>
+<script src="guide.js"></script>
+<script src="topshelf.js"></script>
+<script src="sports.js"></script>
+<script src="link.js"></script>
+<script src="playeropts.js"></script>
+<script src="backup.js"></script>
+<script src="icons.js"></script>
+<script src="homefix.js"></script>
+<script src="perf.js"></script>
+<script src="diag.js"></script>
+<script src="multiview.js"></script>
+<script src="nativeplayer.js"></script>
+<script src="updates.js"></script>
+<script src="nativehome.js"></script>
+</body>
+</html>

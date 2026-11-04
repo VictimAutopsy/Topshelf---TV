@@ -27,6 +27,13 @@ The data is refreshed every few minutes during games and every few hours otherwi
 
 Fantasy data provided by Yahoo Fantasy.
 
+## Source code
+
+This repository holds TopShelf's full source: the Android app (`app/src/main/java/...`), its web pages
+(`app/src/main/assets/`) and the build tools. How to build and install it: [docs/BUILDING.md](docs/BUILDING.md).
+Nothing private is kept here: no signing key, passwords, tokens or account details. Those stay on the TV
+or in a private repository.
+
 ## Users
 
 One household: me.

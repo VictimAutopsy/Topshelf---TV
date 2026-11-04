@@ -1,0 +1,50 @@
+plugins {
+    id 'com.android.application'
+}
+
+def buildNumber = (System.getenv('GITHUB_RUN_NUMBER') ?: '1') as int
+
+android {
+    namespace 'com.topshelf.launcher'
+    compileSdk 35
+
+    defaultConfig {
+        applicationId 'com.topshelf.launcher'
+        minSdk 26
+        targetSdk 35
+        versionCode buildNumber
+        versionName "1.0.${buildNumber}"
+    }
+
+    // One fixed key so every new build installs over the last one.
+    // The signing key is private (see build-local.sh): TOPSHELF_KEYSTORE / TOPSHELF_KS_PASS, or the
+    // private updates repository cloned next to this one.
+    signingConfigs {
+        release {
+            def ks = System.getenv('TOPSHELF_KEYSTORE') ?: "${rootDir}/../topshelf-updates/signing/topshelf.keystore"
+            def pwFile = new File(new File(ks).parentFile, 'password.txt')
+            def pw = System.getenv('TOPSHELF_KS_PASS') ?: (pwFile.exists() ? pwFile.text.trim() : '')
+            storeFile file(ks)
+            storePassword pw
+            keyAlias 'topshelf'
+            keyPassword pw
+        }
+    }
+
+    buildTypes {
+        release {
+            minifyEnabled false
+            signingConfig signingConfigs.release
+        }
+    }
+
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+    }
+
+    lint {
+        checkReleaseBuilds false
+        abortOnError false
+    }
+}

@@ -1,0 +1,197 @@
+/* ==================== Tabs ==================== */
+#tabs {
+  position: absolute; top: 2.3rem; left: 50%; translate: -50% 0; display: flex; gap: .3rem;
+  padding: .5rem; border-radius: 3rem; z-index: 30; transition: opacity .4s;
+}
+.tab {
+  padding: .95rem 2.1rem; border-radius: 2.4rem; font-size: 1.35rem; font-weight: 600; white-space: nowrap;
+  color: rgba(255,255,255,.78); transition: background .2s, color .2s, scale .2s var(--ease);
+}
+.tab.active { background: rgba(255,255,255,.2); color: #fff; }
+.tab.sel { background: #fff; color: #111; scale: 1.06; }
+body.shelf #tabs, body.playing-fs #tabs, body.playing-fs #topbar { opacity: 0; pointer-events: none; }
+
+/* ==================== Live TV layout ==================== */
+#live { position: absolute; inset: 0; opacity: 0; pointer-events: none; transition: opacity .4s; }
+body.live #live { opacity: 1; pointer-events: auto; }
+body.live #content, body.live #drawer, body.live #hint { opacity: 0 !important; pointer-events: none !important; }
+body.live #bg { filter: brightness(.5) saturate(1.1); }
+body.live .bgimg.kb { animation-play-state: paused; }
+body.shelf #live, body.shelf #player.pv { opacity: 0; pointer-events: none; }
+body.shelf.live #bg { filter: none; }
+
+/* Categories: a panel that slides out over the guide (Left on the remote, or tap the category button). */
+#lcats {
+  position: absolute; left: 3rem; top: 8.8rem; bottom: 2.2rem; width: 24rem; border-radius: 3rem; overflow: hidden; z-index: 20;
+  translate: calc(-100% - 4rem) 0; opacity: 0; pointer-events: none;
+  box-shadow: 1.5rem 0 4rem rgba(0,0,0,.5);
+  transition: translate .42s var(--ease), opacity .3s;
+}
+body.lcats-open #lcats { translate: 0 0; opacity: 1; pointer-events: auto; }
+#lguide::after {          /* dims the guide while the panel is out */
+  content: ''; position: absolute; inset: 0; background: rgba(0,0,0,.35); opacity: 0; pointer-events: none;
+  transition: opacity .35s; z-index: 15; border-radius: inherit;
+}
+body.lcats-open #lguide::after { opacity: 1; }
+#lcats .lh {
+  position: absolute; left: 2.2rem; top: 1.9rem; font-size: 1.05rem; font-weight: 600;
+  letter-spacing: .08em; text-transform: uppercase; color: var(--text-dim);
+}
+#lcatlist {
+  position: absolute; left: 1rem; right: 1rem; top: 4.6rem; bottom: 1rem; overflow-y: auto; overscroll-behavior: contain;
+  touch-action: pan-y; scrollbar-width: none; padding: .2rem 0; overflow-anchor: none;
+}
+#lcatlist::-webkit-scrollbar { display: none; }
+.lcat {
+  position: relative; height: 3.5rem; margin: 0 .2rem .4rem; display: flex; align-items: center; justify-content: space-between;
+  padding: 0 1.2rem; border-radius: 1.4rem; font-size: 1.25rem; font-weight: 500; color: rgba(255,255,255,.82);
+  transition: background .15s, color .15s, scale .2s var(--ease);
+}
+.lcat span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.lcat b { font-weight: 500; font-size: 1rem; color: var(--text-dim); margin-left: .8rem; flex: none; }
+.lcat.cur { background: rgba(255,255,255,.14); color: #fff; }
+.lcat.f { background: #fff; color: #111; scale: 1.03; }
+.lcat.f b { color: rgba(0,0,0,.55); }
+#lcatmore { position: absolute; bottom: .7rem; left: 50%; translate: -50% 0; font-size: 1.2rem; color: var(--text-dim); transition: opacity .3s; }
+
+#lguide { position: absolute; left: 3rem; right: 3rem; top: 8.8rem; bottom: 2.2rem; border-radius: 3rem; overflow: hidden; }
+#linfo { position: absolute; left: 2.4rem; top: 2.2rem; width: 80rem; height: 14rem; }
+.lic { font-size: 1.1rem; color: var(--text-dim); font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.lic span { margin-left: .8rem; padding: .15rem .7rem; border-radius: 1rem; background: rgba(255,255,255,.12); font-size: .9rem; }
+.lit { font-size: 2.3rem; font-weight: 600; letter-spacing: -.02em; margin-top: .5rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.lim { font-size: 1.15rem; color: rgba(255,255,255,.75); margin-top: .4rem; }
+.lbar { height: .35rem; width: 22rem; border-radius: 1rem; background: rgba(255,255,255,.2); margin-top: .7rem; overflow: hidden; }
+.lbar i { display: block; height: 100%; background: #fff; border-radius: 1rem; }
+.lid {
+  font-size: 1.05rem; color: rgba(255,255,255,.7); margin-top: .8rem; line-height: 1.4;
+  display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden;
+}
+
+/* The guide grid is a native scroll area: rows scroll up/down, programmes left/right,
+   the channel column and time bar stay pinned (position: sticky). */
+#lgscroll {
+  position: absolute; left: 2rem; right: 1.4rem; top: 17.4rem; bottom: 1.4rem; overflow: auto;
+  overscroll-behavior: contain; touch-action: pan-x pan-y; scrollbar-width: none; border-radius: 1.4rem;
+  overflow-anchor: none;   /* rows are added/removed while scrolling: never let the browser shift the view */
+}
+#lgscroll::-webkit-scrollbar { display: none; }
+#lgin { position: relative; min-height: 100%; }
+#ltimes { position: sticky; top: 0; z-index: 7; height: 2.8rem; width: 100%; background: rgb(27,27,32); box-shadow: 0 .4rem .8rem rgba(0,0,0,.3); }
+.lday {
+  position: sticky; left: 0; z-index: 2; display: inline-flex; align-items: center; width: calc(var(--lchw, 22rem) - .6rem); height: 100%;
+  box-sizing: border-box; background: rgb(27,27,32);
+}
+/* the category button in the guide's top-left corner */
+.lcb {
+  display: flex; align-items: center; gap: .55rem; height: 2.3rem; max-width: 20.8rem; padding: 0 .9rem 0 .7rem;
+  border-radius: 1.2rem; background: rgba(255,255,255,.12); font-size: 1rem; font-weight: 600; color: #fff;
+  box-sizing: border-box; transition: background .15s, color .15s;
+}
+.lcb svg { width: 1.15rem; height: 1.15rem; flex: none; }
+.lcb span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.lcb.f { background: #fff; color: #111; }
+.lslot { position: absolute; top: .55rem; font-size: 1.05rem; color: var(--text-dim); padding-left: .5rem; border-left: 1px solid rgba(255,255,255,.2); white-space: nowrap; }
+/* Rows area and channel column. The column is ONE pinned layer (cheap for the GPU);
+   only the rows near the screen exist at any time. */
+#lbody { position: relative; display: flex; align-items: flex-start; }
+#lchcol { position: sticky; left: 0; z-index: 5; flex: none; width: var(--lchw, 22rem); contain: layout; background: rgb(27,27,32); }
+#lrows { position: relative; flex: none; contain: layout; }
+.lrow { position: absolute; left: 0; right: 0; height: calc(var(--lrowh, 5.7rem) - .4rem); }
+.lch {
+  position: absolute; left: 0; width: calc(var(--lchw, 22rem) - .6rem); height: calc(var(--lrowh, 5.7rem) - .4rem); display: flex; align-items: center; gap: .7rem;
+  padding: 0 .9rem; box-sizing: border-box; border-radius: 1.2rem; background: rgb(40,40,46);
+}
+.lch.cur { background: rgb(72,72,80); }
+.lch.on { box-shadow: inset .28rem 0 0 #ff453a; }
+.lnum { min-width: 1.6rem; max-width: 3.4rem; overflow: hidden; font-size: .92rem; color: var(--text-dim); text-align: right; flex: none; font-variant-numeric: tabular-nums; }
+.llogo { width: 3.4rem; height: 2.5rem; object-fit: contain; flex: none; }
+.llogo.ph { display: grid; place-items: center; background: rgba(255,255,255,.12); border-radius: .6rem; font-weight: 600; font-size: 1.2rem; }
+.lname {
+  font-size: 1.05rem; font-weight: 500; line-height: 1.22; flex: 1; min-width: 0; overflow: hidden; word-break: break-word;
+  display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical;
+}
+.lch em { font-style: normal; color: #ffd60a; font-size: .95rem; flex: none; }
+.lps { position: absolute; left: 0; right: 0; top: 0; bottom: 0; }
+.lp {
+  position: absolute; top: 0; bottom: 0; padding: .75rem 1rem; box-sizing: border-box; border-radius: 1.2rem;
+  background: rgba(255,255,255,.08); overflow: clip; transition: background .15s, color .15s;
+}
+.lpx { max-width: 100%; transition: transform .25s var(--ease); }
+.lp.live { background: rgba(255,255,255,.13); }
+.lp.past { opacity: .5; }
+.lp.none { background: rgba(255,255,255,.04); }
+.lpt { font-size: 1.12rem; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.lpm { font-size: .92rem; color: var(--text-dim); margin-top: .25rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.lp.f { background: #fff; color: #111; z-index: 2; box-shadow: 0 .5rem 1.4rem rgba(0,0,0,.35); opacity: 1; }
+.lp.f .lpm { color: rgba(0,0,0,.6); }
+#lnow {
+  position: absolute; top: 0; bottom: 0; width: .18rem; translate: -50% 0; z-index: 3; pointer-events: none;
+  background: #ff453a; border-radius: .2rem; box-shadow: 0 0 .6rem rgba(255,69,58,.6);
+}
+
+#lempty {
+  position: absolute; inset: 2rem; display: none; flex-direction: column; align-items: center; justify-content: center;
+  text-align: center; gap: .4rem; font-size: 1.25rem; color: rgba(255,255,255,.75); line-height: 1.55; padding: 0 8rem;
+}
+#lempty b { font-size: 2.1rem; color: #fff; font-weight: 600; display: block; margin-bottom: .6rem; }
+.spin {
+  width: 2.8rem; height: 2.8rem; border-radius: 50%; border: .3rem solid rgba(255,255,255,.2); border-top-color: #fff;
+  animation: spin 1s linear infinite; margin-bottom: .8rem;
+}
+@keyframes spin { to { rotate: 360deg; } }
+
+/* ==================== Player ==================== */
+/* The player is always full-size; the small guide preview is the same element scaled down
+   (a transform), so going full screen is a smooth zoom that the GPU handles. */
+#player {
+  position: absolute; z-index: 60; background: #000; overflow: hidden; opacity: 0; pointer-events: none;
+  left: 0; top: 0; width: 100%; height: 100%; transform-origin: 0 0;
+  /* small preview: 25rem wide, tucked into the guide's top-right corner */
+  transform: translate(calc(var(--sw) * 1rem - 30.6rem), 10.8rem) scale(calc(25 / var(--sw)));
+  border-radius: calc(var(--sw) * .064rem);
+  box-shadow: 0 5rem 12rem rgba(0,0,0,.5);
+  transition: transform .45s var(--ease), border-radius .45s var(--ease), opacity .3s;
+}
+#player.pv { opacity: 1; pointer-events: auto; }
+#player.fs {
+  opacity: 1; pointer-events: auto; transform: none; border-radius: 0; z-index: 90;
+  left: calc(-1 * var(--safe-l)); width: calc(100% + var(--safe-l) + var(--safe-r));   /* video goes edge to edge */
+}
+body.live:not(.playing-fs) #player.pv { box-shadow: 0 5rem 12rem rgba(0,0,0,.5), 0 0 0 .55rem rgba(255,255,255,.25); }
+#video { width: 100%; height: 100%; object-fit: contain; background: #000; display: block; }
+#player.loading::after {
+  content: ''; position: absolute; left: 50%; top: 50%; width: 3rem; height: 3rem; margin: -1.5rem 0 0 -1.5rem;
+  border-radius: 50%; border: .3rem solid rgba(255,255,255,.2); border-top-color: #fff; animation: spin 1s linear infinite;
+}
+#perr {
+  position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center;
+  text-align: center; gap: .4rem; padding: 2rem; font-size: 1.1rem; color: rgba(255,255,255,.75); background: rgba(0,0,0,.6);
+}
+#perr:empty { display: none; }
+#perr b { font-size: 1.6rem; color: #fff; }
+#player.pv #perr { font-size: 4rem; }
+#player.pv #perr b { font-size: 5rem; }
+#player.pv.loading::after { width: 12rem; height: 12rem; margin: -6rem 0 0 -6rem; border-width: 1.2rem; }
+
+#osd {
+  position: absolute; left: 3rem; right: 3rem; bottom: 2.5rem; min-height: 11rem; border-radius: 2.8rem;
+  display: flex; align-items: center; gap: 2rem; padding: 1.8rem 2.6rem; box-sizing: border-box;
+  opacity: 0; translate: 0 2rem; transition: opacity .3s, translate .45s var(--ease); pointer-events: none;
+}
+#osd.show { opacity: 1; translate: 0 0; }
+#player:not(.fs) #osd { display: none; }
+.ologo { width: 9rem; height: 6rem; object-fit: contain; flex: none; }
+.ologo.ph { display: grid; place-items: center; font-size: 2.4rem; font-weight: 600; background: rgba(255,255,255,.12); border-radius: 1rem; }
+.obody { flex: 1; min-width: 0; text-shadow: 0 .1rem .6rem rgba(0,0,0,.5); }
+.oc { font-size: 1.1rem; color: var(--text-dim); font-weight: 500; }
+.ot { font-size: 2.1rem; font-weight: 600; margin-top: .3rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.om { font-size: 1.1rem; color: rgba(255,255,255,.78); margin-top: .3rem; }
+.onext { font-size: 1.05rem; color: var(--text-dim); margin-top: .6rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+#osd .lbar { width: 32rem; }
+.ohint { position: absolute; right: 2.6rem; top: 1.5rem; font-size: .92rem; color: var(--text-dim); }
+
+.srow input.wide { width: 24rem; }
+
+/* the channel preview steps aside while a panel (Settings, Search, a sheet, a picker) is open over the guide */
+body.settings-open #player.pv, body.search-open #player.pv, body.link-open #player.pv, body.sheet-open #player.pv,
+body.spick-open #player.pv, body.icpick-open #player.pv { opacity: 0; pointer-events: none; }

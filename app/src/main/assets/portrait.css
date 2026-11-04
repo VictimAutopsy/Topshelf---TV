@@ -1,0 +1,264 @@
+/* ==================== Phone held upright (portrait) ====================
+   body.portrait is set when the screen is taller than it is wide. The screen is 64rem wide.
+   Tabs move to a bar along the bottom; everything else keeps the same pieces, re-arranged. */
+
+/* ---- tab bar along the bottom ---- */
+body.portrait #tabs {
+  top: auto; bottom: calc(2rem + var(--safe-b)); left: 2.4rem; right: 2.4rem; translate: none;
+  height: 9rem; padding: .7rem; gap: .4rem; border-radius: 4.5rem; box-sizing: border-box;
+}
+body.portrait .tab {
+  flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: .45rem;
+  padding: 0; border-radius: 3.8rem; font-size: 1.5rem; min-width: 0;
+}
+body.portrait .tab .ti { display: block; width: 3.1rem; height: 3.1rem; }
+body.portrait .tab.sel { scale: 1; }
+
+/* ---- top bar: bigger touch targets ---- */
+body.portrait #topbar { top: calc(2rem + var(--safe-t)); right: 2.4rem; padding: .5rem 1.6rem .5rem .5rem; gap: .2rem; }
+body.portrait .tb { width: 6rem; height: 6rem; }
+body.portrait .tb svg { width: 2.8rem; height: 2.8rem; }
+body.portrait .tb .tip { display: none; }
+body.portrait #clock { font-size: 2.3rem; }
+body.portrait:not(.live):not(.vod):not(.sports) #clock { display: none; }
+body.portrait:not(.live):not(.vod):not(.sports) #topbar { padding-right: .5rem; }
+
+/* ---- home: big clock, 3 columns, labels under every app ---- */
+body.portrait #bigclock {
+  display: block; position: absolute; left: 4rem; top: calc(10.5rem + var(--safe-t)); z-index: 2; pointer-events: none;
+  text-shadow: 0 .2rem 1.6rem rgba(0,0,0,.45); transition: opacity .45s var(--ease), translate .5s var(--ease);
+}
+#bigclock .bd { font-size: 2.3rem; font-weight: 600; color: rgba(255,255,255,.85); }
+#bigclock .bt { font-size: 12rem; font-weight: 600; letter-spacing: -.04em; line-height: 1; margin-top: .4rem; font-variant-numeric: tabular-nums; }
+body.portrait.deep #bigclock, body.portrait.shelf #bigclock, body.portrait.live #bigclock, body.portrait.vod #bigclock, body.portrait.sports #bigclock,
+body.portrait.search-open #bigclock, body.portrait.clock-off #bigclock, body.portrait.settings-open #bigclock { opacity: 0; translate: 0 -2rem; }
+
+body.portrait .label { opacity: .92; translate: 0 0; left: -6%; width: 112%; font-size: 1.45rem; top: calc(var(--th) + 1rem); }
+body.portrait #hint { bottom: auto; font-size: 1.45rem; gap: .5rem; }
+body.portrait #hint svg { width: 1.5rem; height: 1.5rem; rotate: 180deg; }
+body.portrait #drawer { top: calc(11rem + var(--safe-t)); bottom: calc(13rem + var(--safe-b)); }
+
+/* photos: a slow pan across the (landscape) photo instead of cropping it hard */
+body.portrait .bgimg {
+  inset: auto; top: -3%; left: 0; height: 106%; width: calc(var(--sh) * 1.06rem * 1.6);
+  transform: translateX(calc((100vw - 100%) * .5));
+}
+body.portrait .bgimg.kb { animation-name: kbp; }
+@keyframes kbp {
+  from { transform: translateX(calc((100vw - 100%) * .15)); }
+  to   { transform: translateX(calc((100vw - 100%) * .85)); }
+}
+body.portrait #caption { left: 4rem; right: 4rem; max-width: none; }
+body.portrait.shelf #caption { top: auto; bottom: calc(8rem + var(--safe-b)); translate: 0 0; }
+body.portrait.shelf #caption.swap { translate: 0 .6rem; }
+body.portrait #shelfhint { right: auto; left: 4rem; bottom: calc(3.4rem + var(--safe-b)); font-size: 1.5rem; }
+body.portrait #shelfhint .kh { display: none; }
+body.portrait #shelfhint .th { display: inline; }
+body.portrait #pausebadge { top: calc(3.4rem + var(--safe-t)); left: 3rem; font-size: 1.5rem; }
+
+/* ---- settings, menus, toast ---- */
+body.portrait #settings {
+  left: 2rem; right: 2rem; width: auto; top: calc(2rem + var(--safe-t)); bottom: calc(2rem + var(--safe-b));
+  padding: 4rem 2.2rem 2.2rem; translate: calc(100% + 3rem) 0;
+}
+body.portrait.settings-open #settings { translate: 0 0; }
+body.portrait #settings h1 { font-size: 3.4rem; margin-left: 1.6rem; }
+body.portrait .srow { font-size: 1.8rem; padding: 1.5rem 1.6rem; gap: 1.2rem; }
+body.portrait .srow > span:first-child { min-width: 0; }
+body.portrait .srow .val { max-width: 52%; overflow: hidden; }
+body.portrait .srow input { font-size: 1.8rem; width: 22rem; }
+body.portrait .srow input.wide { width: 30rem; }
+body.portrait #srows { max-height: calc(100% - 13rem); }
+body.portrait #settings .foot { font-size: 1.3rem; left: 3.8rem; right: 2.4rem; }
+
+body.portrait #menu {
+  left: 2rem !important; right: 2rem; top: auto !important; bottom: calc(2rem + var(--safe-b)); min-width: 0;
+  padding: 1.2rem; border-radius: 3.2rem; transform-origin: 50% 100% !important; translate: 0 2rem; z-index: 70;
+}
+body.portrait #menu.open { translate: 0 0; }
+body.portrait .mi { font-size: 2rem; padding: 1.7rem 1.8rem; gap: 1.5rem; border-radius: 2rem; }
+body.portrait .mi svg { width: 2.4rem; height: 2.4rem; }
+body.portrait .mi.sel { background: transparent; color: #fff; scale: 1; }
+body.portrait #menu .mh { font-size: 1.6rem; max-width: none; padding: .9rem 1.8rem 1.1rem; }
+body.portrait #scrim { transition: opacity .3s, background .3s; }
+body.portrait.menu-open #scrim { opacity: 1; background: rgba(0,0,0,.45); }
+
+body.portrait #toast { bottom: calc(14rem + var(--safe-b)); font-size: 1.8rem; max-width: 54rem; text-align: center; }
+
+/* ---- Movies & TV Shows: backdrop and title on top, rows of bigger posters below ---- */
+body.portrait #vbg { bottom: auto; height: calc(var(--sw) * .5625rem + 10rem + var(--safe-t)); }
+body.portrait .vbgi { background-position: center 25%; }
+body.portrait #vbg::after {
+  background: linear-gradient(to bottom, rgba(0,0,0,.5) 0%, rgba(0,0,0,0) 22%, rgba(0,0,0,.1) 48%, rgba(0,0,0,.86) 80%, #000 100%);
+}
+body.portrait #vhero { left: 3.5rem; right: 3.5rem; width: auto; top: calc(var(--sw) * .5625rem - 9rem + var(--safe-t)); }
+body.portrait .vlogo { max-width: 32rem; max-height: 8rem; }
+body.portrait .vtitle { font-size: 4rem; }
+body.portrait .vmeta { font-size: 1.6rem; margin-top: 1rem; }
+body.portrait .vchip { font-size: 1.3rem; }
+body.portrait .vdesc { font-size: 1.65rem; }
+body.portrait .vhint { font-size: 1.35rem; }
+body.portrait #vrows { top: calc(var(--sw) * .5625rem + 15rem + var(--safe-t)); bottom: calc(13rem + var(--safe-b)); padding-bottom: 6rem; }
+body.portrait .vrow { height: 30.4rem; }
+body.portrait .vrt { left: 3.5rem; font-size: 2rem; top: .2rem; }
+body.portrait .vstrip { top: 3.4rem; height: 26.6rem; }
+body.portrait .vsin { padding-left: 3.5rem; gap: 1.6rem; }
+body.portrait .vp { width: 15rem; height: 22.5rem; border-radius: 1.4rem; }
+body.portrait .vp.x { width: 40rem; }
+body.portrait .vpn { font-size: 1.5rem; }
+body.portrait .vpxl { max-width: 18rem; max-height: 5.5rem; }
+body.portrait .vpxt { font-size: 2rem; }
+
+/* ---- Live TV: preview on top, the guide below it ---- */
+body.portrait #player:not(.fs) {
+  transform: none; left: 2rem; top: calc(10.5rem + var(--safe-t)); width: calc(100% - 4rem);
+  height: calc((var(--sw) - 4) * .5625rem); border-radius: 2rem;
+}
+body.portrait #player.pv #perr { font-size: 1.4rem; }
+body.portrait #player.pv #perr b { font-size: 2rem; }
+body.portrait #player.pv.loading::after { width: 3.4rem; height: 3.4rem; margin: -1.7rem 0 0 -1.7rem; border-width: .35rem; }
+body.portrait #lguide {
+  left: 2rem; right: 2rem; top: calc(10.5rem + var(--safe-t)); bottom: calc(13rem + var(--safe-b));
+  transition: top .4s var(--ease);
+}
+body.portrait.has-pv #lguide { top: calc(10.5rem + (var(--sw) - 4) * .5625rem + 1.6rem + var(--safe-t)); }
+body.portrait #linfo { left: 2.2rem; right: 2.2rem; top: 1.6rem; width: auto; height: 9.6rem; }
+body.portrait .lic { font-size: 1.4rem; }
+body.portrait .lit { font-size: 2.5rem; margin-top: .3rem; }
+body.portrait .lim { font-size: 1.45rem; }
+body.portrait .lbar { width: 100%; }
+body.portrait .lid { display: none; }
+body.portrait #lgscroll { left: 1.2rem; right: 1.2rem; top: 12rem; bottom: 1.2rem; }
+body.portrait #ltimes { height: 3.6rem; }
+body.portrait .lslot { font-size: 1.3rem; top: .9rem; }
+body.portrait .lcb { height: 2.9rem; font-size: 1.3rem; max-width: calc(var(--lchw) - 1.2rem); }
+body.portrait .lcb svg { width: 1.5rem; height: 1.5rem; }
+body.portrait .llogo { width: 3.8rem; height: 3rem; }
+body.portrait .lname { font-size: 1.45rem; }
+body.portrait .lnum { font-size: 1.15rem; }
+body.portrait .lp { padding: 1rem 1.2rem; }
+body.portrait .lpt { font-size: 1.5rem; }
+body.portrait .lpm { font-size: 1.2rem; }
+body.portrait #lcats { left: 2rem; right: 2rem; width: auto; top: calc(10.5rem + var(--safe-t)); bottom: calc(13rem + var(--safe-b)); }
+/* with a preview playing, the categories panel opens below it (like the guide) instead of under it */
+body.portrait #lcats { transition: translate .42s var(--ease), opacity .3s, top .4s var(--ease); }
+body.portrait.has-pv #lcats { top: calc(10.5rem + (var(--sw) - 4) * .5625rem + 1.6rem + var(--safe-t)); }
+body.portrait #lcats .lh { font-size: 1.4rem; left: 2.6rem; top: 2.2rem; }
+body.portrait #lcatlist { top: 5.6rem; }
+body.portrait .lcat { height: 5.4rem; font-size: 1.85rem; border-radius: 2rem; }
+body.portrait .lcat b { font-size: 1.4rem; }
+body.portrait #lempty { padding: 0 2.4rem; font-size: 1.6rem; }
+body.portrait #lempty b { font-size: 2.5rem; }
+body.portrait #osd { left: 2rem; right: 2rem; bottom: calc(3rem + var(--safe-b)); flex-wrap: wrap; }
+body.portrait .ohint { position: static; width: 100%; }
+
+/* ---- search ---- */
+body.portrait #shead { height: 6.6rem; top: 2.4rem; left: 2rem; right: 2rem; border-radius: 3.3rem; }
+body.portrait #shead > svg { width: 2.6rem; height: 2.6rem; }
+body.portrait #sq { font-size: 2.1rem; }
+body.portrait #sclose { width: 5rem; height: 5rem; font-size: 2rem; }
+body.portrait #sres { top: 10.4rem; }
+body.portrait .sst { font-size: 1.8rem; padding-left: 2.6rem; }
+body.portrait .sstrip { padding-left: 2.6rem; padding-right: 2.6rem; gap: 1.6rem; }
+body.portrait .sapp { width: 15rem; }
+body.portrait .sapic { height: 8.4rem; }
+body.portrait .sal { font-size: 1.4rem; }
+body.portrait .sp { width: 13rem; }
+body.portrait .spi { height: 19.5rem; }
+body.portrait .spn { font-size: 1.4rem; }
+body.portrait .spy { font-size: 1.2rem; }
+body.portrait .sch { width: 36rem; height: 8.4rem; gap: 1.4rem; }
+body.portrait .sch img, body.portrait .sch i { width: 5.6rem; height: 4rem; }
+body.portrait .sch b { font-size: 1.65rem; }
+body.portrait .sch span { font-size: 1.3rem; }
+body.portrait .sqc { font-size: 1.7rem; padding: 1.2rem 2rem; }
+body.portrait .smsg { font-size: 1.6rem; padding-left: 2.6rem; }
+body.portrait .smsg.big { font-size: 1.9rem; }
+
+/* ---- launch screen, weather, screensaver (portrait sizes) ---- */
+body.portrait .lxapp { width: 30rem; height: 16.9rem; border-radius: 2.6rem; }
+body.portrait .lxlogo { max-width: 46rem; max-height: 15rem; }
+body.portrait .lxname { font-size: 4.8rem; max-width: 56rem; }
+body.portrait .lxt { font-size: 2.6rem; }
+body.portrait .lxs { font-size: 1.9rem; }
+body.portrait .lxb { width: 22rem; height: .45rem; }
+body.portrait #wx { font-size: 2.2rem; }
+body.portrait #wx svg { width: 2.6rem; height: 2.6rem; }
+body.portrait:not(.live):not(.vod):not(.sports) #wx { display: none !important; }
+body.portrait.shelf.saver #bigclock { left: 4rem; top: calc(10.5rem + var(--safe-t)); opacity: 1; translate: 0 0; }
+body.portrait.shelf.saver #bigclock .bt { font-size: 12rem; }
+body.portrait.shelf.saver #bigclock .bd { font-size: 2.3rem; }
+
+/* ---- Top Shelf, Live TV channel list (portrait) ---- */
+body.portrait #tshelf { height: 22rem; }
+body.portrait .tsh { font-size: 1.8rem; left: 2.4rem; }
+body.portrait .tss { top: 3.2rem; }
+body.portrait .tsin { padding: 0 2.4rem; gap: 1.6rem; }
+body.portrait .tsc { width: 30rem; height: 16.9rem; border-radius: 1.6rem; }
+body.portrait .tsc .tsl { max-height: 5rem; }
+body.portrait .tsc .tsn { font-size: 1.7rem; }
+body.portrait #lzap { width: 70cqw; }
+
+/* ---- Sports (portrait) ---- */
+body.portrait .tab { font-size: 1.35rem; }
+body.portrait #sphead { left: 3rem; top: calc(2.4rem + var(--safe-t)); }
+body.portrait .spt { font-size: 3.8rem; }
+body.portrait .spupd { font-size: 1.4rem; }
+body.portrait #sprows { top: calc(11rem + var(--safe-t)); bottom: calc(13rem + var(--safe-b)); padding-bottom: 4rem; }
+body.portrait .sprt { padding-left: 3rem; font-size: 2rem; }
+body.portrait .sprin { padding: 1rem 3rem 1.6rem; gap: 1.6rem; }
+body.portrait .spnote { padding-left: 3rem; font-size: 1.6rem; }
+body.portrait .gc { width: 42rem; height: 20rem; padding: 1.6rem 1.8rem 1.4rem; border-radius: 2.2rem; }
+body.portrait .gch { font-size: 1.4rem; }
+body.portrait .gct { gap: 1.1rem; margin-top: .9rem; }
+body.portrait .gct img, body.portrait .gct i { width: 3.8rem; height: 3.8rem; }
+body.portrait .gcn { font-size: 1.95rem; }
+body.portrait .gcr { font-size: 1.35rem; }
+body.portrait .gct b { font-size: 2.3rem; }
+body.portrait .gcb { font-size: 1.4rem; }
+body.portrait .gtv svg { width: 1.6rem; height: 1.6rem; }
+body.portrait .gedit b { font-size: 4.4rem; }
+body.portrait .gedit span { font-size: 1.8rem; }
+body.portrait .spsetup .spbig, body.portrait .spsetup .spsub { padding: 0 3rem; }
+body.portrait .spbig { font-size: 3.6rem; }
+body.portrait .spsub { font-size: 1.8rem; }
+body.portrait #spickhead { height: 6.6rem; top: 2.4rem; left: 2rem; right: 2rem; border-radius: 3.3rem; }
+body.portrait #spq { font-size: 2.1rem; }
+body.portrait #spdone { font-size: 1.7rem; padding: 1.2rem 2.2rem; }
+body.portrait #spres { top: 10.4rem; }
+body.portrait .spc { font-size: 1.75rem; padding: 1.3rem 2rem; }
+body.portrait .stc { width: 15rem; }
+body.portrait .stc img, body.portrait .stc i { width: 6rem; height: 6rem; }
+body.portrait .stc span { font-size: 1.4rem; }
+
+/* ---- link panel, ticker, mic (portrait) ---- */
+body.portrait #smic { width: 5rem; height: 5rem; }
+body.portrait #smic svg { width: 2.5rem; height: 2.5rem; }
+body.portrait #ticker { left: 3rem; right: 3rem; max-width: none; top: calc(27.5rem + var(--safe-t)); height: 5.6rem; border-radius: 2.8rem; padding: 0 2rem 0 1.6rem; gap: 1rem; }
+body.portrait .tkr img { width: 2.8rem; height: 2.8rem; }
+body.portrait .tkr b { font-size: 1.7rem; }
+body.portrait .tki { font-size: 1.8rem; }
+body.portrait .tkw { font-size: 1.4rem; }
+body.portrait .tkn { font-size: 1.2rem; }
+body.portrait.saver #ticker { top: calc(27.5rem + var(--safe-t)); left: 3rem; }
+body.portrait #lkhead { left: 2.6rem; top: 2.6rem; }
+body.portrait #lkhead b { font-size: 3rem; }
+body.portrait #lkclose { width: 5rem; height: 5rem; font-size: 2rem; }
+body.portrait #lkbody { top: 10rem; padding: 0 2.6rem 3rem; gap: 2rem; }
+body.portrait .lkhero > svg { width: 4.4rem; height: 4.4rem; }
+body.portrait .lkhero b { font-size: 2.2rem; }
+body.portrait .lkhero span { font-size: 1.5rem; }
+body.portrait .lkp { font-size: 1.7rem; }
+body.portrait .lkb { font-size: 1.7rem; padding: 1.3rem 2rem; border-radius: 2.6rem; }
+body.portrait .lkb.sm { font-size: 1.4rem; padding: .9rem 1.4rem; }
+body.portrait .lkdev { padding: 1.8rem 2rem; border-radius: 2.2rem; }
+body.portrait .lkdev svg { width: 3.4rem; height: 3.4rem; }
+body.portrait .lkdev b { font-size: 1.9rem; }
+body.portrait .lkdev span { font-size: 1.4rem; }
+body.portrait #lkpad { height: 44rem; border-radius: 3.4rem; }
+body.portrait #lkpad span { font-size: 1.6rem; }
+body.portrait .lkkeys { gap: 1.4rem; }
+body.portrait .lkkeys .lkb { padding: 2rem .6rem; }
+body.portrait .lkb.mic svg { width: 2.6rem; height: 2.6rem; }
+body.portrait .lktype input { height: 6.4rem; font-size: 1.8rem; border-radius: 3.2rem; padding: 0 2rem; }
+body.portrait #lkcode { padding: 3.6rem 4rem; }

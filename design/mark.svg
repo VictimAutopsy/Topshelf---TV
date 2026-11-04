@@ -1,0 +1,36 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 108 108">
+  <defs>
+    <linearGradient id="tile" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#4fe3ff"/>
+      <stop offset=".48" stop-color="#5b6bff"/>
+      <stop offset="1" stop-color="#d54cff"/>
+    </linearGradient>
+    <linearGradient id="gloss" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#fff" stop-opacity=".42"/>
+      <stop offset=".55" stop-color="#fff" stop-opacity=".06"/>
+      <stop offset="1" stop-color="#fff" stop-opacity="0"/>
+    </linearGradient>
+    <linearGradient id="rim" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#fff" stop-opacity=".75"/>
+      <stop offset="1" stop-color="#fff" stop-opacity=".1"/>
+    </linearGradient>
+    <filter id="sh" x="-30%" y="-30%" width="160%" height="170%">
+      <feGaussianBlur in="SourceAlpha" stdDeviation="2.4"/>
+      <feOffset dy="2.4"/>
+      <feComponentTransfer><feFuncA type="linear" slope=".45"/></feComponentTransfer>
+      <feMerge><feMergeNode/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+  <!-- lower shelves -->
+  <rect x="38" y="73.2" width="32" height="3.2" rx="1.6" fill="#fff" fill-opacity=".22"/>
+  <rect x="31.5" y="62" width="13.2" height="7.6" rx="2.2" fill="#fff" fill-opacity=".55"/>
+  <rect x="47.4" y="62" width="13.2" height="7.6" rx="2.2" fill="#fff" fill-opacity=".38"/>
+  <rect x="63.3" y="62" width="13.2" height="7.6" rx="2.2" fill="#fff" fill-opacity=".24"/>
+  <!-- the top shelf: a glowing screen with a play mark -->
+  <g filter="url(#sh)">
+    <rect x="31.5" y="31" width="45" height="26.5" rx="6.2" fill="url(#tile)"/>
+    <rect x="31.5" y="31" width="45" height="26.5" rx="6.2" fill="url(#gloss)"/>
+    <rect x="32" y="31.5" width="44" height="25.5" rx="5.8" fill="none" stroke="url(#rim)" stroke-width=".9"/>
+    <path d="M50.2 38.6v11.3a.9.9 0 0 0 1.37.77l9.1-5.65a.9.9 0 0 0 0-1.53l-9.1-5.66a.9.9 0 0 0-1.37.77z" fill="#fff"/>
+  </g>
+</svg>
