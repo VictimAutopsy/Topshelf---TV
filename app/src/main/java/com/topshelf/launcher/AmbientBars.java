@@ -20,7 +20,7 @@ import android.view.View;
  */
 final class AmbientBars extends View {
     interface Source { TextureView texture(); }
-    private static final int SW = 32, SH = 72, COLS = 16;
+    private static final int SW = 32, SH = 270, COLS = 16;      // (a sample row is ~4 px of a 1080p picture)
     private Source src;
     private final Bitmap sample = Bitmap.createBitmap(SW, SH, Bitmap.Config.ARGB_8888);
     private final int[] px = new int[SW * SH];
@@ -30,6 +30,8 @@ final class AmbientBars extends View {
     private final int[] gTop = new int[COLS], gBot = new int[COLS];
     private final Paint p = new Paint(Paint.ANTI_ALIAS_FLAG), shade = new Paint();
     private final Matrix m = new Matrix();
+    private final Paint fade = new Paint();
+    { fade.setXfermode(new android.graphics.PorterDuffXfermode(android.graphics.PorterDuff.Mode.DST_IN)); }
     private boolean on, logged;
 
     AmbientBars(Context c) { super(c); setWillNotDraw(false); }
@@ -57,13 +59,13 @@ final class AmbientBars extends View {
         // the black rows at the top and the bottom (a row is black when even its brightest point is dark)
         int t = 0, b = 0;
         while (t < SH && rowMax(t) < 26) t++;
-        if (t >= SH - 2) return;                                   // (a black frame: says nothing)
+        if (t >= SH - 8) return;                                   // (a black frame: says nothing)
         while (b < SH && rowMax(SH - 1 - b) < 26) b++;
         hist[histI * 2] = t; hist[histI * 2 + 1] = b; histI = (histI + 1) % (hist.length / 2); histN = Math.min(histN + 1, hist.length / 2);
         // the bars are what every recent frame had (at least ~4% each, about the same top and bottom)
         int mt = SH, mb = SH;
         for (int i = 0; i < histN; i++) { mt = Math.min(mt, hist[i * 2]); mb = Math.min(mb, hist[i * 2 + 1]); }
-        boolean bars = histN >= 10 && mt >= 3 && mb >= 3 && Math.abs(mt - mb) <= 3;
+        boolean bars = histN >= 10 && mt >= 8 && mb >= 8 && Math.abs(mt - mb) <= 8;
         float nt = bars ? mt / (float) SH : 0, nb = bars ? mb / (float) SH : 0;
         // into the screen's terms (the picture may be scaled to fill: the same scaling as the video)
         if (bars) {
@@ -75,8 +77,8 @@ final class AmbientBars extends View {
         }
         topT = nt; botT = nb;
         // the colours along the picture's top and bottom edges (the six rows inside each edge, averaged)
-        edge(mt, mt + 6, cTopT);
-        edge(SH - mb - 6, SH - mb, cBotT);
+        edge(mt + 3, mt + 22, cTopT);
+        edge(SH - mb - 22, SH - mb - 3, cBotT);
         invalidate();
     }
     private int rowMax(int r) {
@@ -105,12 +107,13 @@ final class AmbientBars extends View {
         }
         int w = getWidth(), h = getHeight();
         float th = top * h, bh = bot * h;
-        if (th > 1) band(c, w, 0, th + 1, cTop, gTop, true);
-        if (bh > 1) band(c, w, h - bh - 1, h, cBot, gBot, false);
+        float over = h * .012f;          // (~13 px at 1080p: the bar's edge, blended into the picture)
+        if (th > 1) band(c, w, 0, th, cTop, gTop, true, over);
+        if (bh > 1) band(c, w, h - bh, h, cBot, gBot, false, over);
         if (moving) postInvalidateOnAnimation();
     }
     /** one bar: the edge's colours across it, fading to dark away from the picture */
-    private void band(Canvas c, int w, float y0, float y1, float[] col, int[] g, boolean above) {
+    private void band(Canvas c, int w, float y0, float y1, float[] col, int[] g, boolean above, float over) {
         for (int i = 0; i < COLS; i++) {
             // (a little lifted and softened: light, not a copy of the picture)
             float r = col[i * 3], gg = col[i * 3 + 1], b = col[i * 3 + 2];
@@ -118,11 +121,18 @@ final class AmbientBars extends View {
         }
         p.setShader(new LinearGradient(0, 0, w, 0, g, null, Shader.TileMode.CLAMP));
         c.drawRect(0, y0, w, y1, p);
-        p.setShader(null);
         int near = 0x14000000, far = 0xF2000000;
         shade.setShader(new LinearGradient(0, above ? y1 : y0, 0, above ? y0 : y1, near, far, Shader.TileMode.CLAMP));
         c.drawRect(0, y0, w, y1, shade);
         shade.setShader(null);
+        // past the bar: the same light, fading out over the edge of the picture (no hard line where they meet)
+        float e0 = above ? y1 : y0 - over, e1 = above ? y1 + over : y0;
+        c.saveLayerAlpha(0, e0, w, e1, 255);
+        c.drawRect(0, e0, w, e1, p);
+        fade.setShader(new LinearGradient(0, above ? y1 : y0, 0, above ? y1 + over : y0 - over, 0xEB000000, 0x00000000, Shader.TileMode.CLAMP));
+        c.drawRect(0, e0, w, e1, fade);
+        c.restore();
+        p.setShader(null);
     }
     private static int clamp(float v) { return Math.max(0, Math.min(255, Math.round(v))); }
 }
