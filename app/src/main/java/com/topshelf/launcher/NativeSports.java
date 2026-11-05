@@ -89,6 +89,7 @@ final class NativeSports extends FrameLayout {
     private int heroTop = -1;
     private final FrameLayout rowsBox, rowsIn;
     private final View glow;
+    private final StandingsView standings;
     private final TextView setupTitle, setupSub;
     private final Map<String, CardView> cardViews = new HashMap<>();
     private CardView focused;
@@ -206,6 +207,13 @@ final class NativeSports extends FrameLayout {
         rowsBox.addView(rowsIn, new LayoutParams(LayoutParams.MATCH_PARENT, h.px(400)));
         glow = new View(c);
         glow.setAlpha(0f);
+        // Standings (its own tab): over the scoreboard, cards and leagues, under the tabs
+        standings = new StandingsView(h);
+        standings.setBackgroundColor(GROUND);
+        standings.setVisibility(GONE);
+        LayoutParams stl = new LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.MATCH_PARENT); stl.topMargin = h.px(HERO_Y - 1.2f);
+        addView(standings, stl);
+        chrome.bringToFront();
 
         h.imgs.make("sportsbg:" + W + "x" + H, new HomeImages.Maker() { @Override public Bitmap make() { return bakeBg(); } }, new HomeImages.Done() {
             @Override public void done(Bitmap b) {
@@ -313,6 +321,7 @@ final class NativeSports extends FrameLayout {
         tabs.add("Today");
         if (mineIdx >= 0) tabs.add("My Teams");
         if (off == 1) tabs.add("Fantasy");
+        tabs.add("Standings");
         if (!tabs.contains(tab)) tab = tabs.get(0);
         rail.rebuild();
         if (leagueSel >= rail.count()) leagueSel = 0;
@@ -460,6 +469,7 @@ final class NativeSports extends FrameLayout {
 
     /** the games the tab (and league) picks, as the one row on screen */
     private void applySet(boolean smooth) {
+        if (tab.equals("Standings")) standings.show(); else standings.hide();
         String curKey = curItem() != null ? curItem().optString("k").split(":")[0] : null;
         int idx = tab.equals("Live Now") ? liveIdx : tab.equals("My Teams") ? mineIdx : tab.equals("Fantasy") ? (off == 1 ? 0 : -1) : rail.rowOf(leagueSel);
         boolean same = idx == curSet;
@@ -710,9 +720,13 @@ final class NativeSports extends FrameLayout {
             if (d == 'l' && i > 0) { tab = tabs.get(i - 1); applySet(true); }
             else if (d == 'r' && i < tabs.size() - 1) { tab = tabs.get(i + 1); applySet(true); }
             else if (d == 'u') { h.enterTopFromVod(); return true; }
-            else if (d == 'd') { zone = heroOn ? "hero" : sideOn ? "side" : below; drawTabs(); focus(true); }
+            else if (d == 'd') {
+                if (tab.equals("Standings")) { zone = "grid"; drawTabs(); standings.focusIn(); return true; }
+                zone = heroOn ? "hero" : sideOn ? "side" : below; drawTabs(); focus(true);
+            }
             return true;
         }
+        if (tab.equals("Standings")) { if (!standings.move(d)) { zone = "tabs"; drawTabs(); } return true; }
         if (zone.equals("hero")) {
             if (d == 'u') { zone = "tabs"; drawTabs(); }
             else if (d == 'd') zone = below;
@@ -780,6 +794,7 @@ final class NativeSports extends FrameLayout {
         return 0;
     }
     void ok() {
+        if (tab.equals("Standings")) { if (zone.equals("tabs")) { zone = "grid"; drawTabs(); standings.focusIn(); } return; }
         if (zone.equals("tabs") || zone.equals("rail")) { zone = "grid"; drawTabs(); focus(true); rail.invalidate(); return; }
         if (zone.equals("hero")) { openGame(featured); return; }
         if (zone.equals("side")) { sideOk(); return; }
