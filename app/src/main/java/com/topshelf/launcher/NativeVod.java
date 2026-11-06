@@ -110,6 +110,11 @@ final class NativeVod extends FrameLayout {
     }
     private final List<Row> rows = new ArrayList<>();
     private int r = 0;
+    /** a title from the first ordinary row (not Continue watching): for the self-check to open */
+    JSONObject firstTitle() {
+        for (Row w : rows) if (!w.cw && !w.cal && w.items != null) for (JSONObject m : w.items) if (m != null && m.optString("id").startsWith("tt")) return m;
+        return null;
+    }
     private final Map<String, Object[]> cat = new HashMap<>();   // url → {time, List<JSONObject>}
 
     // trailer preview

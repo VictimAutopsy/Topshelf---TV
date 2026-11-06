@@ -2244,6 +2244,8 @@ final class NativeHome extends FrameLayout {
         gamePage.open(sport, league, id, teams);
     }
     private boolean gameOpenNow() { return gamePage != null && gamePage.shownNow(); }
+    /** a title on Movies (else Home's Movies & TV rows), for the self-check */
+    JSONObject anyTitle() { NativeVod v = vodM != null ? vodM : vod; return v == null ? null : v.firstTitle(); }
     void openTitle(JSONObject m) {
         if (titleView == null) { titleView = new TitleView(this); addView(titleView, new LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.MATCH_PARENT)); }
         if (vod != null) vod.stopTrailer();

@@ -1257,6 +1257,7 @@ function buildAllSettings() {
     ...(IS_TV && B.tryRenderScale ? [{ label: 'Picture sharpness', value: () => renderScaleName(B.getRenderScale()), cycle: d => renderScaleStep(d), ok: () => renderScaleStep(1) }] : []),
     { label: 'Speed test', value: () => 'Measure this TV', ok: () => setTimeout(speedTest, 200) },
     ...(IS_TV ? [{ label: 'Diagnostic report', value: () => 'Run a test', ok: () => setTimeout(() => diagRun('tv'), 200) }] : []),
+    ...(IS_TV && B.selfCheck ? [{ label: 'Run a self-check', value: () => 'TopShelf tests its own screens (about a minute)', ok: () => { closeSettings(); setTimeout(() => B.selfCheck(), 600); } }] : []),
     ...(!IS_TV && typeof lkOn === 'function' && lkOn() ? [{ label: 'Report a glitch on the TV', value: () => `When ${lkTvName()}'s screen looks wrong`,
       ok: async () => { const r = await lkSend({ type: 'glitch' }); if (r) toast(r.ok ? `${lkTvName()} is sending what just happened` : `${lkTvName()} needs an update first`); } }] : []),
     ...(IS_TV && B.reportGlitch ? [{ label: 'Report a glitch', value: () => 'Send what just happened', ok: () => { closeSettings(); setTimeout(() => B.reportGlitch(''), 400); toast('Sending what just happened…'); } }] : []),
@@ -1342,7 +1343,7 @@ const SET_SECTIONS = [
   { name: 'System', about: 'Updates, backup and help', groups: [
     ['Updates', ['TopShelf updates', 'Go back to the previous version', 'Updates access token']],
     ['Your settings', ['Backup & restore']],
-    ['Help', ['Diagnostic report', 'Report a glitch', 'Speed test']],
+    ['Help', ['Diagnostic report', 'Run a self-check', 'Report a glitch', 'Speed test']],
     ['Advanced', ['Show frame rate', 'Open Google TV home', 'Android settings']] ] }
 ];
 const setMatch = (it, label) => typeof it === 'string' ? it === label : it.test(label);

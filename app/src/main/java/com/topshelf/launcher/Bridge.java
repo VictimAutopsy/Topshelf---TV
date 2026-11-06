@@ -499,6 +499,8 @@ public class Bridge {
                     .put("acc", HomeWatchService.accessibilityOn(act)).put("log", new JSONObject(HomeWatchService.status())).toString();
         } catch (Exception e) { return "{}"; }
     }
+    /** Settings › System › Run a self-check (see SelfCheck) */
+    @JavascriptInterface public void selfCheck() { act.runOnUiThread(new Runnable() { @Override public void run() { SelfCheck.start(act, "asked for in Settings"); } }); }
     /** Settings › Keep TopShelf ready (see ReadyService) */
     @JavascriptInterface public boolean keepReady() { return ReadyService.wanted(act); }
     @JavascriptInterface public void keepReadySet(boolean on) {

@@ -83,6 +83,7 @@ public class MainActivity extends Activity {
         guardNativeCrashes();
         crashLoopCheck();
         whyLastStopped();
+        SelfCheck.afterUpdate(this);
         // load the TV guide in the background a few seconds after start, so opening Live TV is instant
         main.postDelayed(new Runnable() { @Override public void run() { bridge.warmEpg(); } }, 6000);
         root = new FrameLayout(this);
@@ -367,6 +368,17 @@ public class MainActivity extends Activity {
         js("window.tsNative && tsNative(-1,'broken'," + org.json.JSONObject.quote(String.valueOf(t)) + ")");
     }
 
+    private long lastKeyAt;
+    int versionCodeNow() { return versionCode(); }
+    String verNameNow() { return verName(); }
+    /** the self-check may run: TopShelf on screen, its own Home, nothing playing, the remote left alone a while */
+    boolean readyForSelfCheck() {
+        if (!inFront || inPip() || home == null || homeBroken) return false;
+        if (android.os.SystemClock.uptimeMillis() - lastKeyAt < 25000) return false;
+        if (home.vodPlayingNow() || videoRecently()) return false;
+        String s = home.flightScreen();
+        return s.equals("Home") || s.equals("Movies") || s.equals("TV Shows") || s.equals("screensaver");
+    }
     private String verName() { try { return getPackageManager().getPackageInfo(getPackageName(), 0).versionName; } catch (Throwable t) { return "?"; } }
 
     /* Why TopShelf wasn't running (Android 11+ keeps the reason): a crash, Android needing the memory for
@@ -820,6 +832,9 @@ public class MainActivity extends Activity {
     @Override
     public boolean dispatchKeyEvent(KeyEvent e) {
         int code = e.getKeyCode();
+        // the self-check: a real press of the remote stops it (and does nothing else)
+        if (SelfCheck.running() && !SelfCheck.injecting()) { if (e.getAction() == KeyEvent.ACTION_DOWN) SelfCheck.abort("a button was pressed"); return true; }
+        if (!SelfCheck.injecting()) lastKeyAt = android.os.SystemClock.uptimeMillis();
         if (redditLogin != null) { if (redditLogin.key(e)) return true; return super.dispatchKeyEvent(e); }
         if (homeHasKeys()) {
             try { if (home.key(e)) return true; } catch (Throwable t) { nativeHomeBroken(t); }
