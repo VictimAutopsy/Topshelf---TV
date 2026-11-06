@@ -37,7 +37,11 @@ final class SelfCheck {
     private static long t0;
     private static String why;
     // frames during a step
-    private static long fr, late, hitch;
+    private static long fr, late, hitch, lastVsync;
+    /* a frame is late when it missed its turn on screen: more than one and a half refreshes after the frame before it
+       (in a run of frames: a pause of a quarter second or more is just nothing to draw). How long a frame took to
+       draw isn't the test: the TV works a frame or two ahead, so a slow one can still arrive in time. */
+    static long refreshNs(android.app.Activity a) { try { float hz = a.getWindowManager().getDefaultDisplay().getRefreshRate(); return hz > 1 ? (long) (1e9 / hz) : 16_666_667L; } catch (Throwable t) { return 16_666_667L; } }
     private static Window.OnFrameMetricsAvailableListener fl;
     private static Handler fh;
 
@@ -106,6 +110,7 @@ final class SelfCheck {
             settled(new Runnable() { @Override public void run() {
                 final long appear = SystemClock.uptimeMillis() - s;
                 main.postDelayed(new Runnable() { @Override public void run() {
+                    h.selfCheckIntoScreen();
                     resetFrames();
                     press(keys, 0, new Runnable() { @Override public void run() {
                         main.postDelayed(new Runnable() { @Override public void run() {
@@ -199,15 +204,21 @@ final class SelfCheck {
             steps.put(o);
         } catch (Exception ignored) { }
     }
-    private static void resetFrames() { synchronized (SelfCheck.class) { fr = 0; late = 0; hitch = 0; } }
+    private static void resetFrames() { synchronized (SelfCheck.class) { fr = 0; late = 0; hitch = 0; lastVsync = 0; } }
     private static void watchFrames(boolean on) {
         if (Build.VERSION.SDK_INT < 24 || act == null) return;
         try {
             if (on) {
                 if (fh == null) { android.os.HandlerThread t = new android.os.HandlerThread("selfcheck-frames"); t.start(); fh = new Handler(t.getLooper()); }
+                final long refresh = refreshNs(act);
                 fl = new Window.OnFrameMetricsAvailableListener() { @Override public void onFrameMetricsAvailable(Window w, FrameMetrics m, int dropped) {
-                    long ns = m.getMetric(FrameMetrics.TOTAL_DURATION);
-                    synchronized (SelfCheck.class) { fr++; if (ns > 17_500_000L) late++; if (ns > 100_000_000L) hitch++; }
+                    long ns = m.getMetric(FrameMetrics.TOTAL_DURATION), v = Build.VERSION.SDK_INT >= 26 ? m.getMetric(FrameMetrics.INTENDED_VSYNC_TIMESTAMP) : 0;
+                    synchronized (SelfCheck.class) {
+                        fr++;
+                        if (v > 0 && lastVsync > 0) { long gap = v - lastVsync; if (gap > refresh * 3 / 2 && gap < 250_000_000L) late++; }
+                        lastVsync = v;
+                        if (ns > 100_000_000L) hitch++;
+                    }
                 } };
                 act.getWindow().addOnFrameMetricsAvailableListener(fl, fh);
             } else if (fl != null) { act.getWindow().removeOnFrameMetricsAvailableListener(fl); fl = null; }

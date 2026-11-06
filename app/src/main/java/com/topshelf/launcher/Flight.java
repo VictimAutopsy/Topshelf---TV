@@ -125,15 +125,20 @@ final class Flight {
         // (the window's frames: again for each new window — a change of look makes the screen anew)
         if (Build.VERSION.SDK_INT >= 24) {
             try {
+                // late: missed its turn on screen (see SelfCheck.refreshNs), not merely slow to draw
+                final long refresh = SelfCheck.refreshNs(act);
                 act.getWindow().addOnFrameMetricsAvailableListener(new Window.OnFrameMetricsAvailableListener() {
+                    long lastV;
                     @Override public void onFrameMetricsAvailable(Window w, FrameMetrics m, int dropped) {
-                        long ns = m.getMetric(FrameMetrics.TOTAL_DURATION);
+                        long ns = m.getMetric(FrameMetrics.TOTAL_DURATION), v = Build.VERSION.SDK_INT >= 26 ? m.getMetric(FrameMetrics.INTENDED_VSYNC_TIMESTAMP) : 0;
                         String sc = cur.isEmpty() ? "other" : cur;
+                        boolean missed = v > 0 && lastV > 0 && v - lastV > refresh * 3 / 2 && v - lastV < 250_000_000L;
+                        lastV = v;
                         synchronized (L) {
                             roll();
                             long[] f = arr(frames, sc, 3);
                             f[0]++;
-                            if (ns > 17_500_000L) f[1]++;
+                            if (missed) f[1]++;
                             if (ns > 100_000_000L) f[2]++;
                             dirty = true;
                         }
