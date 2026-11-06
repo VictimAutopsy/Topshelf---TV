@@ -1172,6 +1172,10 @@ function buildAllSettings() {
       cycle: () => { S.livePlayer = S.livePlayer === 'external' ? 'builtin' : 'external'; save(); } },
     { label: 'TopShelf updates', value: () => { if (typeof updInfo !== 'function' || !B.updInfo) return 'Not available'; const i = updInfo(); return !i.token ? 'Not set up' : UPD.latest && UPD.latest.newer ? `${UPD.latest.name} ready — install` : `Up to date (${(B.getVersion && B.getVersion()) || '?'})`; },
       ok: () => { if (!updReady()) return updSetupSheet(); if (UPD.latest && UPD.latest.newer) { closeSettings(); updInstall(); } else updCheck(true); } },
+    { label: 'Go back to the previous version', value: () => UPD.latest && UPD.latest.fallback ? 'TopShelf ' + (UPD.latest.fallback.of || 'before this one') : (UPD.latest ? 'None kept for this version' : 'Checking…'),
+      ok: () => { if (!UPD.latest) return updCheck(true); if (!UPD.latest.fallback) return toast('There\'s no previous version kept for this one');
+        sheetOpen('Go back to the previous version?', `<p class="shsm">This puts back TopShelf ${esc(UPD.latest.fallback.of || '')}, the version before the latest. Your settings stay as they are. The next update brings you forward again.</p>`,
+          [['Go back', () => { closeSettings(); toast('Getting the previous version…'); B.updInstall(UPD.latest.fallback.apk || 'TopShelf-fallback.apk'); }], ['Cancel', null]]); } },
     { label: 'Updates access token', value: () => typeof updInfo === 'function' && B.updInfo && updInfo().token ? 'Set ' + (updInfo().tokenHint || '') : 'Not set',
       edit: { wide: true, type: 'text', ph: 'GitHub fine-grained token (github_pat_…)', get: () => '', set: v => updSetToken(v) } },
     { label: 'Live TV video', value: () => typeof NV === 'undefined' || !IS_TV ? 'Web page' : S.liveEngine === 'web' ? 'Web page (older)' : NV.ok ? "TV's player" : "TV's player (unavailable)",
@@ -1336,7 +1340,7 @@ const SET_SECTIONS = [
     ['', ['Home button', 'Keep TopShelf ready', 'Phone & TV link', 'Ring doorbell']],
     ['The TV, from your phone', ['Report a glitch on the TV', 'TV diagnostic report']] ] },
   { name: 'System', about: 'Updates, backup and help', groups: [
-    ['Updates', ['TopShelf updates', 'Updates access token']],
+    ['Updates', ['TopShelf updates', 'Go back to the previous version', 'Updates access token']],
     ['Your settings', ['Backup & restore']],
     ['Help', ['Diagnostic report', 'Report a glitch', 'Speed test']],
     ['Advanced', ['Show frame rate', 'Open Google TV home', 'Android settings']] ] }

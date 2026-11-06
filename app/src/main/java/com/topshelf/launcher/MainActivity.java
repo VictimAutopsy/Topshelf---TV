@@ -81,6 +81,7 @@ public class MainActivity extends Activity {
             if (sp.getLong("nhSeenVersion", 0) != vc) sp.edit().putLong("nhSeenVersion", vc).remove("nativeHomeOff").apply();
         } catch (Exception ignored) { }
         guardNativeCrashes();
+        crashLoopCheck();
         whyLastStopped();
         // load the TV guide in the background a few seconds after start, so opening Live TV is instant
         main.postDelayed(new Runnable() { @Override public void run() { bridge.warmEpg(); } }, 6000);
@@ -397,6 +398,7 @@ public class MainActivity extends Activity {
                         reason = "last time TopShelf stopped: " + name + (x.getDescription() != null ? " · " + x.getDescription() : "") + " · " + (ago < 120 ? ago + " s" : ago / 60 + " min") + " before this start"
                                 + " · it was using " + (x.getPss() / 1024) + " MB" + (x.getImportance() >= 300 ? " (in the background)" : " (on screen)");
                         bad = r == android.app.ApplicationExitInfo.REASON_CRASH || r == android.app.ApplicationExitInfo.REASON_CRASH_NATIVE || r == android.app.ApplicationExitInfo.REASON_ANR;
+                        if (r == android.app.ApplicationExitInfo.REASON_CRASH_NATIVE && x.getTimestamp() - prevStartedAt < 60000 && x.getTimestamp() > prevStartedAt) noteEarlyCrash(x.getTimestamp());
                         if (r == android.app.ApplicationExitInfo.REASON_ANR) Flight.count("freeze");
                         else if (r == android.app.ApplicationExitInfo.REASON_CRASH || r == android.app.ApplicationExitInfo.REASON_CRASH_NATIVE) Flight.count("crash");
                         else if (x.getImportance() >= 300 && (r == android.app.ApplicationExitInfo.REASON_LOW_MEMORY || r == android.app.ApplicationExitInfo.REASON_OTHER || r == android.app.ApplicationExitInfo.REASON_SIGNALED)) Flight.count("closed by Android in the background");
@@ -424,6 +426,41 @@ public class MainActivity extends Activity {
         } }, 20000);
     }
 
+    /* ------------------------------------------------------------------ the safety net
+       A version that crashes within a minute of starting, twice in fifteen minutes, is gone back from by itself:
+       the previous version (rebuilt with a newer number: TopShelf-fallback.apk, see tools/publish-update.sh) is
+       installed, once per version. Settings › Updates › Go back to the previous version does the same by hand. */
+    private long prevStartedAt;
+    private void noteEarlyCrash(long at) {
+        SharedPreferences p = getSharedPreferences(Bridge.PREFS, MODE_PRIVATE);
+        if (at - p.getLong("startedAt", 0) > 60000) return;
+        String key = "earlyCrashes." + versionCode();
+        p.edit().putString(key, p.getString(key, "") + at + ",").commit();
+    }
+    private int versionCode() { try { return getPackageManager().getPackageInfo(getPackageName(), 0).versionCode; } catch (Exception e) { return 0; } }
+    private void crashLoopCheck() {
+        final SharedPreferences p = getSharedPreferences(Bridge.PREFS, MODE_PRIVATE);
+        prevStartedAt = p.getLong("startedAt", 0);
+        p.edit().putLong("startedAt", System.currentTimeMillis()).apply();
+        final int ver = versionCode();
+        int recent = 0;
+        for (String t : p.getString("earlyCrashes." + ver, "").split(",")) { try { if (System.currentTimeMillis() - Long.parseLong(t) < 15 * 60000L) recent++; } catch (Exception ignored) { } }
+        if (recent < 2 || p.getBoolean("rolledBack." + ver, false)) return;
+        p.edit().putBoolean("rolledBack." + ver, true).commit();
+        Diag.ev("safety net: " + verName() + " crashed as it started twice · going back to the previous version");
+        Flight.count("rolled back by itself");
+        android.widget.Toast.makeText(this, "TopShelf " + verName() + " kept closing — going back to the previous version", android.widget.Toast.LENGTH_LONG).show();
+        new Thread(new Runnable() { @Override public void run() {
+            try {
+                Updater u = new Updater(MainActivity.this, p);
+                org.json.JSONObject r = new org.json.JSONObject(u.check(ver));
+                org.json.JSONObject fb = r.optJSONObject("fallback");
+                if (fb == null) { Diag.ev("safety net: no previous version to go back to"); return; }
+                u.install(fb.optString("apk", "TopShelf-fallback.apk"), new Updater.Progress() { @Override public void step(String state, int pct, String msg) { if ("error".equals(state)) Diag.ev("safety net: going back didn't work (" + msg + ")"); } });
+            } catch (Throwable t) { Diag.ev("safety net: going back didn't work (" + t.getMessage() + ")"); }
+        } }, "safety-net").start();
+    }
+
     /** a crash inside the video library switches it off for next time, so Live TV never gets stuck crashing */
     private void guardNativeCrashes() {
         final Thread.UncaughtExceptionHandler prev = Thread.getDefaultUncaughtExceptionHandler();
@@ -437,6 +474,7 @@ public class MainActivity extends Activity {
                         getSharedPreferences(Bridge.PREFS, MODE_PRIVATE).edit().putBoolean("nativeHomeOff", true).putString("nativeHomeErr", st.length() > 3000 ? st.substring(0, 3000) : st).commit();
                     else if (st.contains("androidx.media3") || st.contains("NativePlayer"))
                         getSharedPreferences(Bridge.PREFS, MODE_PRIVATE).edit().putBoolean("nativeOff", true).putString("nativeErr", st.length() > 1500 ? st.substring(0, 1500) : st).commit();
+                    noteEarlyCrash(System.currentTimeMillis());
                     // every crash is kept, to be sent with the next start (whatever part of the app it was in)
                     getSharedPreferences(Bridge.PREFS, MODE_PRIVATE).edit().putString("lastCrash", "TopShelf " + verName() + " · " + new java.util.Date() + " · thread " + th.getName() + "\n" + (st.length() > 6000 ? st.substring(0, 6000) : st)).commit();
                 } catch (Throwable ignored) { }

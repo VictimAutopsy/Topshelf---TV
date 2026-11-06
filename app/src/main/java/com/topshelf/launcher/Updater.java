@@ -94,6 +94,9 @@ final class Updater {
             o.put("apk", l.optString("apk", "TopShelf.apk"));
             o.put("current", currentCode);
             o.put("newer", l.optInt("code") > currentCode);
+            JSONObject fb = l.optJSONObject("fallback");
+            // (the version before the latest, rebuilt with a newer number: for going back)
+            if (fb != null && fb.optInt("code") > currentCode) o.put("fallback", fb);
         } catch (Exception e) {
             try { o.put("ok", false); o.put("error", String.valueOf(e.getMessage())); } catch (Exception ignored) { }
         }

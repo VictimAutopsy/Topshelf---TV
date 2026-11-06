@@ -23,11 +23,17 @@ GitHub is the only real copy. Several chats work on TopShelf, and an older chat 
 
 1. Get an `android.jar` for API 34 (for example `android-34/android.jar` from github.com/Sable/android-platforms).
 2. Tools: `sudo apt install aapt dalvik-exchange zipalign apksigner openjdk-17-jdk` (and node, for the JS check).
-3. Pull both repositories, then find the last published version: `"code"` in `../topshelf-updates/latest.json`.
-   Use the next number.
+3. Pull both repositories, then take the version number to build from `"next"` in `../topshelf-updates/latest.json`
+   (older files without it: `"code"` + 1). Each publish also uses the number after it, for the safety net below.
 4. Build: `bash build-local.sh /path/to/android.jar <nextCode>`. It finds the key in `../topshelf-updates/signing/`.
 5. Commit and push the source here, then publish: `tools/publish-update.sh "what's new, in plain words"`
    (copies the APK and `latest.json` into the updates repository and pushes it; the TV offers the update).
+   Set `TOPSHELF_SDK=/path/to/android.jar` when publishing: the script then also rebuilds the previous version with
+   the next number as `TopShelf-fallback.apk` (the safety net: TopShelf goes back to it by itself if a new version
+   keeps crashing as it starts, and from Settings › Updates › Go back to the previous version).
+6. TopShelf sends a daily flight-recorder summary to `reports/flight/<day>-tv.json` in the updates repository
+   (timings, buffering, smoothness, memory, crashes, which screens are used; never what's watched). Read those
+   before and after a change to see what it did.
 
 Quick compile check without building:
 `javac -nowarn -encoding UTF-8 -source 8 -target 8 -bootclasspath $SDK -d /tmp/c -cp app/libs/media3-classes.jar $(find app/src/main/java -name '*.java')`
