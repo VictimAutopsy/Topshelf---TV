@@ -10,3 +10,6 @@ TopShelf.apk
 *.idsig
 signing/
 password.txt
+tools/checks/out/
+tools/checks/node_modules/
+tools/checks/package*.json

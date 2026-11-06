@@ -35,6 +35,10 @@ GitHub is the only real copy. Several chats work on TopShelf, and an older chat 
    (timings, buffering, smoothness, memory, crashes, which screens are used; never what's watched). Read those
    before and after a change to see what it did.
 
+Before publishing, run the checks (GitHub runs them on every push too, see .github/workflows/checks.yml):
+`bash tools/checks/run-all.sh /path/to/android.jar` — compiles, every page script parses, every setting is in a
+Settings section, report scrubbing removes keys and logins, and the page opens without a script error.
+
 Quick compile check without building:
 `javac -nowarn -encoding UTF-8 -source 8 -target 8 -bootclasspath $SDK -d /tmp/c -cp app/libs/media3-classes.jar $(find app/src/main/java -name '*.java')`
 

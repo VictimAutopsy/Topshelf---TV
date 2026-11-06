@@ -1,0 +1,26 @@
+# Every change to TopShelf is checked here before it's published: it compiles, every page script parses, every
+# setting shows in Settings, reports can't carry keys or logins, and the page opens without a script error (with
+# screenshots kept). Nothing here is signed or published: that stays with the private updates repository.
+name: checks
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+jobs:
+  checks:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with: { distribution: temurin, java-version: '17' }
+      - uses: actions/setup-node@v4
+        with: { node-version: '20' }
+      - name: Android API 34 (compile only)
+        run: curl -sSL -o "$RUNNER_TEMP/android.jar" https://github.com/Sable/android-platforms/raw/master/android-34/android.jar
+      - name: Headless browser for the page check
+        run: cd tools/checks && npm init -y >/dev/null && npm i --no-save playwright@1.47.2 && npx playwright install --with-deps chromium
+      - name: Checks
+        run: bash tools/checks/run-all.sh "$RUNNER_TEMP/android.jar"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with: { name: screenshots, path: tools/checks/out/ }
