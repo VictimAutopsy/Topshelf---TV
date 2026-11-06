@@ -511,6 +511,7 @@ final class VodPlayer extends FrameLayout {
         final NativePlayer np = h.act.nativePlayer();
         if (np == null) { h.toast("The TV's video player isn't available"); close(); return; }
         long st0 = Progress.startAt(getContext(), videoId);
+        Flight.vodNext(Flight.vodKind(st0 > 30000));
         startPct = st0 < 0 ? Progress.pct(getContext(), videoId) : 0;
         final long start = Math.max(0, st0);
         String url0 = stream.optString("url");

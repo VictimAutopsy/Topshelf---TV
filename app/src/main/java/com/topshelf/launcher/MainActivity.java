@@ -97,6 +97,8 @@ public class MainActivity extends Activity {
         getWindow().setBackgroundDrawable(null);         // the page or the native Home always covers the screen
         buildWebView();
         showCover();
+        // the flight recorder (Flight): timings, smoothness, memory and screen use, sent once a day
+        Flight.start(this, new Flight.Screen() { @Override public String now() { return home == null ? "start-up" : home.flightScreen(); } });
         registerPackageReceiver();
         link = new LinkServer(this);
         link.start();
@@ -395,6 +397,9 @@ public class MainActivity extends Activity {
                         reason = "last time TopShelf stopped: " + name + (x.getDescription() != null ? " · " + x.getDescription() : "") + " · " + (ago < 120 ? ago + " s" : ago / 60 + " min") + " before this start"
                                 + " · it was using " + (x.getPss() / 1024) + " MB" + (x.getImportance() >= 300 ? " (in the background)" : " (on screen)");
                         bad = r == android.app.ApplicationExitInfo.REASON_CRASH || r == android.app.ApplicationExitInfo.REASON_CRASH_NATIVE || r == android.app.ApplicationExitInfo.REASON_ANR;
+                        if (r == android.app.ApplicationExitInfo.REASON_ANR) Flight.count("freeze");
+                        else if (r == android.app.ApplicationExitInfo.REASON_CRASH || r == android.app.ApplicationExitInfo.REASON_CRASH_NATIVE) Flight.count("crash");
+                        else if (x.getImportance() >= 300 && (r == android.app.ApplicationExitInfo.REASON_LOW_MEMORY || r == android.app.ApplicationExitInfo.REASON_OTHER || r == android.app.ApplicationExitInfo.REASON_SIGNALED)) Flight.count("closed by Android in the background");
                         if (r == android.app.ApplicationExitInfo.REASON_ANR || r == android.app.ApplicationExitInfo.REASON_CRASH_NATIVE) {
                             try { java.io.InputStream in = x.getTraceInputStream(); if (in != null) { byte[] b = new byte[8000]; int n = in.read(b); in.close(); if (n > 0) reason += "\n" + new String(b, 0, n, "UTF-8"); } } catch (Throwable ignored) { }
                         }
@@ -875,6 +880,13 @@ public class MainActivity extends Activity {
     @Override
     protected void onResume() {
         super.onResume();
+        // coming back to TopShelf (not starting it): from here to Home's next picture on screen
+        if (home != null && !freshProcess() && !inPip()) {
+            final long t0 = android.os.SystemClock.uptimeMillis();
+            android.view.Choreographer.getInstance().postFrameCallback(new android.view.Choreographer.FrameCallback() { int n;
+                @Override public void doFrame(long f) { if (++n < 2) { android.view.Choreographer.getInstance().postFrameCallback(this); return; } Flight.time("back to TopShelf", android.os.SystemClock.uptimeMillis() - t0); } });
+        }
+        Flight.inFront(true);
         inFront = true;
         HomeWatchService.lift();
         snapHomeSoon();
@@ -963,6 +975,7 @@ public class MainActivity extends Activity {
             startMs = android.os.SystemClock.uptimeMillis() - (Build.VERSION.SDK_INT >= 24 ? android.os.Process.getStartUptimeMillis() : coverAt);
             Diag.ev("start-up: Home on screen " + String.format(java.util.Locale.US, "%.1f", startMs / 1000f) + " s after TopShelf started" + (cover != null ? " (its last picture showed meanwhile)" : "") + (why.isEmpty() ? "" : " · " + why));
             noteStartReady(startMs);
+            Flight.time("fresh start", startMs);
         }
         final android.widget.ImageView c = cover;
         if (c == null) return;
@@ -1058,6 +1071,7 @@ public class MainActivity extends Activity {
 
     @Override
     protected void onStop() {
+        Flight.inFront(false);
         js("window.tsPause && tsPause()");    // also when the floating window is closed
         try { if (home != null && !inPip()) home.appPaused(); } catch (Throwable ignored) { }
         try { if (nplayer != null && !inPip()) nplayer.stop(); } catch (Throwable ignored) { }

@@ -373,6 +373,7 @@ final class NativePlayer implements Player.Listener {
         // (a movie's link often carries a debrid key: only its server goes in the log)
         Diag.ev("play " + kind + " " + ("vod".equals(kind) ? Uri.parse(url).getHost() + " (" + url.replaceAll("[?#].*$", "").replaceAll(".*\\.", ".") + ")" : shortSafe(url)));
         id = newId;
+        Flight.playAsked("vod".equals(kind) ? Flight.takeVod() : "live channel");
         if (!url.equals(this.url)) afrAsked = false;      // (a new film or channel: its frame rate is looked at again; an added subtitle isn't new)
         this.kind = kind == null ? "" : kind;
         this.url = url; this.ua = ua == null ? "" : ua;
@@ -608,6 +609,7 @@ final class NativePlayer implements Player.Listener {
     }
 
     void stop() {
+        Flight.playStopped();
         Diag.ev("video stopped");
         stopPlayer();
         unmatchRate();
@@ -639,6 +641,7 @@ final class NativePlayer implements Player.Listener {
 
     @Override public void onRenderedFirstFrame() {
         firstFrame = true;
+        Flight.firstFrame();
         out.event(id, "ready", vw + "x" + vh);
     }
 
@@ -650,10 +653,13 @@ final class NativePlayer implements Player.Listener {
 
     /* While something plays, the TV mustn't dim or start its screensaver (nothing tells it a video is on: we
        draw the picture ourselves, not with a player view that would) */
-    @Override public void onIsPlayingChanged(boolean playing) { act.keepAwake(playing); }
+    @Override public void onIsPlayingChanged(boolean playing) {
+        act.keepAwake(playing);
+        if (playing) Flight.paused(false); else if (player != null && player.getPlaybackState() == Player.STATE_READY) Flight.paused(true);
+    }
     @Override public void onPlaybackStateChanged(int state) {
-        if (state == Player.STATE_BUFFERING) out.event(id, "buffering", "");
-        else if (state == Player.STATE_READY) out.event(id, "playing", "");
+        if (state == Player.STATE_BUFFERING) { out.event(id, "buffering", ""); Flight.buffering(true); }
+        else if (state == Player.STATE_READY) { out.event(id, "playing", ""); Flight.buffering(false); }
         else if (state == Player.STATE_ENDED) out.event(id, vod() ? "ended" : "error", "stream ended");
     }
 

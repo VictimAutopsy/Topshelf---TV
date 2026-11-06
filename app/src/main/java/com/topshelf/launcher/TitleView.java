@@ -1203,6 +1203,7 @@ final class TitleView extends FrameLayout {
     /** …and when the last one played to the end, the next one starts by itself from the same source (Back stops it) */
     void afterEpisode(JSONObject next, JSONObject from) {
         if (next == null) return;
+        Flight.nextIsEpisode();
         selectEpisode(next);
         askStreams(next.optString("id"));
         zone = "streams"; filter = null; chipSel = 0;

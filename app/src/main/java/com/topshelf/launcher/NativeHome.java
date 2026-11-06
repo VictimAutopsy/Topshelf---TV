@@ -2281,6 +2281,18 @@ final class NativeHome extends FrameLayout {
     void vodEvent(int id, String ev, String data) { if (vodPlayer != null) vodPlayer.event(id, ev, data); }
     private boolean titleOpenNow() { return titleView != null && titleView.shownNow(); }
     boolean vodPlayingNow() { return vodPlayer != null && vodPlayer.shownNow(); }
+    /** which screen is up, for the flight recorder (Flight): the names of screens, never what's on them */
+    String flightScreen() {
+        if (doorbellView != null && doorbellView.shownNow()) return "doorbell";
+        if (vodPlayingNow()) return "movie & TV player";
+        if (titleView != null && titleView.shownNow()) return "title page";
+        if (sheet != null && sheet.shownNow()) return "settings";
+        if (find != null && find.shownNow()) return "search";
+        if (live != null && live.shownNow()) return live.fullNow() ? "Live TV · full screen" : "Live TV · guide";
+        if (sports != null && sports.shownNow()) return "sports";
+        if (saver) return "screensaver";
+        return tab.equals("movies") ? "Movies" : tab.equals("series") ? "TV Shows" : "Home";
+    }
     /** for the report: Home's state in a few words */
     String screenWhy() { return "tab " + tab + ", mode " + mode + ", owner " + owner + (saver ? ", screensaver on" : "") + ", rest " + rest; }
 
