@@ -772,7 +772,12 @@ public class Bridge {
     volatile String watchingGame = "";
     /** the game on the channel being watched full screen (the page doesn't pop up news about the game you're watching) */
     @JavascriptInterface public String liveWatchingGame() {
-        act.runOnUiThread(new Runnable() { @Override public void run() { NativeHome h = act.nativeHome(); watchingGame = h == null ? "" : h.liveWatchingGame(); } });
+        // asked fresh (a moment at most), so an alert right after you go full screen or change channel knows
+        final java.util.concurrent.CountDownLatch done = new java.util.concurrent.CountDownLatch(1);
+        act.runOnUiThread(new Runnable() { @Override public void run() {
+            try { NativeHome h = act.nativeHome(); watchingGame = h == null ? "" : h.liveWatchingGame(); } finally { done.countDown(); }
+        } });
+        try { done.await(400, java.util.concurrent.TimeUnit.MILLISECONDS); } catch (InterruptedException ignored) { }
         return watchingGame;
     }
     @JavascriptInterface public String traktStatus() { return act.trakt == null ? "{}" : act.trakt.status().toString(); }

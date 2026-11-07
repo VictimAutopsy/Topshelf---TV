@@ -931,9 +931,10 @@ async function spTick() {
   show.sort((a, b) => ({ in: 0, pre: 1, post: 2 }[a.state] - { in: 0, pre: 1, post: 2 }[b.state]) || a.at - b.at);
   // what changed since the last look (nothing the first time a game's seen)
   let flash = null;
+  const watching = spWatchingId();       // (the game you're watching: you've just seen it happen)
   for (const e of show) {
     const s = spSig(e), p = TK.sig[e.id];
-    if (p && !flash && (p.st !== s.st || p.sc !== s.sc || (s.brk && p.brk !== s.brk))) flash = e;
+    if (p && !flash && String(e.id) !== watching && (p.st !== s.st || p.sc !== s.sc || (s.brk && p.brk !== s.brk))) flash = e;
     TK.sig[e.id] = s;
   }
   if (flash) { TK.i = show.indexOf(flash); TK.hold = now + SP_FLASH_MS; }

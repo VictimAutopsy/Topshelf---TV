@@ -2019,7 +2019,7 @@ final class NativeHome extends FrameLayout {
     private FyAlert fyShowing;
     private int fyReq;
     /** the game on the channel you're watching full screen ("" if none) */
-    String liveWatchingGame() { return live != null ? live.watchingGameId() : ""; }
+    String liveWatchingGame() { if (live == null) return ""; live.lookAgainForGame(); return live.watchingGameId(); }
     void fantasyAlert(String kind, String title, String detail, String game) {
         // (you're watching that game: you've seen it happen)
         if (game != null && !game.isEmpty() && game.equals(liveWatchingGame())) { Diag.ev("fantasy alert not shown (watching that game): " + title); return; }

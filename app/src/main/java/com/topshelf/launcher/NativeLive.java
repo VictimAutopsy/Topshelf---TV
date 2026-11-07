@@ -182,11 +182,11 @@ final class NativeLive extends FrameLayout {
     private NativeStats statsView;
     /* Live stats: the game on the channel you're watching full screen, found by the page (the Sports
        tab's matching) when the channel starts; the panel opens from the watching menu (hold OK). */
-    private JSONObject watchGame; private int gameReq; private String gameFor = ""; private boolean gamePending;
+    private JSONObject watchGame; private int gameReq; private String gameFor = ""; private boolean gamePending; private long gameLookedAt;
     private void findGame() {
         if (playing == null || recPlay != null) return;
         if (playing.u.equals(gameFor) && (watchGame != null || gamePending)) return;
-        gameFor = playing.u; watchGame = null; gamePending = true; gameReq++;
+        gameFor = playing.u; watchGame = null; gamePending = true; gameReq++; gameLookedAt = System.currentTimeMillis();
         oHint.setText("▲▼ change channel · hold OK for more · Back for guide");
         h.page("window.spGameFor && spGameFor(" + JSONObject.quote(playing.u) + "," + gameReq + ")");
     }
@@ -803,7 +803,14 @@ final class NativeLive extends FrameLayout {
     String playingUrl() { return playing == null ? "" : playing.u; }
     /** the game on the channel playing full screen, as found for Live stats ("" if none) */
     private void pushWatching() { try { h.bridge.watchingGame = watchingGameId(); } catch (Throwable ignored) { } }
-    String watchingGameId() { JSONObject g = watchGame; return full && playing != null && recPlay == null && g != null ? g.optString("id") : ""; }
+    /** no game found on this channel yet (you tuned in to the pre-game show, before the game was near enough to
+        match): look again every few minutes while you watch full screen, so its alerts know you're watching it */
+    void lookAgainForGame() {
+        if (!full || playing == null || recPlay != null) return;
+        if (!playing.u.equals(gameFor)) findGame();
+        else if (watchGame == null && !gamePending && System.currentTimeMillis() - gameLookedAt > 3 * 60000L) { gameFor = ""; findGame(); }
+    }
+    String watchingGameId() { JSONObject g = watchGame; return full && playing != null && recPlay == null && g != null && playing.u.equals(gameFor) ? g.optString("id") : ""; }
     void progressMsg(String m) { progress = m; if (shown) drawEmpty(); }
 
     static String chNum(Ch ch) { String c = ch.c == null ? "" : ch.c.trim(); return c.matches("\\d+(\\.\\d+)?") ? c : String.valueOf(ch.i + 1); }
@@ -1550,6 +1557,7 @@ final class NativeLive extends FrameLayout {
         main().removeCallbacks(noPicture);
         main().postDelayed(noPicture, 12000);
         place();
+        if (full && !same) { findGame(); pushWatching(); }     // (changed channel full screen: which game is on this one)
     }
 
     void stopPlayback() {
@@ -1700,6 +1708,7 @@ final class NativeLive extends FrameLayout {
         showOsd();
         place();
         findGame();
+        pushWatching();
         if (ready) startShift();
     }
 
