@@ -49,9 +49,11 @@ final class LiveTv {
     private static final Charset UTF8 = Charset.forName("UTF-8");
 
     private final File dir;
-    private volatile Map<String, List<long[]>> times;        // key -> [start, end] (ms), sorted
-    private volatile Map<String, List<String[]>> texts;      // key -> [title, desc], parallel to times
-    private final Object epgLock = new Object();
+    /* (one guide in memory however many LiveTv there are: the recorder made its own when TopShelf was started by an
+       update or a reminder, and for a while the whole guide was held twice) */
+    private static volatile Map<String, List<long[]>> times;        // key -> [start, end] (ms), sorted
+    private static volatile Map<String, List<String[]>> texts;      // key -> [title, desc], parallel to times
+    private static final Object epgLock = new Object();
 
     LiveTv(Context ctx) {
         this(new File(ctx.getFilesDir(), "live"));

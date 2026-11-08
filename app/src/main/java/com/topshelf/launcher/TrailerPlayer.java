@@ -264,14 +264,41 @@ final class TrailerPlayer {
 
     /** start finding the video's streams now (resting on a title), so it can start the moment it's wanted */
     void prefetch(final String ytId, final int maxH, final boolean muted) {
-        if (ytId == null || ytId.isEmpty()) return;
+        if (ytId == null || ytId.isEmpty() || isBad(ytId)) return;
         if (!outros.containsKey(ytId)) outro(ytId);
         if (YtStreams.cached(ytId, maxH, !muted) != null || YtStreams.blocked()) return;
         LOOKUP.execute(new Runnable() { @Override public void run() { YtStreams.get(ytId, maxH, !muted); } });
     }
 
+    /* YouTube trailers that can't be played here (removed, private, or their owner allows them only on YouTube): kept
+       for a week, so the banner moves straight on instead of a few seconds of black while YouTube is asked again */
+    private static final long BAD_FOR = 7L * 86400000L;
+    private android.content.SharedPreferences badPrefs() { return act.getSharedPreferences(Bridge.PREFS, android.content.Context.MODE_PRIVATE); }
+    boolean isBad(String ytId) {
+        try { org.json.JSONObject o = new org.json.JSONObject(badPrefs().getString("ytBad", "{}")); return System.currentTimeMillis() - o.optLong(ytId, 0) < BAD_FOR; }
+        catch (Exception e) { return false; }
+    }
+    private void markBad(String ytId) {
+        try {
+            org.json.JSONObject o = new org.json.JSONObject(badPrefs().getString("ytBad", "{}"));
+            long now = System.currentTimeMillis();
+            org.json.JSONObject keep = new org.json.JSONObject();
+            java.util.Iterator<String> it = o.keys();
+            while (it.hasNext()) { String k = it.next(); if (now - o.optLong(k) < BAD_FOR) keep.put(k, o.optLong(k)); }
+            keep.put(ytId, now);
+            badPrefs().edit().putString("ytBad", keep.toString()).apply();
+        } catch (Exception ignored) { }
+    }
+
     /** plays ytId filling host (a frame that's invisible until listener.playing() says the picture moves) */
     void play(final ViewGroup host, final String ytId, final boolean muted, final int maxH, Listener l) {
+        if (isBad(ytId)) {
+            note(ytId, "YouTube trailer skipped (it couldn't be played here before)");
+            stop();
+            final Listener fl = l;
+            if (fl != null) main.post(new Runnable() { @Override public void run() { fl.ended(); } });
+            return;
+        }
         if (!ytId.equals(current)) retried = false;
         directMax = maxH;
         stopQuiet();
@@ -466,7 +493,9 @@ final class TrailerPlayer {
         });
         wv.addJavascriptInterface(new Object() {
             @JavascriptInterface public void playing() { main.post(new Runnable() { @Override public void run() { if (listener != null && !direct) { webShown = true; if (webLog) { webLog = false; Diag.ev("trailer: YouTube's player is showing it"); } listener.playing(); } } }); }
-            @JavascriptInterface public void ev(String m) { Diag.ev("trailer · YouTube's player: " + m + (m.startsWith("error ") ? " (" + errName(m.substring(6)) + ")" : m.startsWith("state ") ? " (" + stateName(m.substring(6)) + ")" : "")); }
+            @JavascriptInterface public void ev(String m) {
+                if (m.startsWith("error ")) { String c = m.substring(6).trim(); String id = current; if (id != null && (c.equals("100") || c.equals("101") || c.equals("150") || c.equals("152"))) markBad(id); }
+                Diag.ev("trailer · YouTube's player: " + m + (m.startsWith("error ") ? " (" + errName(m.substring(6)) + ")" : m.startsWith("state ") ? " (" + stateName(m.substring(6)) + ")" : "")); }
             @JavascriptInterface public void ended() { main.post(new Runnable() { @Override public void run() { if (listener != null && !direct) listener.ended(); } }); }
         }, "TS");
         wv.loadDataWithBaseURL(MainActivity.ORIGIN, PAGE, "text/html", "utf-8", null);
