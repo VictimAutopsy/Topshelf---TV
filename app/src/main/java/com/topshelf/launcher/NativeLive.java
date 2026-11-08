@@ -1588,6 +1588,7 @@ final class NativeLive extends FrameLayout {
             place();
         } else if (ev.equals("stall")) {
             stalls++;
+            Diag.ev("live: picture stood still · " + data);
             ready = false; place();
             main().removeCallbacks(noPicture); main().postDelayed(noPicture, 12000);
         } else if (ev.equals("swdecoder")) {
@@ -2779,6 +2780,12 @@ final class NativeLive extends FrameLayout {
             a.add(new Runnable() { @Override public void run() { later(new Runnable() { @Override public void run() { qualityMenu(tracks()); } }); } });
         }
         l.add(stats ? "Hide stream info" : "Stream info"); a.add(new Runnable() { @Override public void run() { toggleStats(); } });
+        // sends the last few minutes (the freezes in it included) and a picture to the updates repository
+        l.add("Report a glitch"); a.add(new Runnable() { @Override public void run() {
+            Diag.ev("live: glitch reported while watching · " + (stats ? "stream info shown · " : "") + "stalls this channel " + stalls);
+            h.bridge.reportGlitch("Live TV");
+            h.toast("Sending what just happened…");
+        } });
         l.add("Multiview · add channels"); a.add(new Runnable() { @Override public void run() { multiview(ch, null); } });
         l.add(sleepAt > 0 ? "Sleep timer · " + Math.max(0, Math.round((sleepAt - System.currentTimeMillis()) / 60000.0)) + " min left" : "Sleep timer");
         a.add(new Runnable() { @Override public void run() { later(new Runnable() { @Override public void run() { sleepMenu(); } }); } });

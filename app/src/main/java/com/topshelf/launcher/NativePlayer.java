@@ -337,6 +337,7 @@ final class NativePlayer implements Player.Listener {
             Format f = player.getVideoFormat();
             if (f != null) { d.put("mime", f.sampleMimeType); d.put("codecs", f.codecs); d.put("fps", f.frameRate); }
             d.put("strategy", strategy);
+            d.put("playedS", readyAt > 0 ? (now - readyAt) / 1000 : -1);
             lastStall = "way " + strategy + ": " + decoderName + ", rendered " + r + ", dropped " + dc.droppedBufferCount + ", buf " + player.getTotalBufferedDuration() + " ms";
             stallSince = 0;
             if (strategy < 2 && readyAt > 0 && now - readyAt > 10 * 60000) {
