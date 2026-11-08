@@ -2793,6 +2793,7 @@ final class NativeHome extends FrameLayout {
         // never over something you're watching: Live TV full screen, a movie or show, a game page
         if ((isLive() && live.fullNow()) || vodPlayingNow() || MainActivity.videoRecently()) return;
         Diag.ev("screensaver on (" + tab + ")");
+        HeapReport.maybe(getContext().getApplicationContext());
         if (mode.equals("top")) exitTopQuiet();
         if (onVod()) showTab("home");
         if (paused) paused = false;

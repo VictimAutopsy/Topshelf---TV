@@ -199,6 +199,7 @@ final class LiveTv {
             if (times != null) return;
             Map<String, List<long[]>> t = new HashMap<>();
             Map<String, List<String[]>> x = new HashMap<>();
+            Map<String, String> same = new HashMap<>();
             try {
                 File f = new File(dir, "epg.json");
                 // (read as it goes, not as one string: a big guide is tens of megabytes)
@@ -216,7 +217,7 @@ final class LiveTv {
                             while (jr.hasNext()) jr.skipValue();
                             jr.endArray();
                             lt.add(new long[] { a * 1000L, b * 1000L });
-                            lx.add(new String[] { s0, s1, s2 });
+                            lx.add(new String[] { one(same, s0), one(same, s1), one(same, s2) });
                         }
                         jr.endArray();
                         t.put(k, lt);
@@ -227,7 +228,32 @@ final class LiveTv {
             } catch (Throwable ignored) { }
             texts = x;
             times = t;
+            sizeNote(x, same.size());
         }
+    }
+
+    /* The whole guide stays in memory once read (Live TV, Search and Sports all look through it): every programme's
+       title and description, for every channel, a week back and ahead. The same texts come back again and again
+       (repeats, the +1 and HD copies of a channel, "No information"), so each different text is kept once. */
+    private static String one(Map<String, String> same, String v) {
+        if (v == null || v.isEmpty()) return "";
+        String o = same.get(v);
+        if (o != null) return o;
+        same.put(v, v);
+        return v;
+    }
+    private static void dedupe(Map<String, List<String[]>> x) {
+        Map<String, String> same = new HashMap<>();
+        for (List<String[]> l : x.values()) for (String[] a : l) for (int i = 0; i < a.length; i++) a[i] = one(same, a[i]);
+        sizeNote(x, same.size());
+    }
+    /** how big the guide is in memory, for the report */
+    private static void sizeNote(Map<String, List<String[]>> x, int different) {
+        long progs = 0, chars = 0;
+        java.util.IdentityHashMap<String, Boolean> seen = new java.util.IdentityHashMap<>();
+        for (List<String[]> l : x.values()) for (String[] a : l) { progs++; for (String v : a) if (v != null && !v.isEmpty() && seen.put(v, Boolean.TRUE) == null) chars += v.length(); }
+        // (a programme costs ~110 bytes of bookkeeping; text about a byte a character)
+        Diag.ev("live: guide in memory · " + x.size() + " channels · " + progs + " programmes · " + different + " different texts · about " + Math.round((progs * 110 + chars + different * 24L) / 1048576.0) + " MB");
     }
 
     // ---------------------------------------------------------------- refresh
@@ -505,6 +531,7 @@ final class LiveTv {
         jw.endObject();
         } finally { jw.close(); }
         if (!tmpF.renameTo(new File(dir, "epg.json"))) throw new IOException("Couldn't save epg.json");
+        dedupe(x);
         synchronized (epgLock) { texts = x; times = t; }
         return t.size();
     }

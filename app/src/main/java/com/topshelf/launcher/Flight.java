@@ -167,6 +167,7 @@ final class Flight {
                 synchronized (L) { roll(); List<Long> l = front ? memFg : memBg; if (l.size() < 300) l.add(mb); dirty = true; }
             } catch (Throwable ignored) { }
             save();
+            upload();          // (a day that ended while TopShelf stayed on screen: sent now, not only on leaving)
             bg.postDelayed(this, 10 * 60000L);
         } }, 60000);
     }
