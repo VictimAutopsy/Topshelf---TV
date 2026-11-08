@@ -1024,13 +1024,43 @@ final class SportsData {
         for (List<Ev> l : ev.values()) if (l != null) for (Ev e : l) if (e.id.equals(id)) return e;
         return null;
     }
+    /** the game in the form Live TV keeps for the channel you're watching (as the page's spGameFor gives it): picked
+        from Sports, Live TV then knows which game is on even when the guide doesn't say (so no alerts about it) */
+    JSONObject gameJson(Ev e) {
+        try {
+            Lg lg = league(e.lg);
+            JSONArray ts = new JSONArray();
+            for (Team t : e.teams) ts.put(new JSONObject().put("id", t.id).put("name", t.name).put("full", t.full).put("abbr", t.abbr).put("color", t.color).put("score", t.score).put("rec", t.rec).put("logo", t.logo));
+            return new JSONObject().put("id", e.id).put("lg", e.lg).put("lgName", e.lgName).put("sport", lg == null ? "" : lg.sport).put("league", lg == null ? "" : lg.league)
+                    .put("name", e.name).put("short", e.shortName).put("card", e.card).put("state", e.state).put("teams", ts).put("picked", true);
+        } catch (Exception x) { return null; }
+    }
+    interface GameOn { void found(JSONObject game); }
+    /** which game (of those on now or about to be) the Sports tab's own matching puts on this channel (main thread in,
+        answer on the main thread; null if none) — Live TV asks this when the page's matching finds nothing */
+    void gameOn(final String url, final GameOn cb) {
+        index();
+        final List<Ev> all = new ArrayList<>();
+        for (List<Ev> l : ev.values()) all.addAll(l);
+        work.execute(new Runnable() { @Override public void run() {
+            Ev best = null;
+            long now = System.currentTimeMillis();
+            for (Ev e : all) {
+                boolean near = e.state.equals("in") || (e.state.equals("pre") && e.at - now < 45 * 60000L);
+                if (!near) continue;
+                for (Hit x : match(e)) if (x.ch.u.equals(url)) { if (best == null || (e.state.equals("in") && !best.state.equals("in"))) best = e; break; }
+            }
+            final JSONObject g = best == null ? null : gameJson(best);
+            main.post(new Runnable() { @Override public void run() { cb.found(g); } });
+        } });
+    }
     /** Watch: straight to the channel that's showing it, or the game's menu when none is found */
     void watch(final Ev e) {
         index();
         work.execute(new Runnable() { @Override public void run() {
             final List<Hit> m = e.state.equals("post") ? new ArrayList<Hit>() : match(e);
             main.post(new Runnable() { @Override public void run() {
-                if (!m.isEmpty()) h.livePlayUrl(m.get(0).ch.u); else menu(e, m);
+                if (!m.isEmpty()) h.livePlayUrl(m.get(0).ch.u, gameJson(e)); else menu(e, m);
             } });
         } });
     }
@@ -1378,7 +1408,7 @@ final class SportsData {
     private void menu(final Ev e, final List<Hit> m) {
         List<String> l = new ArrayList<>(); List<Runnable> a = new ArrayList<>();
         final Runnable nothing = new Runnable() { @Override public void run() { } };
-        for (final Hit x : m) { l.add("Watch on " + x.ch.n + ("guide".equals(x.why) ? "  ·  in the guide" : "")); a.add(new Runnable() { @Override public void run() { h.livePlayUrl(x.ch.u); } }); }
+        for (final Hit x : m) { l.add("Watch on " + x.ch.n + ("guide".equals(x.why) ? "  ·  in the guide" : "")); a.add(new Runnable() { @Override public void run() { h.livePlayUrl(x.ch.u, gameJson(e)); } }); }
         if (e.state.equals("pre") && !m.isEmpty()) {
             final NativeLive.Ch best = m.get(0).ch;
             final boolean has = Reminders.has(h, best.u, e.at);

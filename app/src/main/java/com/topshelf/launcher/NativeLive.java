@@ -183,10 +183,15 @@ final class NativeLive extends FrameLayout {
     /* Live stats: the game on the channel you're watching full screen, found by the page (the Sports
        tab's matching) when the channel starts; the panel opens from the watching menu (hold OK). */
     private JSONObject watchGame; private int gameReq; private String gameFor = ""; private boolean gamePending; private long gameLookedAt;
+    /* the game you picked in Sports for this channel: the guide matching found nothing on some channels (an event
+       channel without a guide), and alerts about the game you were watching kept coming */
+    private String chosenFor = ""; private JSONObject chosen;
+    void chooseGame(String u, JSONObject g) { chosenFor = u == null ? "" : u; chosen = g; Diag.ev("live: game picked in Sports · " + g.optString("short", g.optString("name"))); }
+    private JSONObject chosenHere() { return playing != null && chosen != null && playing.u.equals(chosenFor) ? chosen : null; }
     private void findGame() {
         if (playing == null || recPlay != null) return;
         if (playing.u.equals(gameFor) && (watchGame != null || gamePending)) return;
-        gameFor = playing.u; watchGame = null; gamePending = true; gameReq++; gameLookedAt = System.currentTimeMillis();
+        gameFor = playing.u; watchGame = chosenHere(); gamePending = true; gameReq++; gameLookedAt = System.currentTimeMillis();
         oHint.setText("▲▼ change channel · hold OK for more · Back for guide");
         h.page("window.spGameFor && spGameFor(" + JSONObject.quote(playing.u) + "," + gameReq + ")");
     }
@@ -195,6 +200,17 @@ final class NativeLive extends FrameLayout {
         if (!String.valueOf(gameReq).equals(req)) return;
         gamePending = false;
         try { watchGame = json == null || json.isEmpty() ? null : new JSONObject(json); } catch (Exception e) { watchGame = null; }
+        if (watchGame == null) watchGame = chosenHere();
+        if (watchGame == null && playing != null) {
+            // (the page's matching found nothing: the Sports tab's own may — it's what offered this channel for the game)
+            final String u = playing.u; final int rq = gameReq;
+            try { h.sportsData().gameOn(u, new SportsData.GameOn() { @Override public void found(JSONObject g) {
+                if (g == null || rq != gameReq || playing == null || !playing.u.equals(u) || watchGame != null) return;
+                watchGame = g; pushWatching();
+                Diag.ev("live stats: game " + g.optString("short", g.optString("name")) + " (Sports' matching)");
+                if (statsView != null) statsView.gameFound(watchGame);
+            } }); } catch (Throwable ignored) { }
+        }
         Diag.ev("live stats: " + (watchGame == null ? "no game on this channel" : "game " + watchGame.optString("short", watchGame.optString("name"))));
         oHint.setText(watchGame != null ? "▲▼ change channel · hold OK · Live stats · Back for guide" : "▲▼ change channel · hold OK for more · Back for guide");
         if (statsView != null) statsView.gameFound(watchGame);

@@ -1989,6 +1989,11 @@ final class NativeHome extends FrameLayout {
     void liveChanged(boolean playlist) { if (live != null) live.changed(playlist); }
     void liveProgress(String m) { if (live != null) live.progressMsg(m); }
     /** from the page (search, a reminder, Multiview closing): watch this channel full screen here */
+    /** a channel picked for a game (Sports): Live TV knows that game is the one on it */
+    void livePlayUrl(String u, JSONObject game) {
+        if (live != null && game != null) live.chooseGame(u, game);
+        livePlayUrl(u);
+    }
     void livePlayUrl(String u) {
         if (!liveNativeOk()) return;
         if (mode.equals("menu")) closeMenu();
