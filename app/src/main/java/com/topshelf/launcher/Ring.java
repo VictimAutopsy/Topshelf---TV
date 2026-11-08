@@ -293,6 +293,7 @@ final class Ring {
         if (thread != null) thread.interrupt();
     }
     private volatile boolean listening;
+    private volatile long lastSessionMs, lastFrom; private volatile int lastTag = -1;
     private volatile SSLSocket sock;
 
     private void loop() {
@@ -314,6 +315,9 @@ final class Ring {
             } catch (Throwable t) {
                 listening = false;
                 if (!running) return;
+                /* a connection that had been working a while starts again in seconds; only failures one after
+                   another wait longer (they had added up over a day to five minutes deaf after every drop) */
+                if (lastSessionMs > 60000) fails = 0;
                 fails++;
                 state = connected() ? "Reconnecting…" : state;
                 Diag.ev("ring: " + t.getMessage() + " · trying again");
@@ -423,7 +427,9 @@ final class Ring {
         SSLSocket s = (SSLSocket) SSLSocketFactory.getDefault().createSocket("mtalk.google.com", 5228);
         sock = s;
         try {
-            s.setSoTimeout(5 * 60000 + 30000);
+            // a heartbeat of our own after a minute of quiet: home routers drop a connection that's silent for a few
+            // minutes (the connection was being reset every ~3½ minutes)
+            s.setSoTimeout(60000);
             s.startHandshake();
             final OutputStream os = s.getOutputStream();
             DataInputStream in = new DataInputStream(new java.io.BufferedInputStream(s.getInputStream()));
@@ -440,6 +446,8 @@ final class Ring {
             if (version < 38) throw new Exception("push server: version " + version);
             int streamId = 0, idle = 0;
             long loggedAt = 0;
+            lastSessionMs = 0;
+            try {
             while (running) {
                 int tag, size; byte[] body;
                 try {
@@ -449,7 +457,7 @@ final class Ring {
                     idle = 0;
                 } catch (java.net.SocketTimeoutException te) {
                     // quiet for a while: a heartbeat (twice quiet in a row: start again)
-                    if (++idle >= 2) throw new Exception("push connection went quiet");
+                    if (++idle >= 3) throw new Exception("push connection went quiet");
                     byte[] hb = new Pb().int32(2, streamId).bytes();
                     ByteArrayOutputStream b = new ByteArrayOutputStream(); b.write(0); Pb.varint(b, hb.length); b.write(hb);
                     synchronized (os) { os.write(b.toByteArray()); os.flush(); }
@@ -464,6 +472,15 @@ final class Ring {
                 }
                 else if (tag == 4) throw new Exception("push server closed the connection");
                 else if (tag == 8) message(pc, body, System.currentTimeMillis() - loggedAt < 2000);
+                lastFrom = System.currentTimeMillis(); lastTag = tag;
+                if (loggedAt > 0) lastSessionMs = System.currentTimeMillis() - loggedAt;
+            }
+            } catch (Exception e) {
+                // (what the connection was doing when it dropped, for the report)
+                long now = System.currentTimeMillis();
+                if (loggedAt > 0) lastSessionMs = now - loggedAt;
+                throw new Exception(e.getMessage() + (loggedAt == 0 ? " (before the login was answered)"
+                        : " (" + (now - loggedAt) / 1000 + " s after login, last message " + (now - lastFrom) / 1000 + " s before, kind " + lastTag + ")"), e);
             }
         } finally {
             listening = false;

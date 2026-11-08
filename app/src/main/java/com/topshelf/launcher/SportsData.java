@@ -780,7 +780,8 @@ final class SportsData {
        tab full of games (every team's name, every channel's programmes, again and again). Instead the guide is
        read once — only your channels, the next three days — and every programme whose title has one of the
        teams' words is noted under that word; looking a team up is then one lookup. Kept for ten minutes. */
-    private volatile Object[] gIdx;          // {time, signature, Map<word, List<Object[]{key, start, end, title}>>}
+    private volatile Object[] gIdx;
+    private volatile boolean idxAgain;          // {time, signature, Map<word, List<Object[]{key, start, end, title}>>}
     private final Set<String> words = java.util.Collections.newSetFromMap(new ConcurrentHashMap<String, Boolean>());
     private static List<String> wordsOf(String s) {
         List<String> out = new ArrayList<>();
@@ -803,6 +804,20 @@ final class SportsData {
         String sig = chanKey + "|" + words.size();
         Object[] g = gIdx;
         if (g != null && now - (Long) g[0] < 10 * 60000L && sig.equals(g[1])) return (Map<String, List<Object[]>>) g[2];
+        /* (reading the guide takes up to a second: an index made in the last few hours is used straight away and a
+           new one is made after, so the tab doesn't wait; the rows are made again if the new one finds more) */
+        if (g != null && now - (Long) g[0] < 4 * 3600000L && h.bridge.live.epgReady() && ((String) g[1]).startsWith(chanKey + "|")) {
+            if (!idxAgain) {
+                idxAgain = true;
+                work.execute(new Runnable() { @Override public void run() {
+                    gIdx = null;
+                    try { guideIndex(); } finally { idxAgain = false; }
+                    match.clear();
+                    main.post(new Runnable() { @Override public void run() { push(); } });
+                } });
+            }
+            return (Map<String, List<Object[]>>) g[2];
+        }
         if (!h.bridge.live.epgReady()) { h.bridge.warmEpg(); return new HashMap<>(); }
         final Map<String, List<Object[]>> idx = new HashMap<>();
         final Set<String> want = new HashSet<>(words);

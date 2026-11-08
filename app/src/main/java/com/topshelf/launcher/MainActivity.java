@@ -1134,6 +1134,10 @@ public class MainActivity extends Activity {
     @Override
     protected void onDestroy() {
         try { if (nplayer != null) nplayer.stop(); } catch (Throwable ignored) { }
+        // (if Android makes the screen again in the same process, the new one starts its own: two doorbell connections
+        // with the same identity would keep pushing each other off)
+        try { if (ring != null) ring.stop(); } catch (Throwable ignored) { }
+        try { if (link != null) link.stop(); } catch (Throwable ignored) { }
         if (packageReceiver != null) {
             try { unregisterReceiver(packageReceiver); } catch (Exception ignored) { }
         }
