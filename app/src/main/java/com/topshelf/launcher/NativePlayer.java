@@ -83,6 +83,62 @@ final class NativePlayer implements Player.Listener {
         }
     }
 
+    /* An IPTV channel's HLS link (…/live/user/pass/123.m3u8) usually sends the player on to a link of its own with a
+       pass in it, and the player keeps reloading that one every few seconds. Some providers let that pass run out after
+       a minute or two and then refuse it (509): the picture played on what it had saved, froze, and started over about
+       40 s later, every two minutes (seen on a game day, 1.0.296). Now a refused reload asks the channel's own link
+       again, which hands out a fresh pass, and the picture carries on. */
+    static final class FreshLink implements androidx.media3.datasource.DataSource.Factory {
+        private final androidx.media3.datasource.DataSource.Factory base;
+        private final Uri orig;
+        private volatile Uri first, current;
+        private volatile int renewed;
+        FreshLink(androidx.media3.datasource.DataSource.Factory b, Uri o) { base = b; orig = o; }
+        private boolean playlist(Uri u) {
+            if (u == null) return false;
+            if (u.equals(orig) || u.equals(first) || u.equals(current)) return true;
+            String path = u.getPath() == null ? "" : u.getPath().toLowerCase(java.util.Locale.US);
+            return path.endsWith(".m3u8") || path.endsWith(".m3u");
+        }
+        private static boolean refused(int c) { return c == 509 || c == 458 || c == 401 || c == 403 || c == 404 || c == 410; }
+        @Override public androidx.media3.datasource.DataSource createDataSource() {
+            final androidx.media3.datasource.DataSource d = base.createDataSource();
+            return new androidx.media3.datasource.DataSource() {
+                @Override public void addTransferListener(androidx.media3.datasource.TransferListener l) { d.addTransferListener(l); }
+                @Override public long open(androidx.media3.datasource.DataSpec spec) throws java.io.IOException {
+                    boolean pl = playlist(spec.uri);
+                    Uri f = first, c = current;
+                    // (the player reloads the first link it was sent on to: the latest one is asked for instead)
+                    if (pl && f != null && c != null && spec.uri.equals(f) && !c.equals(f)) spec = spec.withUri(c);
+                    try {
+                        long n = d.open(spec);
+                        if (pl && spec.uri.equals(orig)) {
+                            Uri got = d.getUri();
+                            if (first == null) {
+                                first = got;
+                                Diag.ev("live: the channel's playlist " + (got == null || got.equals(orig) ? "comes straight from its link" : "is on a link of its own (" + (got.getHost() == null ? "" : got.getHost().equals(orig.getHost()) ? "same server" : "another server") + ")"));
+                            }
+                            current = got;
+                        }
+                        return n;
+                    } catch (androidx.media3.datasource.HttpDataSource.InvalidResponseCodeException e) {
+                        if (!pl || spec.uri.equals(orig) || !refused(e.responseCode)) throw e;
+                        try { d.close(); } catch (java.io.IOException ignored) { }
+                        long n = d.open(spec.withUri(orig));
+                        current = d.getUri();
+                        renewed++;
+                        Diag.ev("live: the provider refused the channel's playlist (" + e.responseCode + "): a fresh one from the channel's link" + (renewed > 1 ? " (" + renewed + " times on this channel)" : ""));
+                        return n;
+                    }
+                }
+                @Override public int read(byte[] b, int off, int len) throws java.io.IOException { return d.read(b, off, len); }
+                @Override public Uri getUri() { return d.getUri(); }
+                @Override public java.util.Map<String, java.util.List<String>> getResponseHeaders() { return d.getResponseHeaders(); }
+                @Override public void close() throws java.io.IOException { d.close(); }
+            };
+        }
+    }
+
     interface Events { void event(int id, String ev, String data); }
 
     private final MainActivity act;
@@ -505,7 +561,7 @@ final class NativePlayer implements Player.Listener {
         } else if (local) {
             src = new HlsMediaSource.Factory(new DriveAuth(new androidx.media3.datasource.DefaultDataSource.Factory(act, http))).setExtractorFactory(SafeTs.hls()).setAllowChunklessPreparation(true).createMediaSource(item);
         } else if ("hls".equals(kind)) {
-            src = new HlsMediaSource.Factory(http).setExtractorFactory(SafeTs.hls()).setAllowChunklessPreparation(true).setLoadErrorHandlingPolicy(new LiveRetry()).createMediaSource(item);
+            src = new HlsMediaSource.Factory(new FreshLink(http, Uri.parse(this.url))).setExtractorFactory(SafeTs.hls()).setAllowChunklessPreparation(true).setLoadErrorHandlingPolicy(new LiveRetry()).createMediaSource(item);
         } else {
             SafeTs ex = new SafeTs(DefaultTsPayloadReaderFactory.FLAG_ALLOW_NON_IDR_KEYFRAMES
                     | DefaultTsPayloadReaderFactory.FLAG_DETECT_ACCESS_UNITS, 1500 * 188);
