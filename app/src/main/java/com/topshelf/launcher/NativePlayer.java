@@ -92,13 +92,29 @@ final class NativePlayer implements Player.Listener {
         private final androidx.media3.datasource.DataSource.Factory base;
         private final Uri orig;
         private volatile Uri first, current;
-        private volatile int renewed;
+        private volatile int renewed, pieces;
+        /** the folders the playlist has been in (each pass makes its own): a piece's link is moved to the latest */
+        private final java.util.Set<String> dirs = java.util.concurrent.ConcurrentHashMap.newKeySet();
         FreshLink(androidx.media3.datasource.DataSource.Factory b, Uri o) { base = b; orig = o; }
+        private static String dir(Uri u) {
+            String x = u.toString(); int q = x.indexOf('?'); if (q >= 0) x = x.substring(0, q);
+            int i = x.lastIndexOf('/'); return i >= 0 ? x.substring(0, i + 1) : x;
+        }
+        private void setCurrent(Uri u) { current = u; if (u != null) dirs.add(dir(u)); }
+        /** the channel's own link asked again on its own connection: where it sends the playlist now */
+        private Uri renew() throws java.io.IOException {
+            androidx.media3.datasource.DataSource x = base.createDataSource();
+            try { x.open(new androidx.media3.datasource.DataSpec(orig)); Uri u = x.getUri(); setCurrent(u); renewed++; return u; }
+            finally { try { x.close(); } catch (java.io.IOException ignored) { } }
+        }
         private boolean playlist(Uri u) {
             if (u == null) return false;
             if (u.equals(orig) || u.equals(first) || u.equals(current)) return true;
             String path = u.getPath() == null ? "" : u.getPath().toLowerCase(java.util.Locale.US);
             return path.endsWith(".m3u8") || path.endsWith(".m3u");
+        }
+        private static String code(java.io.IOException e) {
+            return e instanceof androidx.media3.datasource.HttpDataSource.InvalidResponseCodeException ? String.valueOf(((androidx.media3.datasource.HttpDataSource.InvalidResponseCodeException) e).responseCode) : e.getClass().getSimpleName();
         }
         private static boolean refused(int c) { return c == 509 || c == 458 || c == 401 || c == 403 || c == 404 || c == 410; }
         @Override public androidx.media3.datasource.DataSource createDataSource() {
@@ -118,10 +134,11 @@ final class NativePlayer implements Player.Listener {
                                 first = got;
                                 Diag.ev("live: the channel's playlist " + (got == null || got.equals(orig) ? "comes straight from its link" : "is on a link of its own (" + (got.getHost() == null ? "" : got.getHost().equals(orig.getHost()) ? "same server" : "another server") + ")"));
                             }
-                            current = got;
+                            setCurrent(got);
                         }
                         return n;
                     } catch (androidx.media3.datasource.HttpDataSource.InvalidResponseCodeException e) {
+                        if (!pl && refused(e.responseCode)) return piece(spec, e);
                         if (!pl || spec.uri.equals(orig) || !refused(e.responseCode)) throw e;
                         return again(spec, String.valueOf(e.responseCode));
                     } catch (androidx.media3.datasource.HttpDataSource.HttpDataSourceException e) {
@@ -133,11 +150,31 @@ final class NativePlayer implements Player.Listener {
                 }
                 private long again(androidx.media3.datasource.DataSpec spec, String why) throws java.io.IOException {
                     try { d.close(); } catch (java.io.IOException ignored) { }
-                    long n = d.open(spec.withUri(orig));
-                    current = d.getUri();
+                    long n;
+                    try { n = d.open(spec.withUri(orig)); }
+                    catch (java.io.IOException e) { Diag.ev("live: the channel's playlist failed (" + why + ") and its own link refused too (" + code(e) + ")"); throw e; }
+                    setCurrent(d.getUri());
                     renewed++;
-                    Diag.ev("live: the channel's playlist failed (" + why + "): a fresh one from the channel's link" + (renewed > 1 ? " (" + renewed + " times on this channel)" : ""));
+                    if (renewed <= 3 || renewed % 20 == 0) Diag.ev("live: the channel's playlist failed (" + why + "): a fresh one from the channel's link" + (renewed > 1 ? " (" + renewed + " times on this channel)" : ""));
                     return n;
+                }
+                /* a piece of the picture refused (its pass, from an older playlist, had run out): a fresh pass, and the
+                   same piece asked for in the fresh pass's folder */
+                private long piece(androidx.media3.datasource.DataSpec spec, androidx.media3.datasource.HttpDataSource.InvalidResponseCodeException e) throws java.io.IOException {
+                    String u = spec.uri.toString(), from = null;
+                    for (String x : dirs) if (u.startsWith(x) && (from == null || x.length() > from.length())) from = x;
+                    if (from == null) { Diag.ev("live: a piece of the channel was refused (" + e.responseCode + ")"); throw e; }
+                    Uri fresh;
+                    try { fresh = renew(); } catch (java.io.IOException e2) { Diag.ev("live: a piece of the channel was refused (" + e.responseCode + ") and its own link refused too (" + code(e2) + ")"); throw e; }
+                    String to = fresh == null ? null : dir(fresh);
+                    if (to == null || to.equals(from)) { Diag.ev("live: a piece of the channel was refused (" + e.responseCode + "), the channel's link gave the same place"); throw e; }
+                    try { d.close(); } catch (java.io.IOException ignored) { }
+                    try {
+                        long n = d.open(spec.withUri(Uri.parse(to + u.substring(from.length()))));
+                        pieces++;
+                        if (pieces <= 3 || pieces % 20 == 0) Diag.ev("live: a piece of the channel was refused (" + e.responseCode + "): fetched on a fresh link" + (pieces > 1 ? " (" + pieces + " times)" : ""));
+                        return n;
+                    } catch (java.io.IOException e3) { Diag.ev("live: a piece of the channel was refused (" + e.responseCode + "), and on a fresh link too (" + code(e3) + ")"); throw e; }
                 }
                 @Override public int read(byte[] b, int off, int len) throws java.io.IOException { return d.read(b, off, len); }
                 @Override public Uri getUri() { return d.getUri(); }
