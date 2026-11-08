@@ -123,13 +123,21 @@ final class NativePlayer implements Player.Listener {
                         return n;
                     } catch (androidx.media3.datasource.HttpDataSource.InvalidResponseCodeException e) {
                         if (!pl || spec.uri.equals(orig) || !refused(e.responseCode)) throw e;
-                        try { d.close(); } catch (java.io.IOException ignored) { }
-                        long n = d.open(spec.withUri(orig));
-                        current = d.getUri();
-                        renewed++;
-                        Diag.ev("live: the provider refused the channel's playlist (" + e.responseCode + "): a fresh one from the channel's link" + (renewed > 1 ? " (" + renewed + " times on this channel)" : ""));
-                        return n;
+                        return again(spec, String.valueOf(e.responseCode));
+                    } catch (androidx.media3.datasource.HttpDataSource.HttpDataSourceException e) {
+                        // the server the playlist had moved to couldn't be reached: the channel's own link may send it
+                        // to another one (seen: "connection failed" once after 17 minutes of a game)
+                        if (!pl || spec.uri.equals(orig) || e.type != androidx.media3.datasource.HttpDataSource.HttpDataSourceException.TYPE_OPEN) throw e;
+                        return again(spec, "couldn't connect");
                     }
+                }
+                private long again(androidx.media3.datasource.DataSpec spec, String why) throws java.io.IOException {
+                    try { d.close(); } catch (java.io.IOException ignored) { }
+                    long n = d.open(spec.withUri(orig));
+                    current = d.getUri();
+                    renewed++;
+                    Diag.ev("live: the channel's playlist failed (" + why + "): a fresh one from the channel's link" + (renewed > 1 ? " (" + renewed + " times on this channel)" : ""));
+                    return n;
                 }
                 @Override public int read(byte[] b, int off, int len) throws java.io.IOException { return d.read(b, off, len); }
                 @Override public Uri getUri() { return d.getUri(); }
