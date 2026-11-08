@@ -860,7 +860,19 @@ final class NativeSports extends FrameLayout {
             final String key = "card:" + item.optString("k") + ":" + item.optString("lg") + ":" + (mine == null ? 0 : mine);
             Bitmap b = cards.get(key);
             if (b != null) { img.setImageBitmap(b); setBackground(null); return; }
+            /* first with the logos already here (it shows at once: teams, times, channel), then again with any logo
+               still to come from ESPN — a card used to stay an empty box until all its logos had downloaded */
             painter.execute(new Runnable() { @Override public void run() {
+                missing = false; offlineT.set(true);
+                final Bitmap quick;
+                try { quick = paintCard(item); } finally { offlineT.set(false); }
+                final boolean again = missing;
+                main().post(new Runnable() { @Override public void run() {
+                    if (quick == null) return;
+                    if (!again) cards.put(key, quick);
+                    img.setImageBitmap(quick); setBackground(null);
+                } });
+                if (!again) return;
                 final Bitmap out = paintCard(item);
                 main().post(new Runnable() { @Override public void run() {
                     if (out == null) return;
@@ -892,11 +904,32 @@ final class NativeSports extends FrameLayout {
     /* A logo is decoded at (about twice) the size it's drawn, and kept per size: the small card logo used to be
        reused, stretched, for the big scoreboard. ESPN's "-dark" versions are made for dark backgrounds. */
     private Bitmap logo(String url, int size) { return logo(url, size, true); }
+    // (a quick paint with no downloads, on the painter's thread only; something wasn't here yet)
+    private final ThreadLocal<Boolean> offlineT = new ThreadLocal<>();
+    private volatile boolean missing;
+    private static volatile boolean logosPruned;
+    /** the logos kept on the TV: at most 800 (the oldest go) */
+    private static void pruneLogos(java.io.File dir) {
+        logosPruned = true;
+        java.io.File[] fs = dir.listFiles();
+        if (fs == null || fs.length <= 800) return;
+        java.util.Arrays.sort(fs, new java.util.Comparator<java.io.File>() { @Override public int compare(java.io.File a, java.io.File b) { return Long.compare(a.lastModified(), b.lastModified()); } });
+        for (int i = 0; i < fs.length - 800; i++) //noinspection ResultOfMethodCallIgnored
+            fs[i].delete();
+    }
     private Bitmap logo(String url, int size, boolean dark) {
         if (url == null || url.isEmpty()) return null;
         int b = size <= 72 ? 128 : size <= 180 ? 260 : 420;
         String key = url + "@" + b + (dark ? "" : "L");
         synchronized (logos) { if (logos.containsKey(key)) return logos.get(key); }
+        // logos are kept on the TV too (they were downloaded again every time TopShelf started)
+        java.io.File df = new java.io.File(new java.io.File(getContext().getCacheDir(), "logos"), Integer.toHexString(key.hashCode()) + "-" + key.length() + ".png");
+        if (df.exists()) {
+            Bitmap c = android.graphics.BitmapFactory.decodeFile(df.getPath());
+            if (c != null) { synchronized (logos) { logos.put(key, c); } return c; }
+        }
+        if (Boolean.TRUE.equals(offlineT.get())) { missing = true; return null; }
+        if (!logosPruned) pruneLogos(df.getParentFile());
         Bitmap bm = null;
         List<String> tries = new ArrayList<>();
         if (dark && url.contains("espncdn.com") && url.contains("/500/")) tries.add(url.replace("/500/", "/500-dark/"));
@@ -910,6 +943,12 @@ final class NativeSports extends FrameLayout {
             Bitmap scd = Bitmap.createScaledBitmap(bm, Math.max(1, Math.round(bm.getWidth() * sc)), Math.max(1, Math.round(bm.getHeight() * sc)), true);
             if (scd != bm) bm.recycle(); bm = scd;
         }
+        if (bm != null) try {
+            df.getParentFile().mkdirs();
+            java.io.File tmp = new java.io.File(df.getPath() + ".tmp");
+            try (java.io.FileOutputStream o = new java.io.FileOutputStream(tmp)) { bm.compress(Bitmap.CompressFormat.PNG, 100, o); }
+            if (!tmp.renameTo(df)) tmp.delete();
+        } catch (Throwable ignored) { }
         synchronized (logos) { logos.put(key, bm); }
         return bm;
     }
