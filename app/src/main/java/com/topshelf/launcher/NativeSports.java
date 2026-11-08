@@ -251,6 +251,9 @@ final class NativeSports extends FrameLayout {
         animate().alpha(0f).setDuration(250).withLayer().withEndAction(new Runnable() { @Override public void run() { if (!shown) setVisibility(INVISIBLE); } }).start();
     }
     boolean shownNow() { return shown; }
+    /** the self-check: the Standings tab, as choosing it with the remote does */
+    boolean selfCheckStandings() { if (!tabs.contains("Standings")) return false; tab = "Standings"; zone = "grid"; applySet(false); return true; }
+    boolean standingsShown() { return standings.shownNow(); }
     /** the app's bars went up (or stepped aside): the score strip and the tabs take their place while you're in the tab */
     void barsHidden(boolean hide) {
         if (h.portrait) return;            // (upright, the tab bar is at the bottom: the strip and tabs stay)

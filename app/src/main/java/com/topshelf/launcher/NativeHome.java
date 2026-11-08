@@ -1640,6 +1640,7 @@ final class NativeHome extends FrameLayout {
 
     void enterTopFromVod() { enterTop(); }
     /** the self-check: its presses go to the screen itself, not the top bar (where ◀ ▶ changes tab) */
+    NativeSports sportsNow() { return sports; }
     void selfCheckIntoScreen() { if (mode.equals("top")) exitTop(); }
     /** left off the left edge of a screen: the side menu (nothing, with the bar across the top) */
     void leftEdge() { if (side) enterTop(); }

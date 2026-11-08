@@ -81,6 +81,7 @@ final class SelfCheck {
         plan.add(title());
         plan.add(tab("TV Shows", "series", "r4"));
         plan.add(tab("Sports", "sports", ""));
+        plan.add(standings());
         plan.add(tab("Live TV", "live", "d4u4"));
         plan.add(settings());
         plan.add(tab("Home again", "home", ""));
@@ -149,6 +150,26 @@ final class SelfCheck {
                 } else if (++n < 60) main.postDelayed(this, 100);
                 else { record("Title page", -1, "didn't open within 6 s"); main.post(next); }
             } }, 100);
+        } };
+    }
+    /** Sports › Standings: shown, and pictured once the tables have had a moment to come from ESPN */
+    private static Runnable standings() {
+        return new Runnable() { @Override public void run() {
+            final NativeHome h = act.nativeHome(); if (h == null) { abort("Home went away"); return; }
+            NativeSports sp = h.sportsNow();
+            if (sp == null || !sp.shownNow()) { record("Standings", -1, "Sports wasn't open"); main.post(next); return; }
+            final long s = SystemClock.uptimeMillis();
+            resetFrames();
+            if (!sp.selfCheckStandings()) { record("Standings", -1, "no Standings tab"); main.post(next); return; }
+            settled(new Runnable() { @Override public void run() {
+                final long appear = SystemClock.uptimeMillis() - s;
+                main.postDelayed(new Runnable() { @Override public void run() {
+                    press("d2u2", 0, new Runnable() { @Override public void run() {
+                        record("Standings", appear, "");
+                        shot("Standings", next);
+                    } });
+                } }, 3000);
+            } });
         } };
     }
     private static Runnable settings() {
