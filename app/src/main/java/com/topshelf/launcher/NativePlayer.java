@@ -121,7 +121,36 @@ final class NativePlayer implements Player.Listener {
             final androidx.media3.datasource.DataSource d = base.createDataSource();
             return new androidx.media3.datasource.DataSource() {
                 @Override public void addTransferListener(androidx.media3.datasource.TransferListener l) { d.addTransferListener(l); }
+                private byte[] buf; private int pos; private Uri openedUri;
+                /* A playlist is read whole and looked at: once the provider answered a reload with something that
+                   wasn't a playlist at all (no "#EXTM3U"), and the player gave up on the channel and started over —
+                   20 seconds without a picture. Now that answer is put down to a pass that ran out, like a 509. */
                 @Override public long open(androidx.media3.datasource.DataSpec spec) throws java.io.IOException {
+                    buf = null; pos = 0; openedUri = null;
+                    long n = openRaw(spec);
+                    if (!playlist(spec.uri)) return n;
+                    byte[] b = readAll(); Uri u = d.getUri();
+                    if (!m3u(b)) {
+                        String what = sample(b);
+                        try { d.close(); } catch (java.io.IOException ignored) { }
+                        try {
+                            Thread.sleep(400);
+                            d.open(new androidx.media3.datasource.DataSpec(orig));
+                            byte[] b2 = readAll(); Uri u2 = d.getUri();
+                            if (m3u(b2)) { b = b2; u = u2; setCurrent(u2); renewed++; Diag.ev("live: the channel's playlist came back as something else (" + what + "): a fresh one from the channel's link"); }
+                            else Diag.ev("live: the channel's playlist came back as something else (" + what + "), and from the channel's link too (" + sample(b2) + ")");
+                        } catch (Exception e) { Diag.ev("live: the channel's playlist came back as something else (" + what + "), and the channel's link failed (" + (e instanceof java.io.IOException ? code((java.io.IOException) e) : e.getClass().getSimpleName()) + ")"); }
+                    }
+                    try { d.close(); } catch (java.io.IOException ignored) { }
+                    buf = b; openedUri = u;
+                    return b.length;
+                }
+                private byte[] readAll() throws java.io.IOException {
+                    java.io.ByteArrayOutputStream o = new java.io.ByteArrayOutputStream(16384); byte[] t = new byte[16384]; int k;
+                    while ((k = d.read(t, 0, t.length)) != C.RESULT_END_OF_INPUT) { if (k > 0) o.write(t, 0, k); if (o.size() > 4 << 20) break; }
+                    return o.toByteArray();
+                }
+                private long openRaw(androidx.media3.datasource.DataSpec spec) throws java.io.IOException {
                     boolean pl = playlist(spec.uri);
                     Uri f = first, c = current;
                     // (the player reloads the first link it was sent on to: the latest one is asked for instead)
@@ -176,11 +205,32 @@ final class NativePlayer implements Player.Listener {
                         return n;
                     } catch (java.io.IOException e3) { Diag.ev("live: a piece of the channel was refused (" + e.responseCode + "), and on a fresh link too (" + code(e3) + ")"); throw e; }
                 }
-                @Override public int read(byte[] b, int off, int len) throws java.io.IOException { return d.read(b, off, len); }
-                @Override public Uri getUri() { return d.getUri(); }
+                @Override public int read(byte[] b, int off, int len) throws java.io.IOException {
+                    if (buf == null) return d.read(b, off, len);
+                    if (pos >= buf.length) return C.RESULT_END_OF_INPUT;
+                    int k = Math.min(len, buf.length - pos); System.arraycopy(buf, pos, b, off, k); pos += k; return k;
+                }
+                @Override public Uri getUri() { return openedUri != null ? openedUri : d.getUri(); }
                 @Override public java.util.Map<String, java.util.List<String>> getResponseHeaders() { return d.getResponseHeaders(); }
-                @Override public void close() throws java.io.IOException { d.close(); }
+                @Override public void close() throws java.io.IOException { buf = null; d.close(); }
             };
+        }
+        /** a playlist starts "#EXTM3U" (after any byte-order mark or blank space) */
+        private static boolean m3u(byte[] b) {
+            int i = 0;
+            if (b.length >= 3 && (b[0] & 0xFF) == 0xEF && (b[1] & 0xFF) == 0xBB && (b[2] & 0xFF) == 0xBF) i = 3;
+            while (i < b.length && (b[i] == ' ' || b[i] == '\n' || b[i] == '\r' || b[i] == '\t')) i++;
+            byte[] h = "#EXTM3U".getBytes();
+            if (b.length - i < h.length) return false;
+            for (int k = 0; k < h.length; k++) if (b[i + k] != h[k]) return false;
+            return true;
+        }
+        /** what came back instead, for the report: its size and the start of it in plain characters */
+        private static String sample(byte[] b) {
+            if (b.length == 0) return "nothing";
+            StringBuilder o = new StringBuilder();
+            for (int i = 0; i < b.length && o.length() < 48; i++) { int c = b[i] & 0xFF; o.append(c >= 32 && c < 127 ? (char) c : '.'); }
+            return b.length + " bytes: " + o.toString().trim();
         }
     }
 
