@@ -96,7 +96,8 @@ function mvLabel(t) {
     `<span><b>${esc(ch.n)}</b>${p && p[2] ? `<i>${esc(p[2])}</i>` : ''}</span>`;
 }
 
-function mvStartTile(t, kind, url) {
+function mvStartTile(t, kind, url, libsAsked) {
+  if (!libsAsked && ((kind === 'hls' && !window.Hls) || (kind === 'ts' && !window.mpegts)) && typeof lvLibs === 'function') { lvLibs().then(() => mvStartTile(t, kind, url, true)); return; }
   mvStopStream(t);
   t.kind = kind;
   url = url || t.ch.u;

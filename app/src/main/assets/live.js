@@ -766,7 +766,19 @@ function lvTuneCard(ch) {
   $('#player').classList.add('tuning');
 }
 
-function lvStart(ch, kind, url) {
+/* The page's own players for a channel (hls.js, mpegts.js: about 900 KB of script) are read the first time a
+   channel plays in the page, not every time TopShelf starts: on the TV the app's own player plays channels, so
+   they were read at every start for nothing. */
+let LV_LIBS = null;
+function lvLibs() {
+  if (window.Hls && window.mpegts) return Promise.resolve();
+  if (LV_LIBS) return LV_LIBS;
+  const add = src => new Promise(res => { const s = document.createElement('script'); s.src = src; s.onload = s.onerror = () => res(); document.head.appendChild(s); });
+  LV_LIBS = Promise.all([window.Hls ? null : add('lib/hls.min.js'), window.mpegts ? null : add('lib/mpegts.js')]);
+  return LV_LIBS;
+}
+function lvStart(ch, kind, url, libsAsked) {
+  if (!libsAsked && ((kind === 'hls' && !window.Hls) || (kind === 'ts' && !window.mpegts))) { lvLibs().then(() => lvStart(ch, kind, url, true)); return; }
   const sameCh = LV.playing && LV.playing.u === ch.u;
   const wasTuning = $('#player').classList.contains('tuning');      // a retry keeps the card up
   lvStop();

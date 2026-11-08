@@ -63,6 +63,7 @@ public class MainActivity extends Activity {
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+        startMark("screen being made");
         applyOrientation();
         readLaunchChannel(getIntent());
         getWindow().addFlags(WindowManager.LayoutParams.FLAG_FULLSCREEN);
@@ -125,6 +126,7 @@ public class MainActivity extends Activity {
         // lets a computer connected over ADB (USB/Wi-Fi debugging, which you have to allow on the TV)
         // inspect and time the page with Chrome's developer tools — how performance gets measured on the TV itself
         WebView.setWebContentsDebuggingEnabled(true);
+        startMark("page view being made");
         web = new WebView(this);
         /* The page is hidden while the app draws Home, and by default a hidden web view's helper process
            counts for little: with a big app in front (TizenTube…) Android closed it, and TopShelf had to
@@ -252,7 +254,9 @@ public class MainActivity extends Activity {
     NativeHome nativeHome() {
         if (!nativeHomeWanted() || web == null) return null;
         if (home == null) {
+            startMark("Home being built (the page asked)");
             home = new NativeHome(this, bridge);
+            startMark("Home built");
             root.addView(home, 0, new FrameLayout.LayoutParams(FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.MATCH_PARENT));
         }
         return home;
@@ -1023,6 +1027,11 @@ public class MainActivity extends Activity {
         } catch (Throwable ignored) { cover = null; }
     }
     /** Home has drawn itself (NativeHome), or it isn't coming */
+    /* where a start-up's seconds go (marks only during the first 15 s of the process, in the report's timeline) */
+    static void startMark(String what) {
+        long ms = android.os.SystemClock.uptimeMillis() - android.os.Process.getStartUptimeMillis();
+        if (ms < 15000) Diag.ev("start-up: " + what + " at " + ms + " ms");
+    }
     void coverOff(final String why) {
         if (startMs < 0 && startNoted) {
             startMs = android.os.SystemClock.uptimeMillis() - (Build.VERSION.SDK_INT >= 24 ? android.os.Process.getStartUptimeMillis() : coverAt);
