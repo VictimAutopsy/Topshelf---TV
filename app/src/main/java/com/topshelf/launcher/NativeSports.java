@@ -903,7 +903,9 @@ final class NativeSports extends FrameLayout {
     private final Map<String, Bitmap> logos = new java.util.LinkedHashMap<String, Bitmap>(64, .75f, true) {
         @Override protected boolean removeEldestEntry(Map.Entry<String, Bitmap> e) { return size() > 120; }
     };
-    { Diag.TRIMMERS.add(new Runnable() { @Override public void run() { cards.evictAll(); synchronized (logos) { logos.clear(); } } }); }
+    private final Runnable trimmer = new Runnable() { @Override public void run() { cards.evictAll(); synchronized (logos) { logos.clear(); } } };
+    { Diag.TRIMMERS.add(trimmer); }
+    void dispose() { Diag.TRIMMERS.remove(trimmer); painter.shutdownNow(); cards.evictAll(); synchronized (logos) { logos.clear(); } }
     /* A logo is decoded at (about twice) the size it's drawn, and kept per size: the small card logo used to be
        reused, stretched, for the big scoreboard. ESPN's "-dark" versions are made for dark backgrounds. */
     private Bitmap logo(String url, int size) { return logo(url, size, true); }

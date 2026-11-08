@@ -33,7 +33,10 @@ final class HomeImages {
         @Override protected int sizeOf(String k, Bitmap b) { return b.getByteCount(); }
     };
     private final Map<String, List<Done>> waiting = new HashMap<>();
-    { Diag.TRIMMERS.add(new Runnable() { @Override public void run() { cache.evictAll(); } }); }
+    private final Runnable trimmer = new Runnable() { @Override public void run() { cache.evictAll(); } };
+    { Diag.TRIMMERS.add(trimmer); }
+    /** this Home is being replaced (a phone turned): its pictures and threads go */
+    void dispose() { Diag.TRIMMERS.remove(trimmer); main.removeCallbacksAndMessages(null); pool.shutdownNow(); cache.evictAll(); }
 
     Bitmap cached(String key) { return cache.get(key); }
     /** how much the picture cache holds (MB, items) */

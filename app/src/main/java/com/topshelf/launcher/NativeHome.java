@@ -1641,6 +1641,20 @@ final class NativeHome extends FrameLayout {
     void enterTopFromVod() { enterTop(); }
     /** the self-check: its presses go to the screen itself, not the top bar (where ◀ ▶ changes tab) */
     NativeSports sportsNow() { return sports; }
+    String tabNow() { return tab; }
+    /* A phone turned with the app's screens in both directions: this Home is replaced by one laid out for the new
+       shape (MainActivity.reshapeHome), instead of the whole app starting over behind its loading picture. Everything
+       this one runs stops here: its timers, frame callbacks, threads and picture caches. */
+    void dispose() {
+        main.removeCallbacksAndMessages(null);
+        Choreographer.getInstance().removeFrameCallback(fcb);
+        Choreographer.getInstance().removeFrameCallback(redrawCb);
+        try { if (billboard != null) billboard.dispose(); } catch (Throwable ignored) { }
+        try { if (vodM != null) vodM.dispose(); if (vodS != null) vodS.dispose(); } catch (Throwable ignored) { }
+        try { if (sports != null) sports.dispose(); } catch (Throwable ignored) { }
+        try { if (sportsData != null) sportsData.dispose(); } catch (Throwable ignored) { }
+        try { imgs.dispose(); } catch (Throwable ignored) { }
+    }
     void selfCheckIntoScreen() { if (mode.equals("top")) exitTop(); }
     /** left off the left edge of a screen: the side menu (nothing, with the bar across the top) */
     void leftEdge() { if (side) enterTop(); }

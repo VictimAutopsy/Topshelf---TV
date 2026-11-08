@@ -90,6 +90,7 @@ final class SportsData {
     private final Handler main;
     private final ExecutorService net = Executors.newFixedThreadPool(8);
     private final ExecutorService work = Executors.newSingleThreadExecutor();
+    void dispose() { work.shutdownNow(); }
 
     // ---- state (main thread)
     private final Map<String, List<Ev>> ev = new HashMap<>();

@@ -74,6 +74,12 @@ public class MainActivity extends Activity {
             getWindow().setAttributes(lp);
         }
         bridge = new Bridge(this);
+        // phones: the app's screens upright too, so turning the phone keeps the same screens (asked for: both ways
+        // up the same, and no start-over when turned) — once; Settings › Home › Upright layout still switches it
+        if (!isTv()) {
+            SharedPreferences up = getSharedPreferences(Bridge.PREFS, MODE_PRIVATE);
+            if (!up.getBoolean("uprightBoth1", false)) up.edit().putBoolean("uprightNative", true).putBoolean("uprightBoth1", true).commit();
+        }
         wasWanted = nativeHomeWanted();
         sCurrent = new java.lang.ref.WeakReference<>(this);
         try {   // a new version gets another chance at the native Home if the last one failed
@@ -238,8 +244,8 @@ public class MainActivity extends Activity {
         super.onConfigurationChanged(c);
         if (isTv() || web == null) return;
         boolean want = nativeHomeWanted();
-        if (want == wasWanted) return;
         if (videoLandscape || (nplayer != null && nplayer.active()) || (home != null && (home.vodPlayingNow() || home.liveWatching()))) return;
+        if (want == wasWanted) { reshapeLater(); return; }
         wasWanted = want;
         main.post(new Runnable() { @Override public void run() { recreate(); } });
     }
@@ -762,7 +768,36 @@ public class MainActivity extends Activity {
     void setVideoLandscape(boolean on) {
         videoLandscape = on;
         applyOrientation();
+        if (!on) main.postDelayed(new Runnable() { @Override public void run() { reshapeLater(); } }, 700);
     }
+    /* A phone turned (the app's screens both ways up): Home made again for the new shape in place — the page and
+       everything else stay as they are; it used to start the whole app again behind its loading picture. */
+    private void reshapeLater() {
+        main.removeCallbacks(reshape);
+        main.post(reshape);
+    }
+    private final Runnable reshape = new Runnable() { @Override public void run() {
+        if (isTv() || home == null || web == null) return;
+        if (videoLandscape || (nplayer != null && nplayer.active()) || home.vodPlayingNow() || home.liveWatching()) return;
+        android.util.DisplayMetrics dm = getResources().getDisplayMetrics();
+        boolean upright = dm.heightPixels > dm.widthPixels;
+        if (upright == home.portrait) return;
+        long t0 = android.os.SystemClock.uptimeMillis();
+        NativeHome old = home;
+        String tab = old.tabNow();
+        try { old.dispose(); } catch (Throwable t) { Diag.ev("turned: the old Home didn't stop cleanly (" + t + ")"); }
+        try { root.removeView(old); } catch (Throwable ignored) { }
+        home = null;
+        NativeHome h;
+        try { h = nativeHome(); } catch (Throwable t) { nativeHomeBroken(t); return; }
+        if (h == null) return;
+        h.setAlpha(0f);
+        h.animate().alpha(1f).setDuration(220).start();
+        bridge.reapply(h);
+        if (!tab.equals("home")) try { h.showTab(tab); } catch (Throwable ignored) { }
+        js("try { NH.owner = ''; nhSync(); } catch (e) {}");
+        Diag.ev("turned: Home made again " + (upright ? "upright" : "sideways") + " in " + (android.os.SystemClock.uptimeMillis() - t0) + " ms");
+    } };
 
     /** While Live TV is playing full screen, leaving the app shrinks it into a floating window. */
     volatile boolean pipReady;

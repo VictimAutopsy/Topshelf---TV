@@ -408,6 +408,7 @@ final class Billboard extends FrameLayout {
             }
         });
     }
+    void dispose() { stopTrailer(); if (trailer != null) trailer.stop(); }
     private void stopTrailer() {
         if (trailer != null && trailer.playing()) trailer.stop();
         trOn = false; trLoading = false;

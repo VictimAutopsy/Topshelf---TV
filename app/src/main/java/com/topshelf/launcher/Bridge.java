@@ -711,8 +711,14 @@ public class Bridge {
         } catch (Exception e) { return "{}"; }
     }
     @JavascriptInterface public void nhReload(final String what) { nh(new Runnable() { @Override public void run() { act.nativeHome().reload(what); } }); }
-    @JavascriptInterface public void nhShelf(final String json) { nh(new Runnable() { @Override public void run() { act.nativeHome().setShelf(json); } }); }
-    @JavascriptInterface public void nhWeather(final String text) { nh(new Runnable() { @Override public void run() { act.nativeHome().setWeather(text); } }); }
+    // (the last of each, for a Home made again when a phone turns: the page sends them only when they change)
+    private volatile String lastShelf, lastWeather;
+    @JavascriptInterface public void nhShelf(final String json) { lastShelf = json; nh(new Runnable() { @Override public void run() { act.nativeHome().setShelf(json); } }); }
+    @JavascriptInterface public void nhWeather(final String text) { lastWeather = text; nh(new Runnable() { @Override public void run() { act.nativeHome().setWeather(text); } }); }
+    void reapply(NativeHome h) {
+        try { if (lastShelf != null) h.setShelf(lastShelf); } catch (Throwable ignored) { }
+        try { if (lastWeather != null) h.setWeather(lastWeather); } catch (Throwable ignored) { }
+    }
     @JavascriptInterface public void nhLink(final boolean on) { nh(new Runnable() { @Override public void run() { act.nativeHome().setLink(on); } }); }
     @JavascriptInterface public void nhMeasureStart() { nh(new Runnable() { @Override public void run() { act.nativeHome().measureStart(); } }); }
     @JavascriptInterface public String nhMeasureStop() {

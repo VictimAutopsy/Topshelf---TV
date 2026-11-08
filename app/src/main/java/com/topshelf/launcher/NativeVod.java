@@ -180,7 +180,9 @@ final class NativeVod extends FrameLayout {
             h.reclaim(old);
         }
     };
-    { Diag.TRIMMERS.add(new Runnable() { @Override public void run() { baked.evictAll(); } }); }
+    private final Runnable trimmer = new Runnable() { @Override public void run() { baked.evictAll(); } };
+    { Diag.TRIMMERS.add(trimmer); }
+    void dispose() { Diag.TRIMMERS.remove(trimmer); baked.evictAll(); }
     private final Runnable bgLater = new Runnable() { @Override public void run() { backdropNow(); } };
     private final Runnable heroLater = new Runnable() { @Override public void run() { drawHero(); } };
     private int heroTok;
