@@ -98,6 +98,7 @@ final class Assistant {
                 String sys = "You turn a TV viewer's spoken request into ONE action for the TopShelf TV launcher. Reply with only a JSON object, one of:\n"
                         + "{\"do\":\"game\",\"id\":\"<id from the list>\"} to watch a game in the list;\n"
                         + "{\"do\":\"channel\",\"name\":\"<channel name, e.g. ESPN, CNN, Fox Sports 1>\"} to tune a live channel;\n"
+                        + "{\"do\":\"play\",\"title\":\"<exact title>\",\"type\":\"movie or series\",\"year\":<year if known or said, else 0>,\"season\":<number or 0>,\"episode\":<number or 0>} to play, watch, start or continue a movie or TV show (name the title even if they only described it);\n"
                         + "{\"do\":\"search\",\"query\":\"<a movie, show or person's exact name>\"} when they named or described one specific title (name it);\n"
                         + "{\"do\":\"suggest\",\"say\":\"<a few words>\",\"titles\":[\"<3 to 6 real movie or show titles that fit>\"]} for a recommendation;\n"
                         + "{\"do\":\"catchup\"} when they ask what they missed in the game they're watching;\n"
@@ -134,6 +135,7 @@ final class Assistant {
                 h.toast("No channel called “" + a.optString("name") + "” in your playlist");
                 return;
             }
+            case "play": playTitle(h, a, said); return;
             case "search": if (isQuestion(said)) { answer(h, said); return; } h.searchQuery(a.optString("query"), true); return;
             case "suggest": {
                 JSONArray ts = a.optJSONArray("titles");
@@ -180,6 +182,59 @@ final class Assistant {
             if (bestRank == 0) break;
         }
         return best;
+    }
+
+    // ================================================================== "play …" (a movie or a show)
+
+    /* The title is found on Cinemeta and played the way Play on its page does (the best stream; a movie from where
+       you left off, a show at your next episode, or the season and episode you said). Several titles of that name
+       (a remake, a film and a series): a short menu to choose from. */
+    private static String norm(String t) { return t.toLowerCase(Locale.US).replaceAll("^(the|a|an) ", "").replaceAll("[^a-z0-9]", ""); }
+    static void playTitle(final NativeHome h, final JSONObject a, final String said) {
+        final String title = a.optString("title").trim(), type = a.optString("type");
+        final int year = a.optInt("year"), season = a.optInt("season"), episode = a.optInt("episode");
+        if (title.isEmpty()) { h.searchQuery(said, true); return; }
+        h.toast("Finding “" + title + "”…");
+        new Thread(new Runnable() { @Override public void run() {
+            final List<JSONObject> hits = new ArrayList<>();
+            String[] types = type.equals("movie") ? new String[] { "movie", "series" } : type.equals("series") ? new String[] { "series", "movie" } : season > 0 ? new String[] { "series" } : new String[] { "movie", "series" };
+            String want = norm(title);
+            for (String ty : types) {
+                try {
+                    byte[] d = HomeImages.http(NativeVod.CINEMETA + "/catalog/" + ty + "/top/search=" + android.net.Uri.encode(title) + ".json", null);
+                    JSONArray ms = d == null ? null : new JSONObject(new String(d, StandardCharsets.UTF_8)).optJSONArray("metas");
+                    if (ms != null) for (int i = 0; i < ms.length() && i < 8; i++) {
+                        JSONObject m = ms.optJSONObject(i);
+                        if (m == null || !m.optString("id").startsWith("tt") || !norm(m.optString("name")).equals(want)) continue;
+                        if (!m.has("type")) m.put("type", ty);
+                        hits.add(m);
+                    }
+                } catch (Throwable ignored) { }
+                // (the kind they named has it: the other kind isn't asked)
+                if (!hits.isEmpty() && !type.isEmpty()) break;
+            }
+            // the year said or known settles it
+            if (year > 0 && hits.size() > 1) { List<JSONObject> y = new ArrayList<>(); for (JSONObject m : hits) if (m.optString("releaseInfo").startsWith(String.valueOf(year))) y.add(m); if (!y.isEmpty()) { hits.clear(); hits.addAll(y); } }
+            MAIN.post(new Runnable() { @Override public void run() {
+                Diag.ev("assistant: play · " + hits.size() + " of that name" + (season > 0 ? " · a season and episode asked for" : ""));
+                if (hits.isEmpty()) { h.searchQuery(title, true); return; }
+                if (hits.size() == 1) { start(h, hits.get(0), season, episode); return; }
+                List<String> l = new ArrayList<>(); List<Runnable> r = new ArrayList<>();
+                for (final JSONObject m : hits) {
+                    if (l.size() >= 6) break;
+                    l.add(m.optString("name") + "  ·  " + (m.optString("type").equals("series") ? "show" : "movie") + (m.optString("releaseInfo").isEmpty() ? "" : "  ·  " + m.optString("releaseInfo")));
+                    r.add(new Runnable() { @Override public void run() { start(h, m, season, episode); } });
+                }
+                h.showMenu(l, r, null, 1f, "Which one?");
+                speak(h.getContext(), "Which one?");
+            } });
+        } }, "assistant-play").start();
+    }
+    private static void start(NativeHome h, JSONObject m, int season, int episode) {
+        try {
+            if (m.optString("type").equals("series") && season > 0) m.put("video", m.optString("id") + ":" + season + ":" + Math.max(1, episode));
+        } catch (Exception ignored) { }
+        h.openTitlePlay(m);
     }
 
     // ================================================================== questions
