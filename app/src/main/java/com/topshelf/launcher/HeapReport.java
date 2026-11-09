@@ -92,8 +92,10 @@ final class HeapReport {
             Map<String, long[]> prim = new HashMap<>();      // "byte[]" → {count, bytes}
             Map<Long, long[]> objArr = new HashMap<>();      // array class id → {count, bytes}
             List<long[]> bitmaps = new ArrayList<>();        // {width, height}
+            Map<Long, String> bigPics = new HashMap<>();     // pictures of 1 MB or more: id → "WxH"
             List<long[]> bigArrays = new ArrayList<>();      // {bytes, type}
             List<byte[]> bitmapData = new ArrayList<>();     // Bitmap instances' field data (read once Bitmap's layout is known)
+            List<Long> bitmapIds = new ArrayList<>();
             long appBytes = 0;
             boolean appHeap = true;
             Long bitmapClass = null;
@@ -140,13 +142,13 @@ final class HeapReport {
                                 break;
                             }
                             case 0x21: {                     // an object
-                                skip(in, idSize); in.readInt(); long cid = id(in, idSize); int n = in.readInt();
+                                long oid = id(in, idSize); in.readInt(); long cid = id(in, idSize); int n = in.readInt();
                                 end -= idSize * 2 + 8 + n;
                                 if (appHeap) {
                                     Cls c = classes.get(cid); if (c == null) { c = new Cls(); classes.put(cid, c); }
                                     c.count++; c.bytes += n; appBytes += n;
                                     if (bitmapClass == null) { String nm = className(cid, classNameId, strings); if ("android.graphics.Bitmap".equals(nm)) bitmapClass = cid; }
-                                    if (bitmapClass != null && bitmapClass == cid && bitmapData.size() < 5000) { byte[] b = new byte[n]; in.readFully(b); bitmapData.add(b); break; }
+                                    if (bitmapClass != null && bitmapClass == cid && bitmapData.size() < 5000) { byte[] b = new byte[n]; in.readFully(b); bitmapData.add(b); bitmapIds.add(oid); break; }
                                 }
                                 skip(in, n);
                                 break;
@@ -184,9 +186,12 @@ final class HeapReport {
                     if ("mHeight".equals(bc.fieldNames[i])) hOff = off;
                     off += size(bc.fieldTypes[i], idSize);
                 }
-                if (wOff >= 0 && hOff >= 0) for (byte[] b : bitmapData) {
+                if (wOff >= 0 && hOff >= 0) for (int k = 0; k < bitmapData.size(); k++) {
+                    byte[] b = bitmapData.get(k);
                     if (b.length < Math.max(wOff, hOff) + 4) continue;
                     bitmaps.add(new long[] { int4(b, wOff), int4(b, hOff) });
+                    long px = (long) int4(b, wOff) * int4(b, hOff);
+                    if (px * 4 >= 1048576L && bigPics.size() < 150) bigPics.put(bitmapIds.get(k), int4(b, wOff) + "x" + int4(b, hOff));
                 }
             }
             // the summary
@@ -210,7 +215,16 @@ final class HeapReport {
             Collections.sort(bigArrays, new Comparator<long[]>() { @Override public int compare(long[] a, long[] b) { return Long.compare(b[0], a[0]); } });
             JSONArray big = new JSONArray();
             for (int i = 0; i < Math.min(20, bigArrays.size()); i++) big.put(primName((int) bigArrays.get(i)[1]) + "[] " + Math.round(bigArrays.get(i)[0] / 104857.6) / 10.0 + " MB");
-            return new JSONObject().put("appHeapMB", Math.round(appBytes / 1048576.0)).put("top3", top3.toString()).put("kinds", top)
+            // who holds the big pictures (the first of TopShelf's own parts found going up from each)
+            JSONArray held = new JSONArray();
+            try {
+                in.close();
+                Map<String, Integer> by = owners(f, idSize, classes, classNameId, strings, bigPics);
+                List<Map.Entry<String, Integer>> hl = new ArrayList<>(by.entrySet());
+                Collections.sort(hl, new Comparator<Map.Entry<String, Integer>>() { @Override public int compare(Map.Entry<String, Integer> a, Map.Entry<String, Integer> b) { return b.getValue() - a.getValue(); } });
+                for (Map.Entry<String, Integer> e : hl) held.put(e.getValue() + " × " + e.getKey());
+            } catch (Throwable t) { held.put("couldn't trace: " + t.getClass().getSimpleName()); }
+            return new JSONObject().put("bigPicturesHeldBy", held).put("appHeapMB", Math.round(appBytes / 1048576.0)).put("top3", top3.toString()).put("kinds", top)
                     .put("pictures", new JSONObject().put("count", bitmaps.size()).put("pixelMB", Math.round(bmPixels * 4 / 1048576.0)).put("sizes", bms))
                     .put("biggestArrays", big);
         } finally {
@@ -218,6 +232,119 @@ final class HeapReport {
         }
     }
 
+    /* Who holds each big picture: the file is read again (a few times), each time finding what points at the
+       pictures (or at what pointed at them last time), until one of TopShelf's own parts is reached. */
+    private static Map<String, Integer> owners(File f, int idSize, Map<Long, Cls> classes, Map<Long, Long> names, Map<Long, String> strings, Map<Long, String> targets) throws IOException {
+        Map<String, Integer> out = new HashMap<>();
+        Map<Long, String> frontier = new HashMap<>(targets);       // id → what it leads to ("1920x1080 ← …")
+        Map<Long, Integer> many = new HashMap<>();                 // id → how many pictures it leads to
+        Map<Long, String[]> layouts = new HashMap<>();
+        for (int pass = 0; pass < 6 && !frontier.isEmpty(); pass++) {
+            Map<Long, String> found = new HashMap<>();             // frontier id → its holder's description
+            Map<Long, Long> holder = new HashMap<>();              // frontier id → holder id (0: a class's static field)
+            DataInputStream in = new DataInputStream(new BufferedInputStream(new FileInputStream(f), 1 << 16));
+            try {
+                while (in.readByte() != 0) { }
+                in.readInt(); in.readLong();
+                while (true) {
+                    int tag;
+                    try { tag = in.readUnsignedByte(); } catch (EOFException e) { break; }
+                    in.readInt();
+                    long len = in.readInt() & 0xFFFFFFFFL;
+                    if (tag != 0x0C && tag != 0x1C) { skip(in, len); continue; }
+                    long end = len;
+                    while (end > 0) {
+                        int st = in.readUnsignedByte(); end -= 1;
+                        switch (st) {
+                            case 0xFF: case 0x05: case 0x07: case 0x89: case 0x8A: case 0x8B: case 0x8C: case 0x8D: case 0x90: skip(in, idSize); end -= idSize; break;
+                            case 0x01: skip(in, idSize * 2); end -= idSize * 2; break;
+                            case 0x02: case 0x03: case 0x08: case 0x8E: skip(in, idSize + 8); end -= idSize + 8; break;
+                            case 0x04: case 0x06: skip(in, idSize + 4); end -= idSize + 4; break;
+                            case 0xFE: skip(in, 4 + idSize); end -= 4 + idSize; break;
+                            case 0x20: {
+                                long cid = id(in, idSize); in.readInt(); id(in, idSize); skip(in, idSize * 5); in.readInt();
+                                end -= idSize * 7 + 8;
+                                int cp = in.readUnsignedShort(); end -= 2;
+                                for (int i = 0; i < cp; i++) { in.readUnsignedShort(); int t = in.readUnsignedByte(); int sz = size(t, idSize); skip(in, sz); end -= 3 + sz; }
+                                int sf = in.readUnsignedShort(); end -= 2;
+                                for (int i = 0; i < sf; i++) {
+                                    long fn = id(in, idSize); int t = in.readUnsignedByte(); int sz = size(t, idSize); end -= idSize + 1 + sz;
+                                    if (t == 2) { long v = id(in, idSize); if (frontier.containsKey(v) && !found.containsKey(v)) { found.put(v, className(cid, names, strings) + "." + strings.get(fn) + " (static)"); holder.put(v, 0L); } }
+                                    else skip(in, sz);
+                                }
+                                int nf = in.readUnsignedShort(); skip(in, (long) nf * (idSize + 1)); end -= 2 + (long) nf * (idSize + 1);
+                                break;
+                            }
+                            case 0x21: {
+                                long oid = id(in, idSize); in.readInt(); long cid = id(in, idSize); int n = in.readInt();
+                                end -= idSize * 2 + 8 + n;
+                                byte[] b = new byte[n]; in.readFully(b);
+                                String[] lay = layouts.get(cid);
+                                if (lay == null) { lay = layout(cid, classes, idSize); layouts.put(cid, lay); }
+                                for (int i = 0; i < lay.length; i += 2) {
+                                    int off = Integer.parseInt(lay[i + 1]);
+                                    if (off + idSize > n) break;
+                                    long v = idSize == 4 ? (int4(b, off) & 0xFFFFFFFFL) : (((long) int4(b, off)) << 32) | (int4(b, off + 4) & 0xFFFFFFFFL);
+                                    if (v != 0 && frontier.containsKey(v) && !found.containsKey(v)) { found.put(v, className(cid, names, strings) + "." + lay[i]); holder.put(v, oid); }
+                                }
+                                break;
+                            }
+                            case 0x22: {
+                                long aid = id(in, idSize); in.readInt(); int num = in.readInt(); long acid = id(in, idSize);
+                                end -= idSize * 2 + 8 + (long) num * idSize;
+                                for (int i = 0; i < num; i++) { long v = id(in, idSize); if (v != 0 && frontier.containsKey(v) && !found.containsKey(v)) { found.put(v, className(acid, names, strings)); holder.put(v, aid); } }
+                                break;
+                            }
+                            case 0x23: case 0xC3: {
+                                skip(in, idSize); in.readInt(); int num = in.readInt(); int t = in.readUnsignedByte();
+                                long bb = (long) num * size(t, idSize); end -= idSize + 9;
+                                if (st == 0x23) { skip(in, bb); end -= bb; }
+                                break;
+                            }
+                            default: throw new IOException("unknown part " + Integer.toHexString(st));
+                        }
+                    }
+                }
+            } finally { in.close(); }
+            Map<Long, String> next = new HashMap<>();
+            Map<Long, Integer> nextMany = new HashMap<>();
+            for (Map.Entry<Long, String> e : frontier.entrySet()) {
+                int n = many.containsKey(e.getKey()) ? many.get(e.getKey()) : 1;
+                String via = found.get(e.getKey());
+                if (via == null) { add(out, e.getValue() + " ← (nothing found)", n); continue; }
+                String chain = e.getValue() + " ← " + via;
+                Long hid = holder.get(e.getKey());
+                if (via.startsWith("com.topshelf") || hid == null || hid == 0L || pass == 5) add(out, shorten(chain), n);
+                else if (!next.containsKey(hid)) { next.put(hid, chain); nextMany.put(hid, n); }
+                else nextMany.put(hid, nextMany.get(hid) + n);          // (several pictures in one list: followed once)
+            }
+            frontier = next; many = nextMany;
+        }
+        for (Map.Entry<Long, String> e : frontier.entrySet()) add(out, shorten(e.getValue()), many.containsKey(e.getKey()) ? many.get(e.getKey()) : 1);
+        return out;
+    }
+    private static void add(Map<String, Integer> m, String k, int n) { Integer c = m.get(k); m.put(k, c == null ? n : c + n); }
+    /** "1920x1080 ← a ← b ← … ← TopShelf part" kept short: the size, then the last three steps */
+    private static String shorten(String chain) {
+        String[] p = chain.split(" ← ");
+        if (p.length <= 4) return chain.replace("com.topshelf.launcher.", "");
+        return (p[0] + " ← … ← " + p[p.length - 3] + " ← " + p[p.length - 2] + " ← " + p[p.length - 1]).replace("com.topshelf.launcher.", "");
+    }
+    /** an object's reference fields: {name, offset, name, offset…} — its own class's fields first, then its parents' */
+    private static String[] layout(long cid, Map<Long, Cls> classes, int idSize) {
+        List<String> l = new ArrayList<>();
+        int off = 0; long c = cid; int guard = 0;
+        while (c != 0 && guard++ < 40) {
+            Cls k = classes.get(c);
+            if (k == null || k.fieldNames == null) break;
+            for (int i = 0; i < k.fieldNames.length; i++) {
+                if (k.fieldTypes[i] == 2) { l.add(String.valueOf(k.fieldNames[i])); l.add(String.valueOf(off)); }
+                off += size(k.fieldTypes[i], idSize);
+            }
+            c = k.superId;
+        }
+        return l.toArray(new String[0]);
+    }
     private static String version(Context c) { try { return c.getPackageManager().getPackageInfo(c.getPackageName(), 0).versionName; } catch (Exception e) { return "?"; } }
     private static long id(DataInputStream in, int n) throws IOException { return n == 4 ? in.readInt() & 0xFFFFFFFFL : in.readLong(); }
     private static void skip(DataInputStream in, long n) throws IOException {

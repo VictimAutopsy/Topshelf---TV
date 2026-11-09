@@ -615,6 +615,7 @@ final class NativeLive extends FrameLayout {
     static List<Ch> readChannels(java.io.File f) {
         List<Ch> out = new ArrayList<>();
         if (f == null || !f.exists()) return out;
+        Map<String, String> same = new HashMap<>();
         try (android.util.JsonReader r = new android.util.JsonReader(new java.io.InputStreamReader(new java.io.BufferedInputStream(new java.io.FileInputStream(f), 65536), "UTF-8"))) {
             r.beginArray();
             int idx = 0;
@@ -643,11 +644,18 @@ final class NativeLive extends FrameLayout {
                     }
                 }
                 r.endObject();
+                c.g = one(same, c.g); c.ua = one(same, c.ua); c.cu = one(same, c.cu); c.cs = one(same, c.cs);
                 out.add(c); idx++;
             }
             r.endArray();
         } catch (Throwable ignored) { }
         return out;
+    }
+    /** each repeated text (a group's name, a user agent) kept once for the whole list */
+    private static String one(Map<String, String> same, String v) {
+        if (v == null || v.isEmpty()) return "";
+        String o = same.get(v); if (o != null) return o;
+        same.put(v, v); return v;
     }
     /** read the channel list in the background (then `then` on the screen's thread) */
     static void prepare(final Bridge b, final android.os.Handler main, final Runnable then) {
@@ -655,13 +663,24 @@ final class NativeLive extends FrameLayout {
             try {
                 java.io.File f = b.live.channelsFile();
                 long st = f.exists() ? f.lastModified() + f.length() : 0;
-                boolean fresh;
-                synchronized (PREP_LOCK) { fresh = prepList != null && prepStamp == st; }
-                if (!fresh) { List<Ch> l = readChannels(f); synchronized (PREP_LOCK) { prepList = l; prepStamp = st; } }
+                shared(f);
                 Diag.ev("live: channel list read in the background");
             } catch (Throwable ignored) { }
             if (then != null) main.post(then);
         } }, "channels").start();
+    }
+    /* One channel list in memory: whoever needs it first reads it and everyone after shares it. Live TV opened
+       before the background read had finished read its own copy, and the memory summary found the 15,000-channel
+       list held more than twice (38,000 channel entries). */
+    static List<Ch> shared(java.io.File f) {
+        long st = f.exists() ? f.lastModified() + f.length() : 0;
+        synchronized (PREP_LOCK) { if (prepList != null && prepStamp == st) return prepList; }
+        List<Ch> l = readChannels(f);
+        synchronized (PREP_LOCK) {
+            if (prepList != null && prepStamp == st) return prepList;
+            prepList = l; prepStamp = st;
+        }
+        return l;
     }
     private static List<Ch> prepared(java.io.File f) {
         long st = f.exists() ? f.lastModified() + f.length() : 0;
@@ -672,7 +691,7 @@ final class NativeLive extends FrameLayout {
         chans.clear(); byUrl.clear();
         java.io.File chFile = h.bridge.live.channelsFile();
         List<Ch> pre = prepared(chFile);
-        if (pre == null) { Diag.ev("live: channel list read on the screen's thread"); pre = readChannels(chFile); }
+        if (pre == null) { Diag.ev("live: channel list read on the screen's thread"); pre = shared(chFile); }
         Set<String> hidCh = hiddenChans();
         if (hidCh.isEmpty()) chans.addAll(pre); else for (Ch c : pre) if (!hidCh.contains(c.u)) chans.add(c);
         favs.clear(); JSONArray f = pref("favs"); for (int i = 0; i < f.length(); i++) favs.add(f.optString(i));

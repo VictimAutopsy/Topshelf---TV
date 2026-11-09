@@ -160,6 +160,10 @@ final class LiveTv {
     }
 
     boolean epgReady() { return times != null; }
+    /** let go of the guide (TopShelf a long while in the background); it's read again from the TV when next wanted */
+    static boolean dropGuide() {
+        synchronized (epgLock) { boolean had = times != null; times = null; texts = null; return had; }
+    }
 
     interface ProgVisitor { void visit(String key, long start, long end, String title); }
     /** every programme of these channels overlapping [from, to] (the guide must be loaded) */

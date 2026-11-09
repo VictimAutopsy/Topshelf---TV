@@ -972,6 +972,7 @@ public class MainActivity extends Activity {
     @Override
     protected void onResume() {
         super.onResume();
+        backInFront();
         // coming back to TopShelf (not starting it): from here to Home's next picture on screen
         if (home != null && !freshProcess() && !inPip()) {
             final long t0 = android.os.SystemClock.uptimeMillis();
@@ -1006,6 +1007,19 @@ public class MainActivity extends Activity {
         Diag.mem("every 2 min");
         main.postDelayed(this, 120000);
     } };
+    /* Memory in the background (where Android decides what to close) was mostly TopShelf's own memory not yet
+       swept up: a sweep a few seconds after leaving, and after ten minutes away the TV guide (about 35 MB, read
+       again from the TV in a moment when TopShelf comes back) goes too. */
+    private boolean guideDropped;
+    private final Runnable gcSoon = new Runnable() { @Override public void run() { if (!inFront) { System.gc(); Diag.mem("left TopShelf (swept)"); } } };
+    private final Runnable deepTrim = new Runnable() { @Override public void run() {
+        if (inFront) return;
+        if (LiveTv.dropGuide()) { guideDropped = true; System.gc(); Diag.mem("away 10 min (guide let go)"); }
+    } };
+    private void backInFront() {
+        main.removeCallbacks(gcSoon); main.removeCallbacks(deepTrim);
+        if (guideDropped) { guideDropped = false; try { bridge.warmEpg(); } catch (Throwable ignored) { } }
+    }
     @Override public void onTrimMemory(int level) {
         super.onTrimMemory(level);
         Diag.ev("memory: Android asked for memory back (level " + level + ")");
@@ -1016,6 +1030,8 @@ public class MainActivity extends Activity {
                backdrops), so Android is less likely to close TopShelf to make room for it */
             Diag.trim("left TopShelf");
             try { if (home != null) home.leftApp(); } catch (Throwable ignored) { }
+            main.removeCallbacks(gcSoon); main.postDelayed(gcSoon, 5000);
+            main.removeCallbacks(deepTrim); main.postDelayed(deepTrim, 10 * 60000L);
             main.postDelayed(new Runnable() { @Override public void run() { Diag.mem("left TopShelf (3 s later)"); } }, 3000);
         }
     }
