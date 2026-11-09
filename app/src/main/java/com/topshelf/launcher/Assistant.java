@@ -564,6 +564,45 @@ final class Assistant {
         for (int i = 0; i < l.size(); i++) if (l.get(i).getName().equals(want)) return "Voice " + (i + 1) + " of " + l.size() + " · " + l.get(i).getLocale().getDisplayCountry() + (l.get(i).isNetworkConnectionRequired() ? " · online" : "");
         return "Chosen";
     }
+    /** the speech engine started ahead (Settings › Assistant is open), so the list of voices is there when asked */
+    static void warmVoice(Context c) {
+        if (tts != null) return;
+        final Context c0 = c.getApplicationContext();
+        tts = new android.speech.tts.TextToSpeech(c0, new android.speech.tts.TextToSpeech.OnInitListener() { @Override public void onInit(int st) {
+            ttsReady = st == android.speech.tts.TextToSpeech.SUCCESS;
+            if (!ttsReady) return;
+            try { tts.setLanguage(Locale.getDefault()); } catch (Throwable ignored) { }
+            applyVoice(c0);
+            String w = ttsWaiting; ttsWaiting = null;
+            if (w != null) tts.speak(w, android.speech.tts.TextToSpeech.QUEUE_FLUSH, null, "claude");
+        } });
+    }
+    /** every voice for your language: [{name, label}] ("Voice 3 · United States · online") */
+    static JSONArray voiceList(Context c) {
+        JSONArray out = new JSONArray();
+        if (tts == null || !ttsReady) { warmVoice(c); return out; }
+        List<android.speech.tts.Voice> l = voices();
+        String cur = prefs(c).getString("aiVoiceName", "");
+        try {
+            for (int i = 0; i < l.size(); i++) {
+                android.speech.tts.Voice v = l.get(i);
+                String q = v.getQuality() >= android.speech.tts.Voice.QUALITY_VERY_HIGH ? " · best quality" : v.getQuality() >= android.speech.tts.Voice.QUALITY_HIGH ? " · high quality" : "";
+                out.put(new JSONObject().put("name", v.getName()).put("on", v.getName().equals(cur))
+                        .put("label", "Voice " + (i + 1) + " · " + v.getLocale().getDisplayCountry() + (v.isNetworkConnectionRequired() ? " · online" : "") + q));
+            }
+        } catch (Exception ignored) { }
+        return out;
+    }
+    /** this voice from now on, with a line said in it */
+    static void setVoice(Context c, String name) {
+        prefs(c).edit().putString("aiVoiceName", name == null ? "" : name).apply();
+        if (tts == null || !ttsReady) { warmVoice(c); return; }
+        List<android.speech.tts.Voice> l = voices();
+        for (int i = 0; i < l.size(); i++) if (l.get(i).getName().equals(name)) {
+            try { tts.setVoice(l.get(i)); } catch (Throwable ignored) { }
+            speakNow(c, "This is voice " + (i + 1) + ". The Falcons lead by seven with two minutes left.");
+        }
+    }
     /** the next voice, with a line said in it (the speech engine is started first if it hasn't been) */
     static void nextVoice(final Context c) {
         if (tts == null || !ttsReady) { prefs(c).edit().putBoolean("aiSpeak", true).apply(); speakNow(c, "Press OK again to try the next voice."); return; }

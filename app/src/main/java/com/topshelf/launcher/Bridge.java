@@ -788,6 +788,7 @@ public class Bridge {
     }
     // ---- the assistant (Assistant): the key is kept here only, never handed back to the page
     @JavascriptInterface public String aiInfo() {
+        if (!Assistant.key(act).isEmpty()) act.runOnUiThread(new Runnable() { @Override public void run() { Assistant.warmVoice(act); } });
         try { return new JSONObject().put("key", !Assistant.key(act).isEmpty()).put("voice", prefs.getBoolean("aiVoice", true)).put("speak", prefs.getBoolean("aiSpeak", true)).put("star", prefs.getBoolean("aiStar", true)).put("model", prefs.getString("aiModel", "sonnet")).put("voiceName", Assistant.voiceLabel(act)).put("rate", Assistant.rateLabel(act)).toString(); } catch (Exception e) { return "{}"; }
     }
     @JavascriptInterface public boolean aiSetKey(String k) {
@@ -799,6 +800,8 @@ public class Bridge {
     }
     @JavascriptInterface public void aiSetVoice(boolean on) { prefs.edit().putBoolean("aiVoice", on).apply(); }
     @JavascriptInterface public void aiSetModel(String m) { prefs.edit().putString("aiModel", m == null ? "sonnet" : m).apply(); }
+    @JavascriptInterface public String aiVoices() { return Assistant.voiceList(act).toString(); }
+    @JavascriptInterface public void aiSetVoiceName(final String n) { act.runOnUiThread(new Runnable() { @Override public void run() { Assistant.setVoice(act, n); } }); }
     @JavascriptInterface public void aiNextVoice() { act.runOnUiThread(new Runnable() { @Override public void run() { Assistant.nextVoice(act); } }); }
     @JavascriptInterface public void aiNextRate() { act.runOnUiThread(new Runnable() { @Override public void run() { Assistant.nextRate(act); } }); }
     @JavascriptInterface public void aiSetStar(boolean on) { prefs.edit().putBoolean("aiStar", on).apply(); }

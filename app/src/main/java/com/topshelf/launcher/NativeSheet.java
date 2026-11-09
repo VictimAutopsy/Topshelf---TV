@@ -270,8 +270,12 @@ final class NativeSheet extends FrameLayout {
             v.addView(l, new LinearLayout.LayoutParams(0, LayoutParams.WRAP_CONTENT, 1));
             TextView val = h.text(h.fMed, sec ? 1.05f : 1.35f, 0x99FFFFFF);
             val.setGravity(Gravity.END | Gravity.CENTER_VERTICAL);
-            if (sec) { val.setMaxLines(2); val.setMaxWidth(h.px(18)); val.setLineSpacing(0, 1.15f); }
-            else { val.setSingleLine(true); val.setEllipsize(TextUtils.TruncateAt.START); val.setMaxWidth(h.px(20)); }
+            /* a value may take up to 62% of its row (it was held to a narrow column made for the small sheet: on the
+               full-screen Settings long values were cut off with half the row empty beside them) */
+            int rowW = rows.getWidth() > 0 ? rows.getWidth() : clip.getWidth() > 0 ? clip.getWidth() : h.px(34);
+            int valMax = Math.max(h.px(20), Math.round(rowW * .62f));
+            if (sec) { val.setMaxLines(2); val.setMaxWidth(valMax); val.setLineSpacing(0, 1.15f); }
+            else { val.setSingleLine(true); val.setEllipsize(TextUtils.TruncateAt.END); val.setMaxWidth(valMax); }
             LinearLayout.LayoutParams vl = new LinearLayout.LayoutParams(LayoutParams.WRAP_CONTENT, LayoutParams.WRAP_CONTENT); vl.leftMargin = h.px(1.5f);
             v.addView(val, vl);
             TextView ch = h.text(h.fSemi, 1.6f, 0x99FFFFFF);

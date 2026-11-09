@@ -1268,8 +1268,17 @@ function buildAllSettings() {
         cycle: () => { let i = {}; try { i = JSON.parse(B.aiInfo()); } catch (e) {} B.aiSetVoice(i.voice === false); } },
       { label: 'Read answers aloud', value: () => { let i = {}; try { i = JSON.parse(B.aiInfo()); } catch (e) {} return i.speak === false ? 'Off · answers only on screen' : 'On · in the TV’s own voice'; },
         cycle: () => { let i = {}; try { i = JSON.parse(B.aiInfo()); } catch (e) {} B.aiSetSpeak(i.speak === false); } },
-      { label: 'Voice', value: () => { let i = {}; try { i = JSON.parse(B.aiInfo()); } catch (e) {} return (i.voiceName || 'The TV’s usual voice') + ' · OK for the next'; },
-        ok: () => { if (B.aiNextVoice) B.aiNextVoice(); setTimeout(drawSettings, 500); } },
+      { label: 'Voice', value: () => { let i = {}; try { i = JSON.parse(B.aiInfo()); } catch (e) {} return i.voiceName || 'The TV’s usual voice'; },
+        ok: () => {
+          let vs = []; try { vs = JSON.parse(B.aiVoices()); } catch (e) {}
+          if (!vs.length) { toast('Getting the TV’s voices… press OK again in a moment'); return; }
+          // (the list stays open after a pick, so voices can be tried one after another; Back when you've chosen)
+          const open = () => { let l = []; try { l = JSON.parse(B.aiVoices()); } catch (e) {}
+            // (the list starts at the voice in use, the next ones after it: trying them in turn is one press down each)
+            const at = l.findIndex(v => v.on); if (at > 0) l = l.slice(at).concat(l.slice(0, at));
+            showMenu(l.map(v => ['', (v.on ? '✓  ' : '') + v.label, () => { B.aiSetVoiceName(v.name); setTimeout(() => { refreshSettings(); open(); }, 250); }]), null, 'Voice · OK to hear one · Back when done'); };
+          open();
+        } },
       { label: 'Speaking speed', value: () => { let i = {}; try { i = JSON.parse(B.aiInfo()); } catch (e) {} return i.rate || 'Normal'; },
         ok: () => { if (B.aiNextRate) B.aiNextRate(); setTimeout(drawSettings, 300); } },
       { label: 'Ask from the remote', value: () => { let i = {}; try { i = JSON.parse(B.aiInfo()); } catch (e) {} return i.star === false ? '★ button: Google TV’s own' : '★ button asks Claude (needs the Home button set-up)'; },
