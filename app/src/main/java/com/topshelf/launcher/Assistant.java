@@ -39,8 +39,9 @@ import java.util.regex.Pattern;
  * "What did I miss?": the game you're watching (Live TV, hold OK, or by voice) — ESPN's account of it so far (score,
  * scoring plays, the last drives or plays) summed up in three sentences.
  *
- * What's sent: your words, the time, the names of the games, and ESPN's public account of a game. Never your
- * channel list, logins, playlist or anything you've watched.
+ * What's sent: your words, the time, the names of the games, and ESPN's public account of a game; for the "For
+ * tonight" row, the names of the movies and shows you've watched recently and saved to your list. Never your channel
+ * list, logins, playlist, or which live channels you watch.
  */
 final class Assistant {
     private Assistant() { }
