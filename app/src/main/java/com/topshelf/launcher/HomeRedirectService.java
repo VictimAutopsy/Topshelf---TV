@@ -60,6 +60,19 @@ public class HomeRedirectService extends AccessibilityService {
         int kc = e.getKeyCode();
         if (e.getAction() == android.view.KeyEvent.ACTION_DOWN && e.getRepeatCount() == 0 && (kc < 19 || kc > 23) && kc != 4 && kc != 3 && kc != 66 && kc != 24 && kc != 25)
             Diag.ev("remote button: " + android.view.KeyEvent.keyCodeToString(kc) + " (" + kc + ")");
+        /* The remote's ★ button asks Claude (Settings › System › Assistant › ★ button), from anywhere: Google TV's own
+           ★ set-up only lists ordinary apps, so it's taken here instead. */
+        if (starKey(kc)) {
+            SharedPreferences sp = getSharedPreferences(Bridge.PREFS, Context.MODE_PRIVATE);
+            if (sp.getBoolean("aiStar", true) && !Assistant.key(this).isEmpty()) {
+                if (e.getAction() == android.view.KeyEvent.ACTION_UP) {
+                    Intent ask = new Intent(Intent.ACTION_MAIN).setClassName(getPackageName(), getPackageName() + ".AskClaude")
+                            .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_REORDER_TO_FRONT);
+                    try { startActivity(ask); } catch (Exception ex) { Diag.ev("remote button: couldn't open Ask Claude (" + ex.getMessage() + ")"); }
+                }
+                return true;
+            }
+        }
         if (e.getKeyCode() != android.view.KeyEvent.KEYCODE_HOME) return false;
         SharedPreferences prefs = getSharedPreferences(Bridge.PREFS, Context.MODE_PRIVATE);
         if (!prefs.getBoolean("redirect", true) || System.currentTimeMillis() < prefs.getLong("bypassUntil", 0)) return false;
@@ -79,6 +92,11 @@ public class HomeRedirectService extends AccessibilityService {
             return true;
         }
         return true;
+    }
+
+    /** the codes a remote's ★ / shortcut button sends (Google TV Streamer and others) */
+    static boolean starKey(int kc) {
+        return kc == android.view.KeyEvent.KEYCODE_BOOKMARK || (kc >= 297 && kc <= 304) || (kc >= 313 && kc <= 316);
     }
 
     @Override
