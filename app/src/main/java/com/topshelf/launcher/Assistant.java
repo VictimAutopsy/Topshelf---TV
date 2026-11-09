@@ -317,13 +317,30 @@ final class Assistant {
         Diag.ev("assistant: For tonight · asking Claude, from " + seen.size() + " titles you've watched or saved");
         StringBuilder taste = new StringBuilder();
         for (String s : seen) taste.append("- ").append(s).append('\n');
-        String reply = ask(c, "You pick what to watch tonight on a TV. Reply with only JSON: {\"picks\":[{\"title\":\"…\",\"year\":2014,\"why\":\"…\"}]} — 12 "
+        /* One pick a line ("Title (Year) | why"): a JSON answer cut short, or wrapped in other words, couldn't be read
+           at all ("Claude's answer couldn't be read"); lines still give every pick that came through. */
+        String reply = ask(c, "You pick what to watch tonight on a TV. Suggest 10 "
                 + (mv ? "movies" : "TV series") + " this viewer would enjoy, from their recent watching below. Mix close matches with a few they may not know. "
-                + "Never pick something in their list below. \"why\" is at most 8 words (for example \"Because you liked Godzilla Minus One\").",
-                "Recently watched and saved:\n" + taste, 1200);
-        JSONObject o = firstJson(reply);
-        JSONArray picks = o == null ? null : o.optJSONArray("picks");
-        if (picks == null) { Diag.ev("assistant: For tonight · Claude's answer wasn't a list (" + reply.length() + " characters)"); throw new Exception("Claude's answer couldn't be read"); }
+                + "Never pick something in their list below. Reply with exactly one pick per line, nothing else, in this form:\n"
+                + "Title (Year) | why in at most 8 words\nFor example: Pacific Rim (2013) | Because you liked Godzilla Minus One",
+                "Recently watched and saved:\n" + taste, 1500);
+        JSONArray picks = new JSONArray();
+        java.util.regex.Matcher pm = java.util.regex.Pattern.compile("(?m)^\\s*(?:\\d+[.)]\\s*|[-*•]\\s*)?\\**(.+?)\\**\\s*\\((\\d{4})[^)]*\\)\\s*(?:[|–—:-]\\s*(.*))?$").matcher(reply);
+        while (pm.find() && picks.length() < 14) {
+            String ti = pm.group(1).replaceAll("^[\"“]|[\"”]$", "").trim();
+            if (ti.isEmpty()) continue;
+            picks.put(new JSONObject().put("title", ti).put("year", pm.group(2)).put("why", pm.group(3) == null ? "" : pm.group(3).trim()));
+        }
+        if (picks.length() == 0) {
+            // (the old form, in case it answered that way)
+            JSONObject o = firstJson(reply);
+            if (o != null && o.optJSONArray("picks") != null) picks = o.optJSONArray("picks");
+        }
+        if (picks.length() == 0) {
+            String start = reply.replaceAll("\\s+", " ").trim();
+            Diag.ev("assistant: For tonight · no picks in Claude's answer (" + reply.length() + " characters: " + (start.length() > 80 ? start.substring(0, 80) + "…" : start) + ")");
+            throw new Exception("Claude's answer had no picks in it");
+        }
         final JSONObject[] got = new JSONObject[picks.length()];
         java.util.concurrent.ExecutorService pool = java.util.concurrent.Executors.newFixedThreadPool(4);
         for (int i = 0; i < picks.length(); i++) {
