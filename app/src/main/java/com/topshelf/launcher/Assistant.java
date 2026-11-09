@@ -130,10 +130,11 @@ final class Assistant {
                     l.add(t); r.add(new Runnable() { @Override public void run() { h.searchQuery(t, true); } });
                 }
                 h.showMenu(l, r, null, 1f, a.optString("say", "Some ideas"));
+                speak(h.getContext(), a.optString("say", "Here are some ideas"));
                 return;
             }
             case "catchup": catchUp(h); return;
-            case "say": card(h, "Claude", a.optString("text")); return;
+            case "say": card(h, "Claude", a.optString("text")); speak(h.getContext(), a.optString("text")); return;
             default: h.searchQuery(said, true);        // (nothing usable: searched, as before)
         }
     }
@@ -186,7 +187,7 @@ final class Assistant {
                 text = m.contains("401") ? "The Anthropic API key wasn't accepted (Settings › System › Assistant)." : "Couldn't get the catch-up right now.";
             }
             final String t = text;
-            MAIN.post(new Runnable() { @Override public void run() { card(h, title, t); } });
+            MAIN.post(new Runnable() { @Override public void run() { card(h, title, t); speak(h.getContext(), t); } });
         } }, "assistant-catchup").start();
     }
 
@@ -372,7 +373,34 @@ final class Assistant {
         MAIN.postDelayed(HIDE, Math.max(9000, Math.min(40000, words * 420L + 4000)));
     }
     static boolean cardShown() { return card != null && card.getVisibility() == View.VISIBLE; }
+    // ================================================================== Claude's voice (the TV's own text-to-speech)
+
+    /* Answers read aloud (Settings › System › Assistant › Read answers aloud) by the TV's own voice, Android's
+       text-to-speech: nothing more is sent anywhere. Any press of the remote stops it. */
+    private static android.speech.tts.TextToSpeech tts;
+    private static boolean ttsReady;
+    private static String ttsWaiting;
+    static boolean speaks(Context c) { return prefs(c).getBoolean("aiSpeak", true); }
+    static void speak(Context c, final String text) {
+        if (text == null || text.trim().isEmpty() || !speaks(c)) return;
+        if (tts == null) {
+            ttsWaiting = text;
+            tts = new android.speech.tts.TextToSpeech(c.getApplicationContext(), new android.speech.tts.TextToSpeech.OnInitListener() { @Override public void onInit(int st) {
+                ttsReady = st == android.speech.tts.TextToSpeech.SUCCESS;
+                if (!ttsReady) { Diag.ev("assistant: the TV has no voice to read answers with"); return; }
+                try { tts.setLanguage(Locale.getDefault()); tts.setSpeechRate(1.05f); } catch (Throwable ignored) { }
+                String w = ttsWaiting; ttsWaiting = null;
+                if (w != null) tts.speak(w, android.speech.tts.TextToSpeech.QUEUE_FLUSH, null, "claude");
+            } });
+            return;
+        }
+        if (!ttsReady) { ttsWaiting = text; return; }
+        tts.speak(text, android.speech.tts.TextToSpeech.QUEUE_FLUSH, null, "claude");
+    }
+    static void hush() { try { if (tts != null && ttsReady) tts.stop(); } catch (Throwable ignored) { } ttsWaiting = null; }
+
     static void hideCard() {
+        hush();
         MAIN.removeCallbacks(HIDE);
         if (!cardShown()) return;
         final LinearLayout c = card;

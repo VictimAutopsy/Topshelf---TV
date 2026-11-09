@@ -105,6 +105,25 @@
             </intent-filter>
         </activity>
 
+        <!-- "Ask Claude": its own entry in the app list (so the remote's ★ button can be set to it), and Google's
+             "search for … in TopShelf" — both open TopShelf listening for a request for Claude -->
+        <activity-alias
+            android:name=".AskClaude"
+            android:targetActivity=".MainActivity"
+            android:label="Ask Claude"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+                <category android:name="android.intent.category.LEANBACK_LAUNCHER" />
+            </intent-filter>
+            <intent-filter>
+                <action android:name="android.intent.action.SEARCH" />
+                <action android:name="com.google.android.gms.actions.SEARCH_ACTION" />
+                <category android:name="android.intent.category.DEFAULT" />
+            </intent-filter>
+        </activity-alias>
+
         <receiver android:name=".ReminderReceiver" android:exported="false" />
         <receiver android:name=".RecordReceiver" android:exported="false" />
         <service

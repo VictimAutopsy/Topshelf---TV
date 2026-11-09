@@ -743,11 +743,10 @@ final class NativeHome extends FrameLayout {
         boolean styled = !barStyle.equals("classic"), fl = barStyle.equals("float"), st = barStyle.equals("strip");
         topItems.clear(); topActs.clear();
         for (TextView t : tabViews) { topItems.add(t); topActs.add("tab"); }
-        String[] acts = linkOn ? new String[] { "remote", "search", "photos", "settings" } : new String[] { "search", "photos", "settings" };
+        String[] acts = withAsk(linkOn ? new String[] { "remote", "search", "photos", "settings" } : new String[] { "search", "photos", "settings" });
         for (String a : acts) {
             ImageView b = new ImageView(getContext());
-            int kind = a.equals("remote") ? HomeIcons.REMOTE : a.equals("search") ? HomeIcons.SEARCH : a.equals("photos") ? HomeIcons.PHOTOS : HomeIcons.SETTINGS;
-            HomeIcons ic = new HomeIcons(kind, a.equals("search") ? 2f : 1.8f);
+            HomeIcons ic = toolIcon(a);
             b.setImageDrawable(ic);
             b.setPadding(px(.95f), px(.95f), px(.95f), px(.95f));
             if (styled) { TabBg tb = new TabBg(); tb.ringW = Math.max(2f, .2f * R); b.setBackground(tb); }
@@ -861,7 +860,7 @@ final class NativeHome extends FrameLayout {
         // the tools: rows (the panel, the rail), or one row of buttons at the foot (the card, the menu + what's on)
         if (rl || glance) tabsRow.addView(new View(c), new LinearLayout.LayoutParams(LayoutParams.MATCH_PARENT, 0, 1));
         else divider(tabsRow);
-        String[] acts = linkOn ? new String[] { "search", "photos", "remote", "settings" } : new String[] { "search", "photos", "settings" };
+        String[] acts = withAsk(linkOn ? new String[] { "search", "photos", "remote", "settings" } : new String[] { "search", "photos", "settings" });
         if (panel || rl) {
             for (String a0 : acts) {
                 HomeIcons ic = toolIcon(a0);
@@ -916,10 +915,15 @@ final class NativeHome extends FrameLayout {
         return new Mark(tc | 0xFF000000, lt);
     }
     private static HomeIcons toolIcon(String a0) {
-        int kind = a0.equals("remote") ? HomeIcons.REMOTE : a0.equals("search") ? HomeIcons.SEARCH : a0.equals("photos") ? HomeIcons.PHOTOS : HomeIcons.SETTINGS;
-        return new HomeIcons(kind, a0.equals("search") ? 2f : 1.8f);
+        int kind = a0.equals("ask") ? HomeIcons.MIC : a0.equals("remote") ? HomeIcons.REMOTE : a0.equals("search") ? HomeIcons.SEARCH : a0.equals("photos") ? HomeIcons.PHOTOS : HomeIcons.SETTINGS;
+        return new HomeIcons(kind, a0.equals("search") || a0.equals("ask") ? 2f : 1.8f);
     }
-    private static String toolName(String a0) { return a0.equals("remote") ? "TV remote" : a0.equals("search") ? "Search" : a0.equals("photos") ? "Photo mode" : "Settings"; }
+    private static String toolName(String a0) { return a0.equals("ask") ? "Ask Claude" : a0.equals("remote") ? "TV remote" : a0.equals("search") ? "Search" : a0.equals("photos") ? "Photo mode" : "Settings"; }
+    /** Ask Claude first among the tools when the assistant is set up (Settings › System › Assistant) */
+    private String[] withAsk(String[] acts) {
+        if (Assistant.key(getContext()).isEmpty()) return acts;
+        String[] o = new String[acts.length + 1]; o[0] = "ask"; System.arraycopy(acts, 0, o, 1, acts.length); return o;
+    }
     /** a "right now" row: two lines (what, when) */
     private TextView nowRow() {
         TextView t = text(fMed, 1.45f, Color.WHITE);
@@ -2771,6 +2775,7 @@ final class NativeHome extends FrameLayout {
         exitTopQuiet();
         if (a.equals("photos")) enterShelf();
         else if (a.equals("search")) searchOpen("");
+        else if (a.equals("ask")) act.askClaude();
         else if (a.equals("remote")) page("openLink()");
         else page("openSettings()");
     }

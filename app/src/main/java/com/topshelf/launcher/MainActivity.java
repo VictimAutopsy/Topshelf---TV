@@ -66,6 +66,7 @@ public class MainActivity extends Activity {
         startMark("screen being made");
         applyOrientation();
         readLaunchChannel(getIntent());
+        if (isAsk(getIntent())) pendingAsk = getIntent();
         getWindow().addFlags(WindowManager.LayoutParams.FLAG_FULLSCREEN);
         if (Build.VERSION.SDK_INT >= 28) {
             // draw into the camera cutout area instead of leaving a black strip there
@@ -630,6 +631,29 @@ public class MainActivity extends Activity {
             return new String(b.toByteArray(), java.nio.charset.StandardCharsets.UTF_8);
         } catch (Exception e) { return null; }
     }
+    /* Ask Claude: listening straight away, and whatever is said goes to the assistant (not only what sounds like a
+       request). From the top bar's mic, the "Ask Claude" app (for the remote's ★ button), or Google's "search in
+       TopShelf". */
+    volatile boolean askNext;
+    private Intent pendingAsk;
+    /** opened as "Ask Claude" (the app-list entry, the ★ button) or with Google's "search … in TopShelf" */
+    private static boolean isAsk(Intent i) {
+        if (i == null) return false;
+        String a = i.getAction();
+        if (android.content.Intent.ACTION_SEARCH.equals(a) || "com.google.android.gms.actions.SEARCH_ACTION".equals(a)) return true;
+        return i.getComponent() != null && i.getComponent().getClassName().endsWith(".AskClaude");
+    }
+    private void ask(Intent i) {
+        String q = i.getStringExtra(android.app.SearchManager.QUERY);
+        Diag.ev("assistant: opened to ask" + (q == null || q.isEmpty() ? "" : " (with what was said)"));
+        if (nativeHome() == null) { pendingAsk = i; return; }
+        if (q != null && !q.trim().isEmpty()) Assistant.handle(this, q.trim()); else askClaude();
+    }
+    void askClaude() {
+        if (Assistant.key(this).isEmpty()) { NativeHome h = nativeHome(); if (h != null) h.toast("Add an Anthropic API key in Settings › System › Assistant first"); return; }
+        askNext = true;
+        startVoice("Ask Claude");
+    }
     void startVoice(final String prompt) {
         main.post(new Runnable() {
             @Override public void run() {
@@ -673,6 +697,8 @@ public class MainActivity extends Activity {
             if (r != null && !r.isEmpty()) text = r.get(0);
         }
         // a request ("put on the Falcons game", "what did I miss") goes to the assistant; a name is searched as before
+        boolean ask = askNext; askNext = false;
+        if (ask) { if (text != null && home != null) Assistant.handle(this, text); return; }
         if (text != null && home != null && Assistant.wants(this, text)) { Assistant.handle(this, text); return; }
         js("window.tsVoice && tsVoice(" + (text == null ? "null" : org.json.JSONObject.quote(text)) + ")");
     }
@@ -905,6 +931,7 @@ public class MainActivity extends Activity {
     protected void onNewIntent(Intent intent) {
         super.onNewIntent(intent);
         if (intent != null && intent.getBooleanExtra("fromLink", false)) return;   // just brought forward for the phone
+        if (isAsk(intent)) { ask(intent); return; }
         if (readLaunchChannel(intent)) {                  // a reminder was tapped: go watch it
             js("window.tsLaunchChannel && tsLaunchChannel()");
             return;
@@ -1088,6 +1115,7 @@ public class MainActivity extends Activity {
         if (ms < 15000) Diag.ev("start-up: " + what + " at " + ms + " ms");
     }
     void coverOff(final String why) {
+        if (pendingAsk != null) { final Intent pa = pendingAsk; pendingAsk = null; main.postDelayed(new Runnable() { @Override public void run() { ask(pa); } }, 600); }
         if (startMs < 0 && startNoted) {
             startMs = android.os.SystemClock.uptimeMillis() - (Build.VERSION.SDK_INT >= 24 ? android.os.Process.getStartUptimeMillis() : coverAt);
             Diag.ev("start-up: Home on screen " + String.format(java.util.Locale.US, "%.1f", startMs / 1000f) + " s after TopShelf started" + (cover != null ? " (its last picture showed meanwhile)" : "") + (why.isEmpty() ? "" : " · " + why));
