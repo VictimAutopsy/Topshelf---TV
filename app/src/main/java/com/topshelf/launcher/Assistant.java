@@ -364,7 +364,51 @@ final class Assistant {
     /* Claude picks a dozen movies (or shows) for tonight from what you've been watching (TopShelf's own record and
        Trakt's, and your list), each with a few words on why; Cinemeta supplies the posters and ids, so the row
        works like any other. Answered in Cinemeta's shape for the row (Feeds), and kept for six hours. */
+    /* The row is kept on the TV: one made in the last six hours is used as is; an older one (up to three days) is
+       shown at once while a new one is made behind it; and both rows are made a little after TopShelf starts, so
+       Movies and TV Shows have them the moment they open (making one takes 10–20 seconds: Claude, then a look-up
+       for each pick). */
+    private static java.io.File tonightFile(Context c, String type) { return new java.io.File(c.getCacheDir(), "tonight-" + type + ".json"); }
+    private static final java.util.Set<String> making = java.util.Collections.synchronizedSet(new java.util.HashSet<String>());
+    private static String readFile(java.io.File f) {
+        try (java.io.FileInputStream in = new java.io.FileInputStream(f)) { ByteArrayOutputStream o = new ByteArrayOutputStream(); byte[] b = new byte[8192]; int n; while ((n = in.read(b)) > 0) o.write(b, 0, n); return new String(o.toByteArray(), StandardCharsets.UTF_8); }
+        catch (Exception e) { return null; }
+    }
+    private static String makeAndKeep(NativeHome h, String type) throws Exception {
+        long t0 = System.currentTimeMillis();
+        String s = tonightFresh(h, type);
+        try (java.io.FileOutputStream o = new java.io.FileOutputStream(tonightFile(h.getContext(), type))) { o.write(s.getBytes(StandardCharsets.UTF_8)); } catch (Exception ignored) { }
+        Diag.ev("assistant: For tonight (" + type + ") made in " + (System.currentTimeMillis() - t0) / 1000 + " s");
+        return s;
+    }
+    private static void makeBehind(final NativeHome h, final String type) {
+        if (!making.add(type)) return;
+        new Thread(new Runnable() { @Override public void run() {
+            try { makeAndKeep(h, type); } catch (Exception e) { Diag.ev("assistant: For tonight (" + type + ") not made: " + e.getMessage()); } finally { making.remove(type); }
+        } }, "assistant-tonight").start();
+    }
     static String tonight(NativeHome h, String type) throws Exception {
+        java.io.File f = tonightFile(h.getContext(), type);
+        long age = f.exists() ? System.currentTimeMillis() - f.lastModified() : Long.MAX_VALUE;
+        if (age < 3 * 86400000L) {
+            String s = readFile(f);
+            if (s != null && s.contains("\"metas\"")) { if (age > 6 * 3600000L) makeBehind(h, type); return s; }
+        }
+        // (it's being made behind: wait for that one instead of asking Claude twice)
+        for (int i = 0; i < 60 && making.contains(type); i++) Thread.sleep(500);
+        String s = f.exists() ? readFile(f) : null;
+        if (s != null && s.contains("\"metas\"") && System.currentTimeMillis() - f.lastModified() < 6 * 3600000L) return s;
+        return makeAndKeep(h, type);
+    }
+    /** a little after TopShelf starts: both rows made ahead if they're missing or old */
+    static void warmTonight(NativeHome h) {
+        if (key(h.getContext()).isEmpty()) return;
+        for (String type : new String[] { "movie", "series" }) {
+            java.io.File f = tonightFile(h.getContext(), type);
+            if (!f.exists() || System.currentTimeMillis() - f.lastModified() > 6 * 3600000L) makeBehind(h, type);
+        }
+    }
+    private static String tonightFresh(NativeHome h, String type) throws Exception {
         Context c = h.getContext();
         boolean mv = type.equals("movie");
         List<JSONObject> recent = new ArrayList<>();
@@ -411,7 +455,7 @@ final class Assistant {
             throw new Exception("Claude's answer had no picks in it");
         }
         final JSONObject[] got = new JSONObject[picks.length()];
-        java.util.concurrent.ExecutorService pool = java.util.concurrent.Executors.newFixedThreadPool(4);
+        java.util.concurrent.ExecutorService pool = java.util.concurrent.Executors.newFixedThreadPool(8);      // (all the look-ups at once)
         for (int i = 0; i < picks.length(); i++) {
             final int k = i; final JSONObject p = picks.optJSONObject(i); final String ty = type;
             if (p == null) continue;

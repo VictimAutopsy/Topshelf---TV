@@ -304,6 +304,7 @@ final class NativeHome extends FrameLayout {
         DOCK_PANEL_Y = SH - 2.8f - DOCK_PANEL_H - BOT; DOCK_Y = DOCK_PANEL_Y + 1.8f;
         // Live TV's channel list is read in the background a few seconds after start (ready before it's opened)
         main.postDelayed(new Runnable() { @Override public void run() { try { NativeLive.prepare(bridge, main, null); } catch (Throwable ignored) { } } }, 4000);
+        main.postDelayed(new Runnable() { @Override public void run() { try { Assistant.warmTonight(NativeHome.this); } catch (Throwable ignored) { } } }, 25000);
         // your sports fetched in the background, so the Sports tab has them when it opens
         main.postDelayed(new Runnable() { @Override public void run() { try { if (built) sportsData().warm(); } catch (Throwable ignored) { } } }, 20000);
         // TV Shows' pane is made while nothing's happening, not on the first visit (its first opening stuttered)

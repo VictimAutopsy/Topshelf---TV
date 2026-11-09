@@ -31,6 +31,7 @@ final class Feeds {
 
     /** how long a row's copy is good for: trending moves quickly, the rest less so */
     static long ttl(String url) {
+        if (url.startsWith("ai:")) return 20 * 60000L;       // (the assistant keeps its own copy: asked again soon, answered at once)
         if (url.contains("/trending") || url.contains("airing_today")) return 3600000L;
         if (url.startsWith("trakt:") || url.startsWith("tmdb:")) return 6 * 3600000L;
         return 6 * 3600000L;
