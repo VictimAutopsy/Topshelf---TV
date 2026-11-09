@@ -413,6 +413,8 @@ final class NativeVod extends FrameLayout {
         /* Rows that stay current (Feeds): Trakt's (with its app ID) and TMDB's (with a key), around Cinemeta's */
         boolean tk = Feeds.traktOn(h), tm = Feeds.tmdbOn(h), mv = type.equals("movie");
         String tt = mv ? "movies" : "shows";
+        // picked by Claude from what you've been watching (with an Anthropic key: Settings › System › Assistant)
+        if (!Assistant.key(getContext()).isEmpty()) addRow("ai-tonight", "For tonight · picked by Claude", "ai:/tonight/" + type);
         if (tk) addRow("tk-trend", "Trending now", "trakt:/" + tt + "/trending?limit=40");
         addRow("pop", "Popular", CINEMETA + "/catalog/" + type + "/top.json");
         if (mv) {

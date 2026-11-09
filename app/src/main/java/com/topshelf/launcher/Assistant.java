@@ -236,6 +236,68 @@ final class Assistant {
         return f.length() > 7000 ? f.substring(f.length() - 7000) : f;
     }
 
+    // ================================================================== "For tonight" (a row in Movies and TV Shows)
+
+    /* Claude picks a dozen movies (or shows) for tonight from what you've been watching (TopShelf's own record and
+       Trakt's, and your list), each with a few words on why; Cinemeta supplies the posters and ids, so the row
+       works like any other. Answered in Cinemeta's shape for the row (Feeds), and kept for six hours. */
+    static String tonight(NativeHome h, String type) throws Exception {
+        Context c = h.getContext();
+        boolean mv = type.equals("movie");
+        List<JSONObject> recent = new ArrayList<>();
+        JSONObject all = Progress.snapshot(c);
+        for (java.util.Iterator<String> it = all.keys(); it.hasNext(); ) { JSONObject x = all.optJSONObject(it.next()); if (x != null && x.optJSONObject("title") != null) recent.add(x); }
+        java.util.Collections.sort(recent, new java.util.Comparator<JSONObject>() { @Override public int compare(JSONObject a, JSONObject b) { return Long.compare(b.optLong("at"), a.optLong("at")); } });
+        java.util.LinkedHashSet<String> seen = new java.util.LinkedHashSet<>();
+        for (JSONObject x : recent) {
+            JSONObject t = x.optJSONObject("title");
+            String n = t.optString("name");
+            if (!n.isEmpty()) seen.add(n + (t.optString("type").equals("movie") ? " (movie)" : " (show)") + (Progress.done(x) ? "" : " — still watching"));
+            if (seen.size() >= 40) break;
+        }
+        try {
+            JSONArray ml = new JSONArray(h.prefs.getString("ui.mylist", "[]"));
+            for (int i = 0; i < ml.length() && i < 20; i++) { JSONObject m = ml.optJSONObject(i); if (m != null && !m.optString("name").isEmpty()) seen.add(m.optString("name") + " (on their list)"); }
+        } catch (Exception ignored) { }
+        if (seen.isEmpty()) return "{\"metas\":[]}";
+        StringBuilder taste = new StringBuilder();
+        for (String s : seen) taste.append("- ").append(s).append('\n');
+        String reply = ask(c, "You pick what to watch tonight on a TV. Reply with only JSON: {\"picks\":[{\"title\":\"…\",\"year\":2014,\"why\":\"…\"}]} — 12 "
+                + (mv ? "movies" : "TV series") + " this viewer would enjoy, from their recent watching below. Mix close matches with a few they may not know. "
+                + "Never pick something in their list below. \"why\" is at most 8 words (for example \"Because you liked Godzilla Minus One\").",
+                "Recently watched and saved:\n" + taste, 1200);
+        JSONObject o = firstJson(reply);
+        JSONArray picks = o == null ? null : o.optJSONArray("picks");
+        if (picks == null) throw new Exception("no picks");
+        final JSONObject[] got = new JSONObject[picks.length()];
+        java.util.concurrent.ExecutorService pool = java.util.concurrent.Executors.newFixedThreadPool(4);
+        for (int i = 0; i < picks.length(); i++) {
+            final int k = i; final JSONObject p = picks.optJSONObject(i); final String ty = type;
+            if (p == null) continue;
+            pool.execute(new Runnable() { @Override public void run() {
+                try {
+                    byte[] d = HomeImages.http(NativeVod.CINEMETA + "/catalog/" + ty + "/top/search=" + android.net.Uri.encode(p.optString("title")) + ".json", null);
+                    JSONArray ms = d == null ? null : new JSONObject(new String(d, StandardCharsets.UTF_8)).optJSONArray("metas");
+                    if (ms == null || ms.length() == 0) return;
+                    JSONObject best = ms.optJSONObject(0);
+                    String y = p.optString("year");
+                    for (int j = 0; j < ms.length() && j < 6; j++) { JSONObject m = ms.optJSONObject(j); if (m != null && !y.isEmpty() && m.optString("releaseInfo").startsWith(y)) { best = m; break; } }
+                    if (best == null || best.optString("poster").isEmpty()) return;
+                    String why = p.optString("why").trim();
+                    if (!why.isEmpty()) best.put("description", why + (why.endsWith(".") ? " " : ". ") + best.optString("description"));
+                    got[k] = best;
+                } catch (Throwable ignored) { }
+            } });
+        }
+        pool.shutdown();
+        pool.awaitTermination(20, java.util.concurrent.TimeUnit.SECONDS);
+        JSONArray metas = new JSONArray();
+        java.util.Set<String> ids = new java.util.HashSet<>();
+        for (JSONObject m : got) if (m != null && ids.add(m.optString("id"))) metas.put(m);
+        Diag.ev("assistant: For tonight · " + metas.length() + " " + (mv ? "movies" : "shows"));
+        return new JSONObject().put("metas", metas).toString();
+    }
+
     // ================================================================== Claude
 
     static String ask(Context c, String system, String user, int maxTokens) throws Exception {

@@ -40,6 +40,7 @@ final class Feeds {
     static String fetch(NativeHome h, String url, String type) throws Exception {
         if (url.startsWith("trakt:")) return trakt(h, url.substring(6), type);
         if (url.startsWith("tmdb:")) return tmdb(h, url.substring(5), type);
+        if (url.startsWith("ai:")) return Assistant.tonight(h, type);
         byte[] d = HomeImages.http(url, null);
         return d == null ? null : new String(d, StandardCharsets.UTF_8);
     }
