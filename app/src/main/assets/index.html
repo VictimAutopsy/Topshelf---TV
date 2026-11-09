@@ -1041,7 +1041,7 @@ function buildAllSettings() {
       ok: () => { let on = false; try { on = B.redditSignedIn(); } catch (e) {}
         if (on) { B.redditSignOut(); toast('Signed out of Reddit'); refreshSettings(); } else { B.redditSignIn(); } } }] : []),
     { label: 'Photos', value: () => photoStatus.startsWith('Failed') || photoStatus.includes("wouldn't") ? 'Failed (details below)' : photoStatus.split(' · ')[0] + (photoStatus.includes(' · ') ? ' (see below)' : ''),
-      ok: () => { photos = []; lastFetch = 0; body.classList.add('nophotos'); loadPhotos(true); toast('Reloading photos…'); } },
+      okLabel: 'Reload the photos now', ok: () => { photos = []; lastFetch = 0; body.classList.add('nophotos'); loadPhotos(true); toast('Reloading photos…'); } },
     { label: 'Show', value: () => SORTS.find(s => s[0] === S.sort)[1], cycle: d => { S.sort = step(SORTS, S.sort, d); changedPhotos(); } },
     { label: 'Menu', value: () => S.nav === 'top' ? 'Bar across the top' : 'Side menu',
       cycle: () => { S.nav = S.nav === 'top' ? 'side' : 'top'; save(); toast(S.nav === 'top' ? 'Switching to the bar across the top…' : 'Switching to the side menu…'); } },
@@ -1144,9 +1144,7 @@ function buildAllSettings() {
     /* Featured trailers' black bars: lit from the picture's edges (a smooth glow, or a blurred reflection of the edge), or left black */
     { label: 'Ambient light on trailers', value: () => S.ambientBars === false ? 'Off' : S.ambientStyle === 'reflection' ? 'Reflection · a blurred mirror of the edge' : 'Glow · the edge\'s colours',
       cycle: d => { const o = ['glow', 'reflection', 'off'], cur = S.ambientBars === false ? 'off' : S.ambientStyle === 'reflection' ? 'reflection' : 'glow';
-        const n = o[(o.indexOf(cur) + (d < 0 ? -1 : 1) + o.length) % o.length]; S.ambientBars = n !== 'off'; if (n !== 'off') S.ambientStyle = n; save(); },
-      ok: () => { const o = ['glow', 'reflection', 'off'], cur = S.ambientBars === false ? 'off' : S.ambientStyle === 'reflection' ? 'reflection' : 'glow';
-        const n = o[(o.indexOf(cur) + 1) % o.length]; S.ambientBars = n !== 'off'; if (n !== 'off') S.ambientStyle = n; save(); } },
+        const n = o[(o.indexOf(cur) + (d < 0 ? -1 : 1) + o.length) % o.length]; S.ambientBars = n !== 'off'; if (n !== 'off') S.ambientStyle = n; save(); } },
     /* YouTube trailers that run on into the channel's outro: stopped where SponsorBlock says it starts, or this many
        seconds before the end when nobody has marked it (Apple TV's trailers have no outro). */
     { label: 'Trailer outro', value: () => { const t = typeof S.trailerTail === 'number' ? S.trailerTail : 10; return t ? 'Skip marked outro, else last ' + t + ' s' : 'Skip marked outro only'; },
@@ -1481,6 +1479,38 @@ function closeSettings() {
   if (isVodTab()) vMark();
   if (tab === 'sports') spMark();
 }
+/* A setting with three or more choices opens a list of them (OK), instead of stepping through them one at a time
+   with ◀ ▶ (which still works). The choices are found by stepping the setting quietly all the way round — no
+   messages, nothing reloaded — and it's left where it started. Settings that change the TV itself as they step
+   (sharpness, the icon pack, the Home button) keep stepping. Two choices (On / Off) just flip. */
+function settingsQuiet(fn) {
+  const t0 = toast, cp0 = changedPhotos, sv0 = save;
+  toast = () => {}; changedPhotos = () => {}; save = () => {};
+  try { return fn(); } finally { toast = t0; changedPhotos = cp0; save = sv0; }
+}
+function settingsChoices(r) {
+  if (!r.cycle || typeof r.value !== 'function') return null;
+  if (/\bB\.(?!ai)|icPack|renderScale|homeButton|hudToggle|location\.reload|refreshSettings/.test(String(r.cycle))) return null;
+  return settingsQuiet(() => {
+    const first = String(r.value()), labels = [first];
+    for (let n = 0; n < 14; n++) { r.cycle(1); const v = String(r.value()); if (v === first) return labels; labels.push(v); }
+    for (let n = 0; n < 14; n++) r.cycle(-1);          // (it never came round: put back, and keep stepping)
+    return null;
+  });
+}
+function settingsChoose(r) {
+  const o = settingsChoices(r);
+  if (!o || o.length < 3) return false;
+  const pick = i => {
+    if (i > 1) settingsQuiet(() => { for (let n = 0; n < i - 1; n++) r.cycle(1); });
+    if (i > 0) r.cycle(1);
+    refreshSettings();
+  };
+  const items = o.map((l, i) => ['', (i === 0 ? '✓  ' : '') + l, () => pick(i)]);
+  if (r.ok && r.okLabel) items.push(['', r.okLabel, () => { r.ok(); refreshSettings(); }]);
+  showMenu(items, null, r.label);
+  return true;
+}
 function settingsKey(k) {
   const r = sRows[sSel];
   if (k === 'u' || k === 'd') {
@@ -1489,7 +1519,7 @@ function settingsKey(k) {
   }
   else if (k === 'l' && r.cycle) r.cycle(-1);
   else if (k === 'r' && r.cycle) r.cycle(1);
-  else if (k === 'ok') { if (r.edit) startEdit(sSel); else if (r.ok) r.ok(); else if (r.cycle) r.cycle(1); }
+  else if (k === 'ok') { if (r.edit) startEdit(sSel); else if (r.cycle && (!r.ok || r.okLabel || String(r.ok).replace(/\s/g, '').includes('cycle')) && settingsChoose(r)) return; else if (r.ok) r.ok(); else if (r.cycle) r.cycle(1); }
   if (mode === 'settings' && editing === null) drawSettings();
 }
 
@@ -1794,8 +1824,9 @@ function tap(t, yRem) {
     if (!row || mode === 'edit') return;
     sSel = [...$('#srows').children].indexOf(row);
     const r = sRows[sSel];
-    if (sSel !== 0 && r.cycle && t.closest('.val')) r.cycle(1);
-    else if (r.edit) startEdit(sSel);
+    if (r.edit) startEdit(sSel);
+    else if (r.cycle && (!r.ok || r.okLabel) && settingsChoose(r)) return;
+    else if (sSel !== 0 && r.cycle && t.closest('.val')) r.cycle(1);
     else if (r.ok) r.ok();
     else if (r.cycle) r.cycle(1);
     if (mode === 'settings') drawSettings();
