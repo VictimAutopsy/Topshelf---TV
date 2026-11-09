@@ -771,6 +771,12 @@ final class NativeSports extends FrameLayout {
         if (chrome.getAlpha() > .5f) for (int i = 0; i < tabRow.getChildCount() && i < tabs.size(); i++) if (h.hit(tabRow.getChildAt(i), x, y, .4f)) {
             tab = tabs.get(i); zone = "grid"; applySet(true); drawTabs(); return "done";
         }
+        if (standings.shownNow() && h.hit(standings, x, y, 0)) {
+            float[] l = h.local(standings, x, y);
+            String got = standings.tapAt(l[0], l[1]);
+            if (got != null) { zone = "grid"; drawTabs(); }
+            return got;
+        }
         if (heroTop >= 0 && featured != null && h.hit(hero[heroTop], x, y, 0)) { zone = "hero"; focus(true); return "ok"; }
         if (side.getVisibility() == VISIBLE && h.hit(side, x, y, 0)) {
             float ly = h.local(side, x, y)[1] / R;
@@ -797,7 +803,7 @@ final class NativeSports extends FrameLayout {
         return 0;
     }
     void ok() {
-        if (tab.equals("Standings")) { if (zone.equals("tabs")) { zone = "grid"; drawTabs(); standings.focusIn(); } return; }
+        if (tab.equals("Standings")) { if (zone.equals("tabs")) { zone = "grid"; drawTabs(); standings.focusIn(); } else standings.ok(); return; }
         if (zone.equals("tabs") || zone.equals("rail")) { zone = "grid"; drawTabs(); focus(true); rail.invalidate(); return; }
         if (zone.equals("hero")) { openGame(featured); return; }
         if (zone.equals("side")) { sideOk(); return; }
@@ -837,6 +843,7 @@ final class NativeSports extends FrameLayout {
     }
     void hold() { ok(); }
     boolean back() {
+        if (tab.equals("Standings") && zone.equals("grid") && standings.back()) return true;
         if (!zone.equals("grid")) { zone = "grid"; drawTabs(); focus(true); rail.invalidate(); return true; }
         if (!tabs.isEmpty() && !tab.equals(tabs.get(0))) { tab = tabs.get(0); applySet(true); return true; }
         return false;

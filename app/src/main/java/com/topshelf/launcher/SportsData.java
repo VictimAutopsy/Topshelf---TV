@@ -1337,7 +1337,7 @@ final class SportsData {
         }
         return o;
     }
-    private static String join(List<String> l, int max, String sep) { StringBuilder b = new StringBuilder(); for (int i = 0; i < l.size() && i < max; i++) { if (i > 0) b.append(sep); b.append(l.get(i)); } return b.toString(); }
+    static String join(List<String> l, int max, String sep) { StringBuilder b = new StringBuilder(); for (int i = 0; i < l.size() && i < max; i++) { if (i > 0) b.append(sep); b.append(l.get(i)); } return b.toString(); }
 
     private int pushTok;
     private boolean loggedOnce;
@@ -1415,6 +1415,8 @@ final class SportsData {
         for (List<Ev> l : ev.values()) for (Ev e : l) if (e.id.equals(id)) { openEv(e); return; }
         h.toast("Add the NFL in Sports & teams to watch games from here");
     }
+    /** a game from elsewhere (a team's page in Standings): its menu, as on the scoreboard */
+    void openEvent(Ev e) { openEv(e); }
     private void openEv(final Ev e) {
         index();
         work.execute(new Runnable() { @Override public void run() {
