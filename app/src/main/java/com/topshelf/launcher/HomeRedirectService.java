@@ -26,6 +26,8 @@ public class HomeRedirectService extends AccessibilityService {
                 && !p.equals("com.google.android.tvlauncher")
                 && !p.equals("com.google.android.leanbacklauncher")) return;
 
+        // (Google TV's other screens in its home app — the ★ button's set-up and the like — are let be)
+        if (HomeWatchService.notHomeScreen(e.getClassName() == null ? null : e.getClassName().toString())) return;
         /* TopShelf is on screen already: Google's home only changed a window behind it (it does, now and then,
            in the background). Taking that for the Home button stopped Live TV and went back to Home mid-show. */
         if (MainActivity.inFront) return;

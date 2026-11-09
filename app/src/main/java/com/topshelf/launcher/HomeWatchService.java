@@ -33,6 +33,18 @@ public class HomeWatchService extends Service {
     static volatile long startedAt, lastRedirect;
     static volatile String lastResult = "", lastError = "";
 
+    /* Google TV's home app also shows screens that aren't its home: setting up the remote's ★ button (which kept
+       sending you back to TopShelf before you could choose an app), its search, its settings, account and profile
+       pickers. Those are let be; only its home itself brings TopShelf back. */
+    private static final java.util.regex.Pattern NOT_HOME = java.util.regex.Pattern.compile(
+            "(?i)setting|remote|button|shortcut|setup|picker|dialog|favou?rite|customi[sz]|programmable|search|voice|assist|account|profile|onboard|consent|input|notification|panel");
+    static boolean notHomeScreen(String cls) {
+        if (cls == null || cls.isEmpty()) return false;
+        String simple = cls.substring(cls.lastIndexOf('.') + 1);
+        boolean not = NOT_HOME.matcher(simple).find();
+        if (not) Diag.ev("home watch: Google TV's " + simple + " left alone (not its home screen)");
+        return not;
+    }
     static void note(String pkg) {
         synchronized (seen) {
             if (!seen.isEmpty() && seen.getFirst().startsWith(pkg + " ")) seen.removeFirst();
@@ -235,8 +247,9 @@ public class HomeWatchService extends Service {
                     if (ev.getEventType() != UsageEvents.Event.MOVE_TO_FOREGROUND) continue;   // = ACTIVITY_RESUMED
                     String p = ev.getPackageName();
                     note(p);
-                    // the last app to come forward decides: Google's home → bring TopShelf back
-                    home = isHomeApp(p);
+                    // the last app to come forward decides: Google's home → bring TopShelf back (not Google's other
+                    // screens in the same app: the remote's ★ button set-up, its search, its settings)
+                    home = isHomeApp(p) && !notHomeScreen(ev.getClassName());
                     sawOther = !home && !p.equals(getPackageName());
                 }
                 last = newest;
