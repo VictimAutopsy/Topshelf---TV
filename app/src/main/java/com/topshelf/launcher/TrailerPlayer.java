@@ -222,6 +222,8 @@ final class TrailerPlayer {
     }
 
     private void playApple(ViewGroup host, String imdb, String url, boolean muted) {
+        if (offScreen(host)) return;
+        watchShown();
         direct = true; apple = true; appleImdb = imdb; endSent = false; cutAt = -1;
         framed = false; directAt = android.os.SystemClock.uptimeMillis(); directHost = host; directMuted = muted;
         main.removeCallbacks(watch);
@@ -403,7 +405,31 @@ final class TrailerPlayer {
         playWeb(host, id, muted);
     } };
 
+    /* Never a trailer for a screen that isn't showing: one asked for on Movies or TV Shows (when its details came in a
+       few seconds later) started after you'd gone to another tab, couldn't show a picture, fell back to YouTube's
+       player — and played its sound with nothing on screen. */
+    private boolean offScreen(ViewGroup host) {
+        if (host != null && host.isShown()) return false;
+        Diag.ev("trailer: not started (its screen isn't showing)");
+        final Listener l = listener;
+        stop();
+        if (l != null) main.post(new Runnable() { @Override public void run() { l.ended(); } });
+        return true;
+    }
+    /** while a trailer plays: if its screen goes away without stopping it, it stops (every 2 s) */
+    private final Runnable shownCheck = new Runnable() { @Override public void run() {
+        if (current == null) return;
+        ViewGroup host = direct ? directHost : wv != null && wv.getParent() instanceof ViewGroup ? (ViewGroup) wv.getParent() : null;
+        if (host != null && host.isShown()) { main.postDelayed(this, 2000); return; }
+        Diag.ev("trailer: stopped (its screen went away)");
+        final Listener l = listener;
+        stop();
+        if (l != null) l.ended();
+    } };
+    private void watchShown() { main.removeCallbacks(shownCheck); main.postDelayed(shownCheck, 2000); }
     private void playDirect(ViewGroup host, String id, YtStreams.Source s, boolean muted) {
+        if (offScreen(host)) return;
+        watchShown();
         direct = true;
         framed = false; directAt = android.os.SystemClock.uptimeMillis(); directHost = host; directMuted = muted;
         main.removeCallbacks(watch);
@@ -508,6 +534,8 @@ final class TrailerPlayer {
         Diag.ev("trailer · YouTube's player: still no picture 15 s after it was asked to play");
     } };
     private void playWeb(ViewGroup host, String ytId, boolean muted) {
+        if (offScreen(host)) return;
+        watchShown();
         webShown = false;
         main.removeCallbacks(webWatch); main.postDelayed(webWatch, 15000);
         WebView w = view();
@@ -529,6 +557,7 @@ final class TrailerPlayer {
     }
     private void stopQuiet() {
         tok++;
+        main.removeCallbacks(shownCheck);
         stopDirect();
         pending = null;
         if (wv == null) return;
