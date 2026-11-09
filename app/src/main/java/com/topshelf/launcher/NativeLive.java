@@ -857,7 +857,15 @@ final class NativeLive extends FrameLayout {
         tmpDate.setTime(ms);
         return ("24".equals(h.S.optString("clock", "12")) ? f24 : f12).format(tmpDate);
     }
-    private String fmtShort(long ms) { return fmt(ms).replace(" AM", "").replace(" PM", ""); }
+    /* (the guide asks for the same few times over and over, every frame of a scroll: formatting a time is slow, so
+       each one is formatted once) */
+    private final Map<Long, String> shortTimes = new HashMap<>();
+    private String fmtShort(long ms) {
+        long key = ms * 2 + ("24".equals(h.S.optString("clock", "12")) ? 1 : 0);     // (the 12/24-hour setting is part of it)
+        String v = shortTimes.get(key);
+        if (v == null) { v = fmt(ms).replace(" AM", "").replace(" PM", ""); if (shortTimes.size() > 2000) shortTimes.clear(); shortTimes.put(key, v); }
+        return v;
+    }
     private static String dur(long ms) { long m = Math.round(ms / 60000.0); return m < 60 ? m + " min" : (m / 60) + " h" + (m % 60 != 0 ? " " + (m % 60) + " min" : ""); }
 
     // reminders (kept by the app: Reminders)
@@ -3427,6 +3435,21 @@ final class NativeLive extends FrameLayout {
             drawingF = false;
         }
 
+        /* A title cut to fit its tile: worked out once per text and width (to the nearest few pixels), not again on
+           every frame of a scroll — sixty-odd tiles each measured twice a frame made the guide the one screen that
+           stuttered (87% of frames on time). */
+        private final Map<String, String> fits = new HashMap<>();
+        private String fit(String text, TextPaint p, float width) {
+            int wb = ((int) width) / 4;
+            String k = (p == tTitle ? "t" : "s") + wb + "|" + text;
+            String v = fits.get(k);
+            if (v == null) {
+                v = p.measureText(text) <= wb * 4 ? text : TextUtils.ellipsize(text, p, wb * 4, TextUtils.TruncateAt.END).toString();
+                if (fits.size() > 3000) fits.clear();
+                fits.put(k, v);
+            }
+            return v;
+        }
         private void cell(Canvas c, float y, long s, long e, String title, String sub, int state, boolean f, long leftT, boolean bell, long now) {
             if (f && !drawingF) { pendF = true; pY = y; pS = s; pE = e; pTitle = title; pSub = sub; pState = state; pLeft = leftT; pBell = bell; pRec = recMark; pNow = now; return; }
             long endT = end();
@@ -3470,8 +3493,8 @@ final class NativeLive extends FrameLayout {
             if (bell) { tTitle.setColor(0xFFFFD60A); c.drawText("🔔", bx, ty, tTitle); bx += tTitle.measureText("🔔 "); tTitle.setColor(Color.WHITE); }
             if (recMark) { recDot.setColor(0xFFFF453A); float rr = .42f * R; c.drawCircle(bx + rr, ty - tTitle.getTextSize() * .36f, rr, recDot); bx += 2 * rr + .55f * R; }
             if (wRem > 4) {
-                c.drawText(TextUtils.ellipsize(title, tTitle, Math.max(1, x1 - bx - 1f * R), TextUtils.TruncateAt.END).toString(), bx, ty, tTitle);
-                c.drawText(TextUtils.ellipsize(sub, tSmall, Math.max(1, avail), TextUtils.TruncateAt.END).toString(), tx, ty + .25f * R + tSmall.getTextSize(), tSmall);
+                c.drawText(fit(title, tTitle, Math.max(1, x1 - bx - 1f * R)), bx, ty, tTitle);
+                c.drawText(fit(sub, tSmall, Math.max(1, avail)), tx, ty + .25f * R + tSmall.getTextSize(), tSmall);
             }
             c.restore();
             tTitle.setAlpha(255); tSmall.setColor(0x99FFFFFF);
