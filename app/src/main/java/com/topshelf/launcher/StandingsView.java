@@ -4,8 +4,10 @@ import android.graphics.Bitmap;
 import android.graphics.Canvas;
 import android.graphics.Color;
 import android.graphics.DashPathEffect;
+import android.graphics.LinearGradient;
 import android.graphics.Paint;
 import android.graphics.RectF;
+import android.graphics.Shader;
 import android.graphics.Typeface;
 import android.text.TextPaint;
 import android.text.TextUtils;
@@ -429,11 +431,18 @@ final class StandingsView extends View {
     private void wantLogo(final String u) {
         if (u == null || u.isEmpty() || logos.containsKey(u)) return;
         logos.put(u, null);
-        final int s = Math.round(1.9f * R);
-        h.imgs.load("stand:" + u, new HomeImages.Source() { @Override public byte[] bytes() throws Exception { return HomeImages.http(u, null); } }, s, s,
+        final int s = Math.round(2.1f * R);
+        h.imgs.load("stand2:" + u, new HomeImages.Source() { @Override public byte[] bytes() throws Exception { return darkFirst(u); } }, s, s,
                 new HomeImages.Done() { @Override public void done(Bitmap b) { if (b != null) { logos.put(u, b); invalidate(); } } });
     }
 
+    /** ESPN's logo made for dark backgrounds (…/500-dark/…) when it has one, else the plain one: the plain logos
+        are drawn for white pages, and dark ones (Bruins, Penguins, Kings…) all but vanished on the cards */
+    static byte[] darkFirst(String u) throws Exception {
+        String d = u.contains("/500/") ? u.replace("/500/", "/500-dark/") : null;
+        if (d != null) { try { byte[] b = HomeImages.http(d, null); if (b != null && b.length > 200) return b; } catch (Exception ignored) { } }
+        return HomeImages.http(u, null);
+    }
     /** by division (NFL, NBA, MLB, NHL: their conference views are made from these), by conference (WNBA, MLS,
         college), one table (soccer) */
     private static int level(String id) { return id.equals("nfl") || id.equals("mlb") || id.equals("nhl") || id.equals("nba") ? 3 : 2; }
@@ -580,7 +589,7 @@ final class StandingsView extends View {
     private void openTeam(final Row r, final String[] lg) {
         team = r; teamLg = lg; tsel = 0; teamLogo = null;
         final int s = Math.round(6 * R);
-        if (!r.logo.isEmpty()) h.imgs.load("standbig:" + r.logo, new HomeImages.Source() { @Override public byte[] bytes() throws Exception { return HomeImages.http(r.logo, null); } }, s, s,
+        if (!r.logo.isEmpty()) h.imgs.load("standbig2:" + r.logo, new HomeImages.Source() { @Override public byte[] bytes() throws Exception { return darkFirst(r.logo); } }, s, s,
                 new HomeImages.Done() { @Override public void done(Bitmap b) { if (team == r) { teamLogo = b; invalidate(); } } });
         final String key = lg[0] + ":" + r.id;
         TeamData have = teamCache.get(key);
@@ -658,11 +667,17 @@ final class StandingsView extends View {
         float pad = 4 * R, gap = 1.6f * R, top = topY();
         int n = perLine();
         float cw = n == 1 ? Math.min(w - 2 * pad, 100 * R) : (w - 2 * pad - gap) / 2;
+        // the rows as roomy as the screen allows with everything in sight (2.45–2.85 rem), else a set height and scrolling
+        int rowsSum = 0, lines = 0, lineMax = 0;
+        for (int i = 0; i < shown.size(); i++) { lineMax = Math.max(lineMax, shown.get(i).rows.size()); if (i % n == n - 1 || i == shown.size() - 1) { rowsSum += lineMax; lines++; lineMax = 0; } }
+        float avail = getHeight() - top - 1.5f * R - legendH(w - 2 * pad);
+        float fitH = rowsSum == 0 ? 0 : (avail - lines * 5.8f * R - (lines - 1) * gap) / rowsSum;
+        float rowH = fitH >= 2.45f * R ? Math.min(2.85f * R, fitH) : 0;
         float y = top, lineH = 0;
         for (int i = 0; i < shown.size(); i++) {
             Table tb = shown.get(i);
             int col = i % n;
-            tb.rowH = tb.rows.size() > 16 ? 2.4f * R : 2.55f * R;
+            tb.rowH = rowH > 0 ? rowH : tb.rows.size() > 16 ? 2.45f * R : 2.7f * R;
             tb.w = cw; tb.x = n == 1 ? (w - cw) / 2f : pad + col * (cw + gap); tb.y = y;
             tb.hh = 4.6f * R + tb.rows.size() * tb.rowH + 1.2f * R;
             // the columns that fit: the name keeps 11 rem; the least wanted go first, from the right
@@ -758,62 +773,100 @@ final class StandingsView extends View {
     }
 
     private void drawTable(Canvas c, Table g, String lg, int chosen) {
-        float x = g.x, y = g.y, w = g.w, rowH = g.rowH, headH = 4.6f * R;
+        float x = g.x, y = g.y, w = g.w, rowH = g.rowH, headH = 4.6f * R, rad = 1.3f * R;
+        // the card: a little lighter at the top, a hairline edge, and a band behind the title and column names
         rf.set(x, y, x + w, y + g.hh);
-        p.setStyle(Paint.Style.FILL); p.setColor(CARD); c.drawRoundRect(rf, 1.2f * R, 1.2f * R, p);
-        p.setStyle(Paint.Style.STROKE); p.setStrokeWidth(Math.max(1, .08f * R)); p.setColor(EDGE); c.drawRoundRect(rf, 1.2f * R, 1.2f * R, p); p.setStyle(Paint.Style.FILL);
-        float in = 1.2f * R;
-        t.setTypeface(cond); t.setTextSize(1.45f * R); t.setColor(Color.WHITE); t.setTextAlign(Paint.Align.LEFT);
-        if (!g.name.isEmpty()) c.drawText(TextUtils.ellipsize(g.name.toUpperCase(Locale.US), t, w - 2 * in, TextUtils.TruncateAt.END).toString(), x + in, y + 2.1f * R, t);
+        p.setStyle(Paint.Style.FILL);
+        p.setShader(new LinearGradient(0, y, 0, y + g.hh, 0xFF17202B, 0xFF10161E, Shader.TileMode.CLAMP));
+        c.drawRoundRect(rf, rad, rad, p);
+        p.setShader(null);
+        c.save(); c.clipRect(x, y, x + w, y + headH - .2f * R);
+        p.setColor(0x0FFFFFFF); c.drawRoundRect(rf, rad, rad, p);
+        c.restore();
+        p.setColor(0x14FFFFFF); c.drawRect(x, y + headH - .2f * R, x + w, y + headH - .2f * R + Math.max(1, .07f * R), p);
+        p.setStyle(Paint.Style.STROKE); p.setStrokeWidth(Math.max(1, .08f * R)); p.setColor(EDGE); c.drawRoundRect(rf, rad, rad, p); p.setStyle(Paint.Style.FILL);
+        float in = 1.3f * R;
+        // the title, with a small gold mark before it
+        if (!g.name.isEmpty()) {
+            p.setColor(GOLD); rf.set(x + in, y + 1f * R, x + in + .3f * R, y + 2.4f * R); c.drawRoundRect(rf, .15f * R, .15f * R, p);
+            t.setTypeface(cond); t.setTextSize(1.5f * R); t.setColor(Color.WHITE); t.setTextAlign(Paint.Align.LEFT); t.setLetterSpacing(.04f);
+            c.drawText(TextUtils.ellipsize(g.name.toUpperCase(Locale.US), t, w - 2 * in - R, TextUtils.TruncateAt.END).toString(), x + in + .9f * R, y + 2.25f * R, t);
+            t.setLetterSpacing(0);
+        }
         int[] fit = g.fit == null ? new int[0] : g.fit;
         float[] cx = new float[fit.length];
         float rx = x + w - in;
         for (int k = fit.length - 1; k >= 0; k--) { cx[k] = rx; rx -= g.cols.get(fit[k]).w * R; }
-        t.setTypeface(h.fSemi); t.setTextSize(1f * R); t.setTextAlign(Paint.Align.RIGHT);
-        for (int k = 0; k < fit.length; k++) { Col col = g.cols.get(fit[k]); t.setColor(col.label.equals("CUT") ? LINE : DIM); c.drawText(col.label, cx[k], y + 3.9f * R, t); }
-        float nameMax = rx - (x + in + 4.6f * R) - .6f * R;
+        // the column the league ranks by (points, else win %) stands out: a faint band, the figures bright and bold
+        String keyCol = lg.equals("nhl") || lg.equals("mls") || lg.equals("epl") || lg.equals("ucl") || lg.equals("laliga") ? "PTS" : "PCT";
+        int keyK = -1; for (int k = 0; k < fit.length; k++) if (g.cols.get(fit[k]).label.equals(keyCol)) keyK = k;
+        if (keyK >= 0) {
+            float kw = g.cols.get(fit[keyK]).w * R;
+            p.setColor(0x0CFFFFFF); rf.set(cx[keyK] - kw + .4f * R, y + headH - .2f * R, cx[keyK] + .5f * R, y + g.hh - .6f * R); c.drawRect(rf, p);
+        }
+        t.setTypeface(h.fSemi); t.setTextSize(1f * R); t.setTextAlign(Paint.Align.RIGHT); t.setLetterSpacing(.06f);
+        for (int k = 0; k < fit.length; k++) { Col col = g.cols.get(fit[k]); t.setColor(col.label.equals("CUT") ? LINE : k == keyK ? 0xFFE8EDF2 : DIM); c.drawText(col.label, cx[k], y + 3.95f * R, t); }
+        t.setLetterSpacing(0);
+        float ls = 2.1f * R, lx = x + in + 2.6f * R;
+        float nameMax = rx - (lx + ls + .8f * R) - .8f * R;
         for (int i = 0; i < g.rows.size(); i++) {
             Row r = g.rows.get(i);
             float ry = y + headH + i * rowH;
             boolean fav = favs.contains(lg + ":" + r.id), out = r.clinch.equals("e"), on = i == chosen;
+            boolean inNow = g.cut > 0 && i < g.cut, playIn = g.cut2 > 0 && i >= g.cut && i < g.cut2;
+            if (fav) { p.setColor(0x22FFC23D); rf.set(x + .35f * R, ry + .1f * R, x + w - .35f * R, ry + rowH - .1f * R); c.drawRoundRect(rf, .7f * R, .7f * R, p); }
             if (on) {
-                p.setColor(0x2EFFFFFF); rf.set(x + .3f * R, ry, x + w - .3f * R, ry + rowH); c.drawRoundRect(rf, .6f * R, .6f * R, p);
-                p.setStyle(Paint.Style.STROKE); p.setStrokeWidth(.16f * R); p.setColor(fav ? GOLD : Color.WHITE); c.drawRoundRect(rf, .6f * R, .6f * R, p); p.setStyle(Paint.Style.FILL);
-            } else if (fav) { p.setColor(0x24FFC23D); rf.set(x + .4f * R, ry, x + w - .4f * R, ry + rowH); c.drawRoundRect(rf, .6f * R, .6f * R, p); }
-            else if (i % 2 == 1) { p.setColor(0x08FFFFFF); rf.set(x + .4f * R, ry, x + w - .4f * R, ry + rowH); c.drawRect(rf, p); }
-            if (r.noteColor != 0) { p.setColor(r.noteColor); rf.set(x + .4f * R, ry + .25f * R, x + .75f * R, ry + rowH - .25f * R); c.drawRect(rf, p); }
-            float base = ry + rowH / 2 + .45f * R;
+                p.setColor(0x30FFFFFF); rf.set(x + .35f * R, ry + .1f * R, x + w - .35f * R, ry + rowH - .1f * R); c.drawRoundRect(rf, .7f * R, .7f * R, p);
+                p.setStyle(Paint.Style.STROKE); p.setStrokeWidth(.18f * R); p.setColor(fav ? GOLD : Color.WHITE); c.drawRoundRect(rf, .7f * R, .7f * R, p); p.setStyle(Paint.Style.FILL);
+            }
+            // a hairline between teams (none where the playoff lines go)
+            boolean lineHere = (g.cut > 0 && i == g.cut - 1) || (g.cut2 > 0 && i == g.cut2 - 1);
+            if (i < g.rows.size() - 1 && !lineHere && !on && !fav) { p.setColor(0x0FFFFFFF); c.drawRect(x + in, ry + rowH - Math.max(1, .06f * R), x + w - in, ry + rowH, p); }
+            if (r.noteColor != 0) { p.setColor(r.noteColor); rf.set(x + .45f * R, ry + .35f * R, x + .8f * R, ry + rowH - .35f * R); c.drawRoundRect(rf, .17f * R, .17f * R, p); }
+            float base = ry + rowH / 2 + .48f * R, mid = ry + rowH / 2;
+            // the place (or seed): in a playoff spot, a filled green dot behind it; in the play-in, gold
             int seedNo = g.seeded ? (int) r.seed : i + 1;
-            t.setTypeface(h.fMed); t.setTextSize(1.1f * R); t.setColor(g.cut > 0 && i < g.cut ? 0xFFDDE3EA : DIM); t.setTextAlign(Paint.Align.RIGHT);
-            c.drawText(String.valueOf(seedNo), x + in + 1.6f * R, base, t);
+            float nx0 = x + in + 1.05f * R;
+            if (inNow || playIn) { p.setColor(inNow ? 0x383DDC84 : 0x33FFC23D); c.drawCircle(nx0, mid, 1f * R, p); }
+            t.setTypeface(cond); t.setTextSize(1.15f * R); t.setTextAlign(Paint.Align.CENTER);
+            t.setColor(inNow ? WIN : playIn ? GOLD : DIM);
+            c.drawText(String.valueOf(seedNo), nx0, mid + .42f * R, t);
             Bitmap b = logos.get(r.logo);
-            float ls = 1.9f * R, lx = x + in + 2.2f * R;
-            if (b != null) { p.setAlpha(out ? 110 : 255); rf.set(lx, ry + (rowH - ls) / 2, lx + ls, ry + (rowH + ls) / 2); c.drawBitmap(b, null, rf, p); p.setAlpha(255); }
+            if (b != null) { p.setAlpha(out ? 100 : 255); rf.set(lx, mid - ls / 2, lx + ls, mid + ls / 2); c.drawBitmap(b, null, rf, p); p.setAlpha(255); }
             // the name, then its marks: the clinch letter, and in a division table the seed it holds now
             String mark = r.clinch;
             String seedTag = g.seedTags && r.seed > 0 && r.seed <= cutFor(lg)[0] ? "#" + (int) r.seed : g.seedTags && cutFor(lg)[1] > 0 && r.seed > 0 && r.seed <= cutFor(lg)[1] ? "#" + (int) r.seed : "";
-            t.setTypeface(cond); t.setTextSize(1f * R);
-            float markW = (mark.isEmpty() ? 0 : t.measureText(mark) + .6f * R) + (seedTag.isEmpty() ? 0 : t.measureText(seedTag) + .9f * R);
-            t.setTypeface(h.fSemi); t.setTextSize(1.3f * R); t.setColor(out ? OUT : fav ? GOLD : Color.WHITE); t.setTextAlign(Paint.Align.LEFT);
+            t.setTypeface(cond); t.setTextSize(1.05f * R);
+            float markW = (mark.isEmpty() ? 0 : t.measureText(mark) + .7f * R) + (seedTag.isEmpty() ? 0 : t.measureText(seedTag) + 1f * R);
+            t.setTypeface(h.fSemi); t.setTextSize(1.4f * R); t.setColor(out ? OUT : fav ? GOLD : Color.WHITE); t.setTextAlign(Paint.Align.LEFT);
             String nm = TextUtils.ellipsize(r.name, t, Math.max(3 * R, nameMax - markW), TextUtils.TruncateAt.END).toString();
-            float nx = lx + ls + .7f * R;
+            float nx = lx + ls + .8f * R;
             c.drawText(nm, nx, base, t);
-            float mx = nx + t.measureText(nm) + .5f * R;
-            t.setTypeface(cond); t.setTextSize(1f * R);
-            if (!mark.isEmpty()) { t.setColor(out ? OUT : WIN); c.drawText(mark, mx, base - .1f * R, t); mx += t.measureText(mark) + .6f * R; }
+            float mx = nx + t.measureText(nm) + .55f * R;
+            t.setTypeface(cond); t.setTextSize(1.05f * R);
+            if (!mark.isEmpty()) { t.setColor(out ? OUT : WIN); c.drawText(mark, mx, base - .12f * R, t); mx += t.measureText(mark) + .7f * R; }
             if (!seedTag.isEmpty()) {
-                boolean inNow = r.seed <= cutFor(lg)[0];
+                boolean held = r.seed <= cutFor(lg)[0];
                 float tw = t.measureText(seedTag);
-                rf.set(mx - .3f * R, ry + rowH / 2 - .75f * R, mx + tw + .3f * R, ry + rowH / 2 + .75f * R);
-                p.setColor(inNow ? 0x333DDC84 : 0x33FFC23D); c.drawRoundRect(rf, .5f * R, .5f * R, p);
-                t.setColor(inNow ? WIN : GOLD); c.drawText(seedTag, mx, base - .1f * R, t);
+                rf.set(mx - .35f * R, mid - .8f * R, mx + tw + .35f * R, mid + .8f * R);
+                p.setColor(held ? 0x333DDC84 : 0x33FFC23D); c.drawRoundRect(rf, .8f * R, .8f * R, p);
+                t.setColor(held ? WIN : GOLD); c.drawText(seedTag, mx, base - .12f * R, t);
             }
-            t.setTypeface(cond); t.setTextSize(1.3f * R); t.setTextAlign(Paint.Align.RIGHT);
+            // the figures: the ranking column bright, streaks and differences in green / red, the rest softer
+            t.setTextSize(1.35f * R); t.setTextAlign(Paint.Align.RIGHT);
             String[] vs = g.vals.get(i);
             for (int k = 0; k < fit.length; k++) {
                 String v = fit[k] < vs.length ? vs[fit[k]] : "";
-                boolean cutCol = g.cols.get(fit[k]).label.equals("CUT");
-                t.setColor(out ? OUT : cutCol ? (v.startsWith("+") ? WIN : v.startsWith("−") ? 0xFFFF8A8E : 0xFFDDE3EA) : fav ? GOLD : 0xFFDDE3EA);
+                String lab = g.cols.get(fit[k]).label;
+                int col;
+                if (out) col = OUT;
+                else if (lab.equals("CUT")) col = v.startsWith("+") ? WIN : v.startsWith("−") ? 0xFFFF8A8E : 0xFFDDE3EA;
+                else if (lab.equals("STRK")) col = v.startsWith("W") ? 0xFF7BE3A8 : v.startsWith("L") ? 0xFFFF9196 : 0xFFB8C2CE;
+                else if (lab.equals("DIFF") || lab.equals("GD")) col = v.startsWith("+") ? 0xFF7BE3A8 : v.startsWith("-") || v.startsWith("−") ? 0xFFFF9196 : 0xFFB8C2CE;
+                else if (k == keyK) col = fav ? GOLD : Color.WHITE;
+                else col = fav ? 0xFFFFD77A : 0xFFB8C2CE;
+                t.setTypeface(k == keyK ? h.fSemi : cond);
+                t.setColor(col);
                 c.drawText(v, cx[k], base, t);
             }
             // the playoff line under the last seed in, the play-in line under the last seed in it
@@ -858,8 +911,12 @@ final class StandingsView extends View {
         float pad = 4 * R, y = 1.2f * R;
         Row r = team;
         teamHits.clear();
-        // the team: logo, name, record and place
+        // the team: logo, name, record and place, on a band across the top
         float ls = 6 * R;
+        rf.set(pad - 1.2f * R, y - .6f * R, w - pad + 1.2f * R, y + ls + .6f * R);
+        p.setShader(new LinearGradient(rf.left, 0, rf.right, 0, 0xFF1B2533, 0xFF10161E, Shader.TileMode.CLAMP));
+        c.drawRoundRect(rf, 1.4f * R, 1.4f * R, p); p.setShader(null);
+        p.setStyle(Paint.Style.STROKE); p.setStrokeWidth(Math.max(1, .08f * R)); p.setColor(EDGE); c.drawRoundRect(rf, 1.4f * R, 1.4f * R, p); p.setStyle(Paint.Style.FILL);
         if (teamLogo != null) { rf.set(pad, y, pad + ls, y + ls); c.drawBitmap(teamLogo, null, rf, p); }
         float tx = pad + ls + 1.6f * R;
         t.setTextAlign(Paint.Align.LEFT);
@@ -947,8 +1004,9 @@ final class StandingsView extends View {
         t.setTextAlign(Paint.Align.LEFT);
     }
     private void head(Canvas c, String s, float x, float y) {
-        t.setTypeface(cond); t.setTextSize(1.2f * R); t.setColor(DIM); t.setTextAlign(Paint.Align.LEFT); t.setLetterSpacing(.08f);
-        c.drawText(s, x, y, t);
+        p.setColor(GOLD); rf.set(x, y - 1.05f * R, x + .3f * R, y + .1f * R); c.drawRoundRect(rf, .15f * R, .15f * R, p);
+        t.setTypeface(cond); t.setTextSize(1.25f * R); t.setColor(0xFFC6CED8); t.setTextAlign(Paint.Align.LEFT); t.setLetterSpacing(.08f);
+        c.drawText(s, x + .8f * R, y, t);
         t.setLetterSpacing(0);
     }
     /** one game: when (or W/L), vs/@ the other team, then the score or where it's on */
