@@ -313,7 +313,8 @@ final class Assistant {
             JSONArray ml = new JSONArray(h.prefs.getString("ui.mylist", "[]"));
             for (int i = 0; i < ml.length() && i < 20; i++) { JSONObject m = ml.optJSONObject(i); if (m != null && !m.optString("name").isEmpty()) seen.add(m.optString("name") + " (on their list)"); }
         } catch (Exception ignored) { }
-        if (seen.isEmpty()) return "{\"metas\":[]}";
+        if (seen.isEmpty()) throw new Exception("nothing watched yet to go on");
+        Diag.ev("assistant: For tonight · asking Claude, from " + seen.size() + " titles you've watched or saved");
         StringBuilder taste = new StringBuilder();
         for (String s : seen) taste.append("- ").append(s).append('\n');
         String reply = ask(c, "You pick what to watch tonight on a TV. Reply with only JSON: {\"picks\":[{\"title\":\"…\",\"year\":2014,\"why\":\"…\"}]} — 12 "
@@ -322,7 +323,7 @@ final class Assistant {
                 "Recently watched and saved:\n" + taste, 1200);
         JSONObject o = firstJson(reply);
         JSONArray picks = o == null ? null : o.optJSONArray("picks");
-        if (picks == null) throw new Exception("no picks");
+        if (picks == null) { Diag.ev("assistant: For tonight · Claude's answer wasn't a list (" + reply.length() + " characters)"); throw new Exception("Claude's answer couldn't be read"); }
         final JSONObject[] got = new JSONObject[picks.length()];
         java.util.concurrent.ExecutorService pool = java.util.concurrent.Executors.newFixedThreadPool(4);
         for (int i = 0; i < picks.length(); i++) {
@@ -330,8 +331,15 @@ final class Assistant {
             if (p == null) continue;
             pool.execute(new Runnable() { @Override public void run() {
                 try {
-                    byte[] d = HomeImages.http(NativeVod.CINEMETA + "/catalog/" + ty + "/top/search=" + android.net.Uri.encode(p.optString("title")) + ".json", null);
-                    JSONArray ms = d == null ? null : new JSONObject(new String(d, StandardCharsets.UTF_8)).optJSONArray("metas");
+                    JSONArray ms = null;
+                    // the title as given, then simpler forms of it ("Spider-Man: Across the Spider-Verse" → "Spider-Man")
+                    String ti = p.optString("title").trim();
+                    for (String q : new String[] { ti, ti.replaceAll("[:\\-–(].*$", "").trim(), ti.replaceAll("[^\\p{L}\\p{N} ]", " ").replaceAll("\\s+", " ").trim() }) {
+                        if (q.length() < 2) continue;
+                        byte[] d = HomeImages.http(NativeVod.CINEMETA + "/catalog/" + ty + "/top/search=" + android.net.Uri.encode(q) + ".json", null);
+                        ms = d == null ? null : new JSONObject(new String(d, StandardCharsets.UTF_8)).optJSONArray("metas");
+                        if (ms != null && ms.length() > 0) break;
+                    }
                     if (ms == null || ms.length() == 0) return;
                     JSONObject best = ms.optJSONObject(0);
                     String y = p.optString("year");
@@ -348,7 +356,8 @@ final class Assistant {
         JSONArray metas = new JSONArray();
         java.util.Set<String> ids = new java.util.HashSet<>();
         for (JSONObject m : got) if (m != null && ids.add(m.optString("id"))) metas.put(m);
-        Diag.ev("assistant: For tonight · " + metas.length() + " " + (mv ? "movies" : "shows"));
+        Diag.ev("assistant: For tonight · " + picks.length() + " picked, " + metas.length() + " found with posters");
+        if (metas.length() == 0) throw new Exception("Claude's picks couldn't be found on Cinemeta");
         return new JSONObject().put("metas", metas).toString();
     }
 
