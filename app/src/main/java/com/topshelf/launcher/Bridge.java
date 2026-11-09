@@ -788,7 +788,7 @@ public class Bridge {
     }
     // ---- the assistant (Assistant): the key is kept here only, never handed back to the page
     @JavascriptInterface public String aiInfo() {
-        try { return new JSONObject().put("key", !Assistant.key(act).isEmpty()).put("voice", prefs.getBoolean("aiVoice", true)).put("speak", prefs.getBoolean("aiSpeak", true)).put("star", prefs.getBoolean("aiStar", true)).toString(); } catch (Exception e) { return "{}"; }
+        try { return new JSONObject().put("key", !Assistant.key(act).isEmpty()).put("voice", prefs.getBoolean("aiVoice", true)).put("speak", prefs.getBoolean("aiSpeak", true)).put("star", prefs.getBoolean("aiStar", true)).put("model", prefs.getString("aiModel", "sonnet")).toString(); } catch (Exception e) { return "{}"; }
     }
     @JavascriptInterface public boolean aiSetKey(String k) {
         k = k == null ? "" : k.trim();
@@ -798,6 +798,7 @@ public class Bridge {
         return true;
     }
     @JavascriptInterface public void aiSetVoice(boolean on) { prefs.edit().putBoolean("aiVoice", on).apply(); }
+    @JavascriptInterface public void aiSetModel(String m) { prefs.edit().putString("aiModel", m == null ? "sonnet" : m).apply(); }
     @JavascriptInterface public void aiSetStar(boolean on) { prefs.edit().putBoolean("aiStar", on).apply(); }
     @JavascriptInterface public void aiSetSpeak(boolean on) { prefs.edit().putBoolean("aiSpeak", on).apply(); if (!on) Assistant.hush(); }
     @JavascriptInterface public void aiCatchUp() { nh(new Runnable() { @Override public void run() { Assistant.catchUp(act.nativeHome()); } }); }

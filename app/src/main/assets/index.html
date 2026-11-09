@@ -1264,6 +1264,8 @@ function buildAllSettings() {
           if (!B.aiSetKey(v)) { toast("That doesn't look like an Anthropic API key (it starts with sk-ant-)"); return; }
           toast(v ? 'Claude is ready: press the mic and ask' : 'Key removed');
         } } },
+      { label: 'Claude model', value: () => { let i = {}; try { i = JSON.parse(B.aiInfo()); } catch (e) {} return i.model === 'haiku' ? 'Haiku · fastest, simplest answers' : i.model === 'opus' ? 'Opus · smartest, slower and costs most' : 'Sonnet · smart and quick (recommended)'; },
+        cycle: () => { let i = {}; try { i = JSON.parse(B.aiInfo()); } catch (e) {} const n = { haiku: 'sonnet', sonnet: 'opus', opus: 'haiku' }[i.model || 'sonnet']; if (B.aiSetModel) B.aiSetModel(n); } },
       { label: 'Voice requests', value: () => { let i = {}; try { i = JSON.parse(B.aiInfo()); } catch (e) {} return i.voice === false ? 'Off · the mic only searches' : 'On · “put on the Falcons game”, “what did I miss”'; },
         cycle: () => { let i = {}; try { i = JSON.parse(B.aiInfo()); } catch (e) {} B.aiSetVoice(i.voice === false); } },
       { label: 'Read answers aloud', value: () => { let i = {}; try { i = JSON.parse(B.aiInfo()); } catch (e) {} return i.speak === false ? 'Off · answers only on screen' : 'On · in the TV’s own voice'; },
@@ -1358,7 +1360,7 @@ const SET_SECTIONS = [
     ['Updates', ['TopShelf updates', 'Go back to the previous version', 'Updates access token']],
     ['Your settings', ['Backup & restore']],
     ['Help', ['Diagnostic report', 'Run a self-check', 'Report a glitch', 'Speed test']],
-    ['Assistant', ['Anthropic API key', 'Voice requests', 'Read answers aloud', 'Ask from the remote']],
+    ['Assistant', ['Anthropic API key', 'Claude model', 'Voice requests', 'Read answers aloud', 'Ask from the remote']],
     ['Advanced', ['Show frame rate', 'Open Google TV home', 'Android settings']] ] }
 ];
 const setMatch = (it, label) => typeof it === 'string' ? it === label : it.test(label);

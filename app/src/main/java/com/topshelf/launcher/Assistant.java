@@ -87,7 +87,8 @@ final class Assistant {
                         + "{\"do\":\"search\",\"query\":\"<a movie, show or person's exact name>\"} when they named or described one specific title (name it);\n"
                         + "{\"do\":\"suggest\",\"say\":\"<a few words>\",\"titles\":[\"<3 to 6 real movie or show titles that fit>\"]} for a recommendation;\n"
                         + "{\"do\":\"catchup\"} when they ask what they missed in the game they're watching;\n"
-                        + "{\"do\":\"say\",\"text\":\"<a short answer, at most two sentences>\"} for anything else.\n"
+                        + "{\"do\":\"ask\"} for a question or anything to talk about (it's answered separately, with more thought);\n"
+                        + "{\"do\":\"say\",\"text\":\"<a few words>\"} only to say you can't do something.\n"
                         + "Speech recognition may mishear names: pick the closest sensible match.";
                 String reply = ask(act, sys, ctx + "\nThey said: \"" + said + "\"", 300);
                 a = firstJson(reply);
@@ -135,6 +136,7 @@ final class Assistant {
             }
             case "catchup": catchUp(h); return;
             case "say": card(h, "Claude", a.optString("text")); speak(h.getContext(), a.optString("text")); return;
+            case "ask": answer(h, said); return;
             default: h.searchQuery(said, true);        // (nothing usable: searched, as before)
         }
     }
@@ -164,6 +166,56 @@ final class Assistant {
             if (bestRank == 0) break;
         }
         return best;
+    }
+
+    // ================================================================== questions
+
+    /* A question ("who won the World Series last year?", "how tall is LeBron?", "what's a good wine with pizza?")
+       answered by the model chosen in Settings (Sonnet, unless changed), which may search the web for anything
+       current. A follow-up within ten minutes carries on the same conversation ("and the year before?"). */
+    private static final JSONArray history = new JSONArray();
+    private static long historyAt;
+    static String model(Context c) {
+        String m = prefs(c).getString("aiModel", "sonnet");
+        return m.equals("haiku") ? "claude-haiku-5-5" : m.equals("opus") ? "claude-opus-5-5" : "claude-sonnet-5-5";
+    }
+    static void answer(final NativeHome h, final String said) {
+        final Context c = h.getContext();
+        card(h, "Claude", "Thinking…");
+        final JSONArray games = h.sportsData().gamesForAssistant();
+        final JSONObject watching = h.liveWatchingGameJson();
+        new Thread(new Runnable() { @Override public void run() {
+            String text;
+            try {
+                StringBuilder sys = new StringBuilder("You are Claude, answering out loud on someone's TV (Google TV, the TopShelf launcher). "
+                        + "Answer in two to four short spoken sentences: no lists, no markdown, no links, no emoji. "
+                        + "Use web search for anything current (scores, news, schedules, weather, prices). "
+                        + "Now: " + new SimpleDateFormat("EEEE MMMM d yyyy, h:mm a", Locale.US).format(new Date()) + ".");
+                if (watching != null) sys.append(" They're watching ").append(watching.optString("name", watching.optString("short"))).append('.');
+                if (games.length() > 0) { sys.append(" Today's games of their sports:"); for (int i = 0; i < games.length() && i < 25; i++) sys.append("\n").append(games.optString(i)); }
+                JSONArray msgs = new JSONArray();
+                synchronized (history) {
+                    if (System.currentTimeMillis() - historyAt > 10 * 60000L) while (history.length() > 0) history.remove(0);
+                    for (int i = 0; i < history.length(); i++) msgs.put(history.get(i));
+                }
+                msgs.put(new JSONObject().put("role", "user").put("content", said));
+                text = call(c, model(c), sys.toString(), msgs, 700, true).trim();
+                text = text.replaceAll("\\*\\*|__|#+ ", "").replaceAll("\\[([^\\]]*)\\]\\([^)]*\\)", "$1");
+                synchronized (history) {
+                    history.put(new JSONObject().put("role", "user").put("content", said));
+                    history.put(new JSONObject().put("role", "assistant").put("content", text.isEmpty() ? "…" : text));
+                    while (history.length() > 12) history.remove(0);
+                    historyAt = System.currentTimeMillis();
+                }
+                Diag.ev("assistant: answered a question (" + model(c) + ")");
+            } catch (Exception e) {
+                String m = String.valueOf(e.getMessage());
+                Diag.ev("assistant: question failed (" + m.replaceAll("sk-ant-[\\w-]+", "…") + ")");
+                text = m.contains("401") ? "The Anthropic API key wasn't accepted (Settings › System › Assistant)." : m.contains("429") || m.contains("529") ? "Claude is busy right now. Try again in a moment." : "Couldn't reach Claude right now.";
+            }
+            final String t = text.isEmpty() ? "I don't have an answer for that." : text;
+            MAIN.post(new Runnable() { @Override public void run() { card(h, "Claude", t); speak(c, t); } });
+        } }, "assistant-answer").start();
     }
 
     // ================================================================== "What did I miss?"
@@ -303,13 +355,22 @@ final class Assistant {
     // ================================================================== Claude
 
     static String ask(Context c, String system, String user, int maxTokens) throws Exception {
+        return call(c, MODEL, system, new JSONArray().put(new JSONObject().put("role", "user").put("content", user)), maxTokens, false);
+    }
+    /* one call to Claude; with `web`, Claude may look things up on the web (Anthropic's own web search, up to three
+       searches) — if that's refused (an account without it), asked again without */
+    static String call(Context c, String model, String system, JSONArray messages, int maxTokens, boolean web) throws Exception {
+        try { return call1(c, model, system, messages, maxTokens, web); }
+        catch (Exception e) { if (web && String.valueOf(e.getMessage()).contains("HTTP 400")) return call1(c, model, system, messages, maxTokens, false); throw e; }
+    }
+    private static String call1(Context c, String model, String system, JSONArray messages, int maxTokens, boolean web) throws Exception {
         String k = key(c);
         if (k.isEmpty()) throw new Exception("no key");
-        JSONObject body = new JSONObject().put("model", MODEL).put("max_tokens", maxTokens).put("system", system)
-                .put("messages", new JSONArray().put(new JSONObject().put("role", "user").put("content", user)));
+        JSONObject body = new JSONObject().put("model", model).put("max_tokens", maxTokens).put("system", system).put("messages", messages);
+        if (web) body.put("tools", new JSONArray().put(new JSONObject().put("type", "web_search_20250305").put("name", "web_search").put("max_uses", 3)));
         HttpURLConnection con = (HttpURLConnection) new URL(API).openConnection();
         try {
-            con.setConnectTimeout(8000); con.setReadTimeout(20000);
+            con.setConnectTimeout(8000); con.setReadTimeout(web ? 60000 : 30000);
             con.setRequestMethod("POST"); con.setDoOutput(true);
             con.setRequestProperty("content-type", "application/json");
             con.setRequestProperty("x-api-key", k);
@@ -370,7 +431,8 @@ final class Assistant {
         }
         MAIN.removeCallbacks(HIDE);
         int words = text.split("\\s+").length;
-        MAIN.postDelayed(HIDE, Math.max(9000, Math.min(40000, words * 420L + 4000)));
+        // (while it's still working — "Thinking…" — it stays until the answer replaces it)
+        MAIN.postDelayed(HIDE, text.endsWith("…") ? 75000 : Math.max(9000, Math.min(40000, words * 420L + 4000)));
     }
     static boolean cardShown() { return card != null && card.getVisibility() == View.VISIBLE; }
     // ================================================================== Claude's voice (the TV's own text-to-speech)
