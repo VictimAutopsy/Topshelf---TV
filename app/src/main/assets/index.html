@@ -1270,6 +1270,10 @@ function buildAllSettings() {
         cycle: () => { let i = {}; try { i = JSON.parse(B.aiInfo()); } catch (e) {} B.aiSetVoice(i.voice === false); } },
       { label: 'Read answers aloud', value: () => { let i = {}; try { i = JSON.parse(B.aiInfo()); } catch (e) {} return i.speak === false ? 'Off · answers only on screen' : 'On · in the TV’s own voice'; },
         cycle: () => { let i = {}; try { i = JSON.parse(B.aiInfo()); } catch (e) {} B.aiSetSpeak(i.speak === false); } },
+      { label: 'Voice', value: () => { let i = {}; try { i = JSON.parse(B.aiInfo()); } catch (e) {} return (i.voiceName || 'The TV’s usual voice') + ' · OK for the next'; },
+        ok: () => { if (B.aiNextVoice) B.aiNextVoice(); setTimeout(drawSettings, 500); } },
+      { label: 'Speaking speed', value: () => { let i = {}; try { i = JSON.parse(B.aiInfo()); } catch (e) {} return i.rate || 'Normal'; },
+        ok: () => { if (B.aiNextRate) B.aiNextRate(); setTimeout(drawSettings, 300); } },
       { label: 'Ask from the remote', value: () => { let i = {}; try { i = JSON.parse(B.aiInfo()); } catch (e) {} return i.star === false ? '★ button: Google TV’s own' : '★ button asks Claude (needs the Home button set-up)'; },
         cycle: () => { let i = {}; try { i = JSON.parse(B.aiInfo()); } catch (e) {} if (B.aiSetStar) B.aiSetStar(i.star === false); } },
     ] : []),
@@ -1360,7 +1364,7 @@ const SET_SECTIONS = [
     ['Updates', ['TopShelf updates', 'Go back to the previous version', 'Updates access token']],
     ['Your settings', ['Backup & restore']],
     ['Help', ['Diagnostic report', 'Run a self-check', 'Report a glitch', 'Speed test']],
-    ['Assistant', ['Anthropic API key', 'Claude model', 'Voice requests', 'Read answers aloud', 'Ask from the remote']],
+    ['Assistant', ['Anthropic API key', 'Claude model', 'Voice requests', 'Read answers aloud', 'Voice', 'Speaking speed', 'Ask from the remote']],
     ['Advanced', ['Show frame rate', 'Open Google TV home', 'Android settings']] ] }
 ];
 const setMatch = (it, label) => typeof it === 'string' ? it === label : it.test(label);

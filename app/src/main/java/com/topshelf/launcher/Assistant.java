@@ -538,14 +538,63 @@ final class Assistant {
     private static boolean ttsReady;
     private static String ttsWaiting;
     static boolean speaks(Context c) { return prefs(c).getBoolean("aiSpeak", true); }
+    /* The voice (Settings › System › Assistant › Voice, Speaking speed): one of the voices the TV's speech engine has
+       for your language; each press of OK moves to the next and says a line in it. */
+    private static List<android.speech.tts.Voice> voices() {
+        List<android.speech.tts.Voice> l = new ArrayList<>();
+        try {
+            String lang = Locale.getDefault().getLanguage();
+            for (android.speech.tts.Voice v : tts.getVoices()) if (v.getLocale() != null && v.getLocale().getLanguage().equals(lang) && !v.getFeatures().contains("notInstalled")) l.add(v);
+            java.util.Collections.sort(l, new java.util.Comparator<android.speech.tts.Voice>() { @Override public int compare(android.speech.tts.Voice a, android.speech.tts.Voice b) { return a.getName().compareTo(b.getName()); } });
+        } catch (Throwable ignored) { }
+        return l;
+    }
+    private static void applyVoice(Context c) {
+        try {
+            tts.setSpeechRate(prefs(c).getFloat("aiRate", 1.05f));
+            String want = prefs(c).getString("aiVoiceName", "");
+            if (!want.isEmpty()) for (android.speech.tts.Voice v : voices()) if (v.getName().equals(want)) { tts.setVoice(v); break; }
+        } catch (Throwable ignored) { }
+    }
+    static String voiceLabel(Context c) {
+        String want = prefs(c).getString("aiVoiceName", "");
+        if (want.isEmpty()) return "The TV's usual voice";
+        if (tts == null || !ttsReady) return "Chosen";
+        List<android.speech.tts.Voice> l = voices();
+        for (int i = 0; i < l.size(); i++) if (l.get(i).getName().equals(want)) return "Voice " + (i + 1) + " of " + l.size() + " · " + l.get(i).getLocale().getDisplayCountry() + (l.get(i).isNetworkConnectionRequired() ? " · online" : "");
+        return "Chosen";
+    }
+    /** the next voice, with a line said in it (the speech engine is started first if it hasn't been) */
+    static void nextVoice(final Context c) {
+        if (tts == null || !ttsReady) { prefs(c).edit().putBoolean("aiSpeak", true).apply(); speakNow(c, "Press OK again to try the next voice."); return; }
+        List<android.speech.tts.Voice> l = voices();
+        if (l.isEmpty()) { speakNow(c, "This TV has only one voice."); return; }
+        String want = prefs(c).getString("aiVoiceName", "");
+        int i = -1; for (int k = 0; k < l.size(); k++) if (l.get(k).getName().equals(want)) i = k;
+        android.speech.tts.Voice v = l.get((i + 1) % l.size());
+        prefs(c).edit().putString("aiVoiceName", v.getName()).apply();
+        try { tts.setVoice(v); } catch (Throwable ignored) { }
+        speakNow(c, "This is voice " + ((i + 1) % l.size() + 1) + ". The Falcons lead by seven with two minutes left.");
+    }
+    static void nextRate(Context c) {
+        float r = prefs(c).getFloat("aiRate", 1.05f);
+        r = r < .9f ? 1.05f : r < 1.1f ? 1.25f : r < 1.3f ? 1.5f : .85f;
+        prefs(c).edit().putFloat("aiRate", r).apply();
+        if (tts != null && ttsReady) try { tts.setSpeechRate(r); } catch (Throwable ignored) { }
+        speakNow(c, "This is how fast I'll speak.");
+    }
+    static String rateLabel(Context c) { float r = prefs(c).getFloat("aiRate", 1.05f); return r < .9f ? "Slower" : r < 1.1f ? "Normal" : r < 1.3f ? "Faster" : "Fastest"; }
+    private static void speakNow(Context c, String t) { boolean was = speaks(c); prefs(c).edit().putBoolean("aiSpeak", true).apply(); speak(c, t); if (!was) prefs(c).edit().putBoolean("aiSpeak", false).apply(); }
     static void speak(Context c, final String text) {
         if (text == null || text.trim().isEmpty() || !speaks(c)) return;
+        final Context c0 = c.getApplicationContext();
         if (tts == null) {
             ttsWaiting = text;
             tts = new android.speech.tts.TextToSpeech(c.getApplicationContext(), new android.speech.tts.TextToSpeech.OnInitListener() { @Override public void onInit(int st) {
                 ttsReady = st == android.speech.tts.TextToSpeech.SUCCESS;
                 if (!ttsReady) { Diag.ev("assistant: the TV has no voice to read answers with"); return; }
-                try { tts.setLanguage(Locale.getDefault()); tts.setSpeechRate(1.05f); } catch (Throwable ignored) { }
+                try { tts.setLanguage(Locale.getDefault()); } catch (Throwable ignored) { }
+                applyVoice(c0);
                 String w = ttsWaiting; ttsWaiting = null;
                 if (w != null) tts.speak(w, android.speech.tts.TextToSpeech.QUEUE_FLUSH, null, "claude");
             } });
