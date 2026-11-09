@@ -66,9 +66,23 @@ final class Assistant {
     // ================================================================== voice requests
 
     /** what was said: worked out by Claude, then done (main thread in) */
+    /* a question ("who won…", "how old is…", "what's the weather…") goes straight to the answer with web search: the
+       quick sorter sometimes took one for a search or answered it in a few words itself */
+    private static final Pattern QUESTION = Pattern.compile("^(who|what|what's|whats|when|where|why|how|is|are|was|were|did|does|do|can|could|will|would|should|which|tell me|explain|define)\\b.*");
+    private static final Pattern DO_THING = Pattern.compile("\\b(put on|play|watch|turn on|switch to|change to|tune|open|show me|find me|recommend|suggest|something to watch|what did i miss|catch me up)\\b");
+    static boolean isQuestion(String said) {
+        String t = said.trim().toLowerCase(Locale.US);
+        return QUESTION.matcher(t).matches() && !DO_THING.matcher(t).find();
+    }
     static void handle(final MainActivity act, final String said) {
         final NativeHome h = act.nativeHome();
         if (h == null) return;
+        if (isQuestion(said)) {
+            Diag.ev("assistant: a question (" + said.length() + " characters)");
+            try { h.findClose(); } catch (Throwable ignored) { }
+            answer(h, said);
+            return;
+        }
         Diag.ev("assistant: a request (" + said.length() + " characters)");
         h.toast("Asking Claude…");
         final JSONArray games = h.sportsData().gamesForAssistant();
@@ -120,7 +134,7 @@ final class Assistant {
                 h.toast("No channel called “" + a.optString("name") + "” in your playlist");
                 return;
             }
-            case "search": h.searchQuery(a.optString("query"), true); return;
+            case "search": if (isQuestion(said)) { answer(h, said); return; } h.searchQuery(a.optString("query"), true); return;
             case "suggest": {
                 JSONArray ts = a.optJSONArray("titles");
                 if (ts == null || ts.length() == 0) { h.searchQuery(said, true); return; }
@@ -135,7 +149,7 @@ final class Assistant {
                 return;
             }
             case "catchup": catchUp(h); return;
-            case "say": card(h, "Claude", a.optString("text")); speak(h.getContext(), a.optString("text")); return;
+            case "say": if (isQuestion(said)) { answer(h, said); return; } card(h, "Claude", a.optString("text")); speak(h.getContext(), a.optString("text")); return;
             case "ask": answer(h, said); return;
             default: h.searchQuery(said, true);        // (nothing usable: searched, as before)
         }

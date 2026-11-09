@@ -317,7 +317,7 @@ final class Ring {
                 if (!running) return;
                 /* a connection that had been working a while starts again in seconds; only failures one after
                    another wait longer (they had added up over a day to five minutes deaf after every drop) */
-                if (lastSessionMs > 60000) fails = 0;
+                if (lastSessionMs > 30000) fails = 0;
                 fails++;
                 state = connected() ? "Reconnecting…" : state;
                 Diag.ev("ring: " + t.getMessage() + " · trying again");

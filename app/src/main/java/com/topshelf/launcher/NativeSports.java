@@ -472,7 +472,7 @@ final class NativeSports extends FrameLayout {
 
     /** the games the tab (and league) picks, as the one row on screen */
     private void applySet(boolean smooth) {
-        if (tab.equals("Standings")) standings.show(); else standings.hide();
+        if (tab.equals("Standings")) { standings.show(); standings.bringToFront(); chrome.bringToFront(); } else standings.hide();
         String curKey = curItem() != null ? curItem().optString("k").split(":")[0] : null;
         int idx = tab.equals("Live Now") ? liveIdx : tab.equals("My Teams") ? mineIdx : tab.equals("Fantasy") ? (off == 1 ? 0 : -1) : rail.rowOf(leagueSel);
         boolean same = idx == curSet;
@@ -1818,6 +1818,8 @@ final class NativeSports extends FrameLayout {
         nv.setAlpha(0f); nv.setTranslationY(.4f * R);
         final int under = heroTop;
         heroTop = next;
+        // (Standings covers the scoreboard: a new scoreboard brought forward went over the tables)
+        if (standings != null && standings.shownNow()) { standings.bringToFront(); chrome.bringToFront(); }
         nv.animate().alpha(1f).translationY(0).setDuration(300).setInterpolator(TileView.EASE).withEndAction(new Runnable() { @Override public void run() {
             if (heroTop == 1 - under || under < 0) { } if (under >= 0 && heroTop != under) hero[under].setAlpha(0f);
         } }).start();
