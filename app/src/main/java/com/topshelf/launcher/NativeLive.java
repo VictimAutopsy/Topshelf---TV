@@ -511,6 +511,8 @@ final class NativeLive extends FrameLayout {
         return out;
     }
     Set<String> favSet() { return new HashSet<>(favs); }
+    /** the game on the channel you're watching full screen (null if none known) */
+    JSONObject watchingGameJson() { return watchingGameId().isEmpty() ? null : watchGame; }
 
     /** watch this channel full screen (from search, a reminder, Multiview…) */
     void playUrl(String u) {
@@ -2822,6 +2824,7 @@ final class NativeLive extends FrameLayout {
             l.add("Quality · " + (tr.optBoolean("auto", true) ? "Auto" : "Fixed"));
             a.add(new Runnable() { @Override public void run() { later(new Runnable() { @Override public void run() { qualityMenu(tracks()); } }); } });
         }
+        if (watchGame != null && !Assistant.key(getContext()).isEmpty()) { l.add("What did I miss?"); a.add(new Runnable() { @Override public void run() { Assistant.catchUp(h); } }); }
         l.add(stats ? "Hide stream info" : "Stream info"); a.add(new Runnable() { @Override public void run() { toggleStats(); } });
         // sends the last few minutes (the freezes in it included) and a picture to the updates repository
         l.add("Report a glitch"); a.add(new Runnable() { @Override public void run() {

@@ -72,7 +72,9 @@ final class Diag {
             m.appendTail(b);
             s = b.toString();
         }
-        return SECRET.matcher(s).replaceAll("$1…");
+        s = SECRET.matcher(s).replaceAll("$1…");
+        // (an Anthropic API key, wherever it turns up)
+        return s.indexOf("sk-ant-") >= 0 ? s.replaceAll("sk-ant-[A-Za-z0-9_\\-]+", "sk-ant-…") : s;
     }
     static void ev(String what) {
         what = scrub(what);

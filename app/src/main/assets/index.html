@@ -1257,6 +1257,16 @@ function buildAllSettings() {
     ...(IS_TV && B.tryRenderScale ? [{ label: 'Picture sharpness', value: () => renderScaleName(B.getRenderScale()), cycle: d => renderScaleStep(d), ok: () => renderScaleStep(1) }] : []),
     { label: 'Speed test', value: () => 'Measure this TV', ok: () => setTimeout(speedTest, 200) },
     ...(IS_TV ? [{ label: 'Diagnostic report', value: () => 'Run a test', ok: () => setTimeout(() => diagRun('tv'), 200) }] : []),
+    ...(IS_TV && B.aiInfo ? [
+      { label: 'Anthropic API key', value: () => { let i = {}; try { i = JSON.parse(B.aiInfo()); } catch (e) {} return i.key ? 'Added · Claude answers voice requests' : 'Not added (console.anthropic.com)'; },
+        edit: { wide: true, type: 'text', ph: 'Paste your Anthropic API key (sk-ant-…)', get: () => '', set: v => {
+          v = (v || '').trim();
+          if (!B.aiSetKey(v)) { toast("That doesn't look like an Anthropic API key (it starts with sk-ant-)"); return; }
+          toast(v ? 'Claude is ready: press the mic and ask' : 'Key removed');
+        } } },
+      { label: 'Voice requests', value: () => { let i = {}; try { i = JSON.parse(B.aiInfo()); } catch (e) {} return i.voice === false ? 'Off · the mic only searches' : 'On · “put on the Falcons game”, “what did I miss”'; },
+        cycle: () => { let i = {}; try { i = JSON.parse(B.aiInfo()); } catch (e) {} B.aiSetVoice(i.voice === false); } },
+    ] : []),
     ...(IS_TV && B.selfCheck ? [{ label: 'Run a self-check', value: () => 'TopShelf tests its own screens (about a minute)', ok: () => { closeSettings(); setTimeout(() => B.selfCheck(), 600); } }] : []),
     ...(!IS_TV && typeof lkOn === 'function' && lkOn() ? [{ label: 'Report a glitch on the TV', value: () => `When ${lkTvName()}'s screen looks wrong`,
       ok: async () => { const r = await lkSend({ type: 'glitch' }); if (r) toast(r.ok ? `${lkTvName()} is sending what just happened` : `${lkTvName()} needs an update first`); } }] : []),
@@ -1344,6 +1354,7 @@ const SET_SECTIONS = [
     ['Updates', ['TopShelf updates', 'Go back to the previous version', 'Updates access token']],
     ['Your settings', ['Backup & restore']],
     ['Help', ['Diagnostic report', 'Run a self-check', 'Report a glitch', 'Speed test']],
+    ['Assistant', ['Anthropic API key', 'Voice requests']],
     ['Advanced', ['Show frame rate', 'Open Google TV home', 'Android settings']] ] }
 ];
 const setMatch = (it, label) => typeof it === 'string' ? it === label : it.test(label);

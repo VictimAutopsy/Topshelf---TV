@@ -1036,6 +1036,22 @@ final class SportsData {
                     .put("name", e.name).put("short", e.shortName).put("card", e.card).put("state", e.state).put("teams", ts).put("picked", true);
         } catch (Exception x) { return null; }
     }
+    /** today's games (on now, or starting in the next 18 hours, or ended in the last 3), one line each, for the
+        assistant: "id | league | away @ home | state | start" (main thread) */
+    JSONArray gamesForAssistant() {
+        JSONArray out = new JSONArray();
+        long now = System.currentTimeMillis();
+        java.text.SimpleDateFormat f = new java.text.SimpleDateFormat("EEE h:mm a", Locale.US);
+        for (List<Ev> l : ev.values()) if (l != null) for (Ev e : l) {
+            boolean near = e.state.equals("in") || (e.state.equals("pre") && e.at - now < 18 * 3600000L && e.at > now - 3600000L) || (e.state.equals("post") && now - e.at < 6 * 3600000L);
+            if (!near || out.length() >= 60) continue;
+            StringBuilder g = new StringBuilder();
+            if (e.teams.size() == 2) g.append(e.teams.get(0).full.isEmpty() ? e.teams.get(0).name : e.teams.get(0).full).append(" @ ").append(e.teams.get(1).full.isEmpty() ? e.teams.get(1).name : e.teams.get(1).full);
+            else g.append(e.name);
+            out.put(e.id + " | " + e.lgName + " | " + g + " | " + (e.state.equals("in") ? "live" : e.state.equals("pre") ? "not started" : "ended") + " | " + f.format(new java.util.Date(e.at)));
+        }
+        return out;
+    }
     interface GameOn { void found(JSONObject game); }
     /** which game (of those on now or about to be) the Sports tab's own matching puts on this channel (main thread in,
         answer on the main thread; null if none) — Live TV asks this when the page's matching finds nothing */

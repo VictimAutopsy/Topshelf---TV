@@ -14,6 +14,7 @@ cases = [
     ("Authorization: Bearer eyJhbGciOiJIUzI1NiJ9.abc.def", ["eyJhbGciOiJIUzI1NiJ9"]),
     ('{"access_token":"abcd1234efgh","refresh_token":"zzzyyy"}', ["abcd1234efgh", "zzzyyy"]),
     ("https://aio.example/stremio/eyJ1c2VyIjoiYWJjZGVmZ2hpamtsbW5vcCJ9/manifest.json", ["eyJ1c2VyIjoiYWJjZGVmZ2hpamtsbW5vcCJ9"]),
+    ("assistant: failed (key sk-ant-api03-AbCdEf_12345-xyz rejected)", ["AbCdEf_12345"]),
 ]
 keep = [("title: cast 12 (Trakt, 10 with photos)", "title: cast 12 (Trakt, 10 with photos)")]
 java = "class NativePlayer {\n" + safe + "}\nclass T {\n" + scrub + """

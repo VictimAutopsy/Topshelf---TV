@@ -672,6 +672,8 @@ public class MainActivity extends Activity {
             ArrayList<String> r = data.getStringArrayListExtra(RecognizerIntent.EXTRA_RESULTS);
             if (r != null && !r.isEmpty()) text = r.get(0);
         }
+        // a request ("put on the Falcons game", "what did I miss") goes to the assistant; a name is searched as before
+        if (text != null && home != null && Assistant.wants(this, text)) { Assistant.handle(this, text); return; }
         js("window.tsVoice && tsVoice(" + (text == null ? "null" : org.json.JSONObject.quote(text)) + ")");
     }
 
@@ -874,6 +876,8 @@ public class MainActivity extends Activity {
         // the self-check: a real press of the remote stops it (and does nothing else)
         if (SelfCheck.running() && !SelfCheck.injecting()) { if (e.getAction() == KeyEvent.ACTION_DOWN) SelfCheck.abort("a button was pressed"); return true; }
         if (!SelfCheck.injecting()) lastKeyAt = android.os.SystemClock.uptimeMillis();
+        // the assistant's card goes at the next press (which does nothing else)
+        if (Assistant.cardShown()) { if (e.getAction() == KeyEvent.ACTION_DOWN) Assistant.hideCard(); return true; }
         if (redditLogin != null) { if (redditLogin.key(e)) return true; return super.dispatchKeyEvent(e); }
         if (homeHasKeys()) {
             try { if (home.key(e)) return true; } catch (Throwable t) { nativeHomeBroken(t); }

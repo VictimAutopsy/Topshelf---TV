@@ -1,0 +1,318 @@
+package com.topshelf.launcher;
+
+import android.content.Context;
+import android.content.SharedPreferences;
+import android.graphics.Color;
+import android.graphics.drawable.GradientDrawable;
+import android.os.Handler;
+import android.os.Looper;
+import android.view.Gravity;
+import android.view.View;
+import android.widget.FrameLayout;
+import android.widget.LinearLayout;
+import android.widget.TextView;
+
+import org.json.JSONArray;
+import org.json.JSONObject;
+
+import java.io.ByteArrayOutputStream;
+import java.io.InputStream;
+import java.io.OutputStream;
+import java.net.HttpURLConnection;
+import java.net.URL;
+import java.nio.charset.StandardCharsets;
+import java.text.SimpleDateFormat;
+import java.util.ArrayList;
+import java.util.Date;
+import java.util.List;
+import java.util.Locale;
+import java.util.regex.Pattern;
+
+/**
+ * The assistant (Settings › System › Assistant): Claude, with your own Anthropic API key, kept on the TV only.
+ *
+ * Voice requests: what you say to the remote's mic that sounds like a request ("put on the Falcons game", "something
+ * funny under two hours", "what did I miss") goes to Claude with what TopShelf knows right now (the time, today's
+ * games of your sports, the game you're watching), and comes back as one thing to do: play a game or a channel,
+ * search, offer a few titles, catch you up on the game, or just answer. Anything else said is searched as before.
+ *
+ * "What did I miss?": the game you're watching (Live TV, hold OK, or by voice) — ESPN's account of it so far (score,
+ * scoring plays, the last drives or plays) summed up in three sentences.
+ *
+ * What's sent: your words, the time, the names of the games, and ESPN's public account of a game. Never your
+ * channel list, logins, playlist or anything you've watched.
+ */
+final class Assistant {
+    private Assistant() { }
+
+    private static final String API = "https://api.anthropic.com/v1/messages";
+    private static final String MODEL = "claude-haiku-5-5";
+    private static final Handler MAIN = new Handler(Looper.getMainLooper());
+
+    static SharedPreferences prefs(Context c) { return c.getSharedPreferences(Bridge.PREFS, Context.MODE_PRIVATE); }
+    static String key(Context c) { return prefs(c).getString("aiKey", "").trim(); }
+    static boolean on(Context c) { return !key(c).isEmpty() && prefs(c).getBoolean("aiVoice", true); }
+
+    /* what sounds like a request rather than a name to search for */
+    private static final Pattern ASK = Pattern.compile("^(put on|play|watch|turn on|switch to|change to|go to|open|show me|find me|find something|"
+            + "i want|i'd like|recommend|suggest|give me|something|anything|what|who|how|when|where|is there|are there|which|can you|tell me|catch me up)\\b"
+            + "|what did i miss|catch me up|something (funny|scary|good|new|light|short)|\\bunder (an|one|two|three|\\d+) hours?\\b");
+    static boolean wants(Context c, String said) {
+        if (said == null || !on(c)) return false;
+        return ASK.matcher(said.trim().toLowerCase(Locale.US)).find();
+    }
+
+    // ================================================================== voice requests
+
+    /** what was said: worked out by Claude, then done (main thread in) */
+    static void handle(final MainActivity act, final String said) {
+        final NativeHome h = act.nativeHome();
+        if (h == null) return;
+        Diag.ev("assistant: a request (" + said.length() + " characters)");
+        h.toast("Asking Claude…");
+        final JSONArray games = h.sportsData().gamesForAssistant();
+        final JSONObject watching = h.liveWatchingGameJson();
+        new Thread(new Runnable() { @Override public void run() {
+            JSONObject a;
+            try {
+                StringBuilder ctx = new StringBuilder();
+                ctx.append("Now: ").append(new SimpleDateFormat("EEEE MMMM d, h:mm a", Locale.US).format(new Date())).append('\n');
+                ctx.append(watching != null ? "Watching now: " + watching.optString("name", watching.optString("short")) + "\n" : "Not watching a game now.\n");
+                ctx.append("Games today and soon (id | league | game | state | start):\n");
+                for (int i = 0; i < games.length(); i++) ctx.append(games.optString(i)).append('\n');
+                String sys = "You turn a TV viewer's spoken request into ONE action for the TopShelf TV launcher. Reply with only a JSON object, one of:\n"
+                        + "{\"do\":\"game\",\"id\":\"<id from the list>\"} to watch a game in the list;\n"
+                        + "{\"do\":\"channel\",\"name\":\"<channel name, e.g. ESPN, CNN, Fox Sports 1>\"} to tune a live channel;\n"
+                        + "{\"do\":\"search\",\"query\":\"<a movie, show or person's exact name>\"} when they named or described one specific title (name it);\n"
+                        + "{\"do\":\"suggest\",\"say\":\"<a few words>\",\"titles\":[\"<3 to 6 real movie or show titles that fit>\"]} for a recommendation;\n"
+                        + "{\"do\":\"catchup\"} when they ask what they missed in the game they're watching;\n"
+                        + "{\"do\":\"say\",\"text\":\"<a short answer, at most two sentences>\"} for anything else.\n"
+                        + "Speech recognition may mishear names: pick the closest sensible match.";
+                String reply = ask(act, sys, ctx + "\nThey said: \"" + said + "\"", 300);
+                a = firstJson(reply);
+            } catch (final Exception e) {
+                MAIN.post(new Runnable() { @Override public void run() { failed(h, e); } });
+                return;
+            }
+            final JSONObject act1 = a;
+            MAIN.post(new Runnable() { @Override public void run() { act(act, h, act1, said); } });
+        } }, "assistant").start();
+    }
+
+    private static void act(MainActivity act, final NativeHome h, JSONObject a, String said) {
+        String what = a == null ? "" : a.optString("do");
+        Diag.ev("assistant: " + (what.isEmpty() ? "no answer it could use" : what));
+        try { h.findClose(); } catch (Throwable ignored) { }
+        act.js("window.closeSearch && mode === 'search' && closeSearch()");
+        switch (what) {
+            case "game": {
+                SportsData sd = h.sportsData();
+                SportsData.Ev e = sd.find(a.optString("id"));
+                if (e != null) { sd.watch(e); return; }
+                h.toast("That game isn't on today");
+                return;
+            }
+            case "channel": {
+                NativeLive.Ch ch = findChannel(h, a.optString("name"));
+                if (ch != null) { h.livePlayUrl(ch.u); return; }
+                h.toast("No channel called “" + a.optString("name") + "” in your playlist");
+                return;
+            }
+            case "search": h.searchQuery(a.optString("query"), true); return;
+            case "suggest": {
+                JSONArray ts = a.optJSONArray("titles");
+                if (ts == null || ts.length() == 0) { h.searchQuery(said, true); return; }
+                List<String> l = new ArrayList<>(); List<Runnable> r = new ArrayList<>();
+                for (int i = 0; i < ts.length() && i < 6; i++) {
+                    final String t = ts.optString(i);
+                    if (t.isEmpty()) continue;
+                    l.add(t); r.add(new Runnable() { @Override public void run() { h.searchQuery(t, true); } });
+                }
+                h.showMenu(l, r, null, 1f, a.optString("say", "Some ideas"));
+                return;
+            }
+            case "catchup": catchUp(h); return;
+            case "say": card(h, "Claude", a.optString("text")); return;
+            default: h.searchQuery(said, true);        // (nothing usable: searched, as before)
+        }
+    }
+
+    private static void failed(NativeHome h, Exception e) {
+        String m = String.valueOf(e.getMessage());
+        Diag.ev("assistant: failed (" + m.replaceAll("sk-ant-[\\w-]+", "…") + ")");
+        h.toast(m.contains("401") ? "The Anthropic API key wasn't accepted (Settings › System › Assistant)"
+                : m.contains("429") || m.contains("529") ? "Claude is busy right now, try again in a moment"
+                : "Couldn't reach Claude");
+    }
+
+    /** a channel by name: the same name first, then one that starts with it, then one that has it (favorites first) */
+    private static NativeLive.Ch findChannel(NativeHome h, String name) {
+        String q = LiveTv.norm(name);
+        if (q.isEmpty()) return null;
+        List<NativeLive.Ch> all;
+        try { all = NativeLive.shared(h.bridge.live.channelsFile()); } catch (Throwable t) { return null; }
+        java.util.Set<String> favs = h.liveFavs();
+        NativeLive.Ch best = null; int bestRank = 99;
+        for (NativeLive.Ch c : all) {
+            String n = LiveTv.norm(c.n);
+            int rank = n.equals(q) ? 0 : n.startsWith(q) ? 2 : n.contains(q) ? 4 : 99;
+            if (rank == 99) continue;
+            if (!favs.contains(c.u)) rank++;
+            if (rank < bestRank || (rank == bestRank && best != null && c.n.length() < best.n.length())) { best = c; bestRank = rank; }
+            if (bestRank == 0) break;
+        }
+        return best;
+    }
+
+    // ================================================================== "What did I miss?"
+
+    static void catchUp(final NativeHome h) {
+        final JSONObject g = h.liveWatchingGameJson();
+        if (g == null) { card(h, "What did I miss?", "TopShelf doesn't know which game this channel is showing. Start the game from Sports and it will."); return; }
+        if (key(h.getContext()).isEmpty()) { h.toast("Add an Anthropic API key in Settings › System › Assistant first"); return; }
+        final String title = "What you missed · " + g.optString("short", g.optString("name"));
+        card(h, title, "Catching up…");
+        new Thread(new Runnable() { @Override public void run() {
+            String text;
+            try {
+                String facts = gameFacts(g);
+                text = ask(h.getContext(), "You are a sports companion on a TV. Using only the facts given, tell a fan who just tuned in what they missed, "
+                        + "in three short sentences: the score and time left, the key moments, and the momentum. No preamble, no lists.", facts, 260).trim();
+                Diag.ev("assistant: caught up on a game");
+            } catch (Exception e) {
+                String m = String.valueOf(e.getMessage());
+                Diag.ev("assistant: catch-up failed (" + m.replaceAll("sk-ant-[\\w-]+", "…") + ")");
+                text = m.contains("401") ? "The Anthropic API key wasn't accepted (Settings › System › Assistant)." : "Couldn't get the catch-up right now.";
+            }
+            final String t = text;
+            MAIN.post(new Runnable() { @Override public void run() { card(h, title, t); } });
+        } }, "assistant-catchup").start();
+    }
+
+    /** ESPN's public account of the game so far, as plain lines */
+    private static String gameFacts(JSONObject g) throws Exception {
+        String url = "https://site.api.espn.com/apis/site/v2/sports/" + g.optString("sport") + "/" + g.optString("league") + "/summary?event=" + g.optString("id");
+        byte[] b = HomeImages.http(url, null);
+        if (b == null) throw new Exception("ESPN didn't answer");
+        JSONObject s = new JSONObject(new String(b, StandardCharsets.UTF_8));
+        StringBuilder o = new StringBuilder();
+        JSONObject comp = s.optJSONObject("header") == null ? null : s.optJSONObject("header").optJSONArray("competitions") == null ? null : s.optJSONObject("header").optJSONArray("competitions").optJSONObject(0);
+        if (comp != null) {
+            JSONArray cs = comp.optJSONArray("competitors");
+            if (cs != null) for (int i = 0; i < cs.length(); i++) {
+                JSONObject c = cs.optJSONObject(i);
+                JSONObject t = c.optJSONObject("team");
+                o.append(c.optString("homeAway")).append(": ").append(t == null ? "?" : t.optString("displayName")).append(' ').append(c.optString("score")).append('\n');
+            }
+            JSONObject st = comp.optJSONObject("status");
+            if (st != null && st.optJSONObject("type") != null) o.append("Status: ").append(st.optJSONObject("type").optString("detail")).append('\n');
+        }
+        JSONArray sp = s.optJSONArray("scoringPlays");
+        if (sp != null && sp.length() > 0) {
+            o.append("Scoring plays:\n");
+            for (int i = 0; i < sp.length() && i < 30; i++) {
+                JSONObject p = sp.optJSONObject(i);
+                JSONObject per = p.optJSONObject("period"), clk = p.optJSONObject("clock"), tm = p.optJSONObject("team");
+                o.append("- ").append(per == null ? "" : "P" + per.optInt("number") + " ").append(clk == null ? "" : clk.optString("displayValue") + " ")
+                 .append(tm == null ? "" : tm.optString("abbreviation") + ": ").append(p.optString("text")).append(" (").append(p.optString("awayScore")).append('-').append(p.optString("homeScore")).append(")\n");
+            }
+        }
+        JSONObject dr = s.optJSONObject("drives");
+        JSONArray prev = dr == null ? null : dr.optJSONArray("previous");
+        if (prev != null && prev.length() > 0) {
+            o.append("Latest drives:\n");
+            for (int i = Math.max(0, prev.length() - 6); i < prev.length(); i++) {
+                JSONObject d = prev.optJSONObject(i);
+                JSONObject tm = d.optJSONObject("team");
+                o.append("- ").append(tm == null ? "" : tm.optString("abbreviation") + ": ").append(d.optString("description")).append(" → ").append(d.optString("displayResult", d.optString("result"))).append('\n');
+            }
+        }
+        JSONArray plays = s.optJSONArray("plays");
+        if ((prev == null || prev.length() == 0) && plays != null && plays.length() > 0) {
+            o.append("Latest plays:\n");
+            for (int i = Math.max(0, plays.length() - 15); i < plays.length(); i++) o.append("- ").append(plays.optJSONObject(i).optString("text")).append('\n');
+        }
+        String f = o.toString();
+        return f.length() > 7000 ? f.substring(f.length() - 7000) : f;
+    }
+
+    // ================================================================== Claude
+
+    static String ask(Context c, String system, String user, int maxTokens) throws Exception {
+        String k = key(c);
+        if (k.isEmpty()) throw new Exception("no key");
+        JSONObject body = new JSONObject().put("model", MODEL).put("max_tokens", maxTokens).put("system", system)
+                .put("messages", new JSONArray().put(new JSONObject().put("role", "user").put("content", user)));
+        HttpURLConnection con = (HttpURLConnection) new URL(API).openConnection();
+        try {
+            con.setConnectTimeout(8000); con.setReadTimeout(20000);
+            con.setRequestMethod("POST"); con.setDoOutput(true);
+            con.setRequestProperty("content-type", "application/json");
+            con.setRequestProperty("x-api-key", k);
+            con.setRequestProperty("anthropic-version", "2023-06-01");
+            try (OutputStream os = con.getOutputStream()) { os.write(body.toString().getBytes(StandardCharsets.UTF_8)); }
+            int code = con.getResponseCode();
+            InputStream in = code >= 400 ? con.getErrorStream() : con.getInputStream();
+            ByteArrayOutputStream bo = new ByteArrayOutputStream(); byte[] buf = new byte[8192]; int n;
+            if (in != null) while ((n = in.read(buf)) > 0) bo.write(buf, 0, n);
+            if (code >= 400) throw new Exception("HTTP " + code);
+            JSONObject r = new JSONObject(new String(bo.toByteArray(), StandardCharsets.UTF_8));
+            JSONArray content = r.optJSONArray("content");
+            StringBuilder t = new StringBuilder();
+            if (content != null) for (int i = 0; i < content.length(); i++) { JSONObject p = content.optJSONObject(i); if (p != null && "text".equals(p.optString("type"))) t.append(p.optString("text")); }
+            return t.toString();
+        } finally { con.disconnect(); }
+    }
+    private static JSONObject firstJson(String s) {
+        if (s == null) return null;
+        int a = s.indexOf('{'), b = s.lastIndexOf('}');
+        if (a < 0 || b <= a) return null;
+        try { return new JSONObject(s.substring(a, b + 1)); } catch (Exception e) { return null; }
+    }
+
+    // ================================================================== the card
+
+    /* A card at the top of the screen with what Claude said: over anything (full-screen TV too), gone after a
+       reading time or at the next press of the remote. */
+    private static LinearLayout card;
+    private static TextView cardTitle, cardBody;
+    private static final Runnable HIDE = new Runnable() { @Override public void run() { hideCard(); } };
+    static void card(NativeHome h, String title, String text) {
+        if (card == null || card.getParent() != h) {
+            if (card != null && card.getParent() != null) ((FrameLayout) card.getParent()).removeView(card);
+            card = new LinearLayout(h.getContext());
+            card.setOrientation(LinearLayout.VERTICAL);
+            GradientDrawable bg = new GradientDrawable(); bg.setColor(0xF2121217); bg.setCornerRadius(1.6f * h.R); bg.setStroke(Math.max(1, h.px(.1f)), 0x26FFFFFF);
+            card.setBackground(bg);
+            card.setPadding(h.px(2.4f), h.px(1.8f), h.px(2.4f), h.px(2f));
+            cardTitle = h.text(h.fSemi, 1.3f, 0xB3FFFFFF);
+            cardBody = h.text(h.fReg, 1.45f, Color.WHITE);
+            cardBody.setLineSpacing(0, 1.3f);
+            card.addView(cardTitle);
+            LinearLayout.LayoutParams bl = new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT); bl.topMargin = h.px(.7f);
+            card.addView(cardBody, bl);
+            FrameLayout.LayoutParams lp = new FrameLayout.LayoutParams(h.px(62), FrameLayout.LayoutParams.WRAP_CONTENT, Gravity.TOP | Gravity.CENTER_HORIZONTAL);
+            lp.topMargin = h.px(3);
+            h.addView(card, lp);
+            card.setVisibility(View.GONE);
+        }
+        cardTitle.setText(title);
+        cardBody.setText(text);
+        card.bringToFront();
+        if (card.getVisibility() != View.VISIBLE) {
+            card.setVisibility(View.VISIBLE);
+            card.setAlpha(0f); card.setTranslationY(-h.px(2));
+            card.animate().alpha(1f).translationY(0).setDuration(240).start();
+        }
+        MAIN.removeCallbacks(HIDE);
+        int words = text.split("\\s+").length;
+        MAIN.postDelayed(HIDE, Math.max(9000, Math.min(40000, words * 420L + 4000)));
+    }
+    static boolean cardShown() { return card != null && card.getVisibility() == View.VISIBLE; }
+    static void hideCard() {
+        MAIN.removeCallbacks(HIDE);
+        if (!cardShown()) return;
+        final LinearLayout c = card;
+        c.animate().alpha(0f).setDuration(180).withEndAction(new Runnable() { @Override public void run() { c.setVisibility(View.GONE); } }).start();
+    }
+}
