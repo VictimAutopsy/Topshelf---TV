@@ -27,7 +27,9 @@ public class HomeRedirectService extends AccessibilityService {
                 && !p.equals("com.google.android.leanbacklauncher")) return;
 
         // (Google TV's other screens in its home app — the ★ button's set-up and the like — are let be)
-        if (HomeWatchService.notHomeScreen(e.getClassName() == null ? null : e.getClassName().toString())) return;
+        String cls = e.getClassName() == null ? "" : e.getClassName().toString();
+        if (!MainActivity.inFront) Diag.ev("home watch: " + p + " shows " + (cls.isEmpty() ? "(no name)" : cls));
+        if (HomeWatchService.notHomeScreen(cls)) return;
         /* TopShelf is on screen already: Google's home only changed a window behind it (it does, now and then,
            in the background). Taking that for the Home button stopped Live TV and went back to Home mid-show. */
         if (MainActivity.inFront) return;
@@ -54,6 +56,10 @@ public class HomeRedirectService extends AccessibilityService {
     private long homeDownAt;
     @Override
     protected boolean onKeyEvent(android.view.KeyEvent e) {
+        // (which code the remote's other buttons send — the ★ button's, to hook it up — in the report)
+        int kc = e.getKeyCode();
+        if (e.getAction() == android.view.KeyEvent.ACTION_DOWN && e.getRepeatCount() == 0 && (kc < 19 || kc > 23) && kc != 4 && kc != 3 && kc != 66 && kc != 24 && kc != 25)
+            Diag.ev("remote button: " + android.view.KeyEvent.keyCodeToString(kc) + " (" + kc + ")");
         if (e.getKeyCode() != android.view.KeyEvent.KEYCODE_HOME) return false;
         SharedPreferences prefs = getSharedPreferences(Bridge.PREFS, Context.MODE_PRIVATE);
         if (!prefs.getBoolean("redirect", true) || System.currentTimeMillis() < prefs.getLong("bypassUntil", 0)) return false;
