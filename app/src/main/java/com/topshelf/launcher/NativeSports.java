@@ -39,7 +39,8 @@ import java.util.Map;
  * Sports, drawn by Android, laid out like a game-day broadcast ("Gameday"): a score strip running across
  * the top, the game that matters most as a big scoreboard split in the two teams' colours (the clock, the
  * down and distance and where the ball is, the count and the runners, the last play, the chance each side
- * wins), your teams down the right, the leagues as chips, and that league's games as scorebugs. OK on the
+ * wins), your teams down the right, the leagues as chips, and that league's games as scorebugs. The Results
+ * tab has each league's finished games of the last week, the newest first (the day each was played on its card). OK on the
  * scoreboard opens the game's own page out of it. The colours, the controls (tabs, leagues) and the ring and
  * glow round what the remote is on are Sports' shared ones (SportsLook).
  *
@@ -81,6 +82,8 @@ final class NativeSports extends FrameLayout {
     private final List<JSONArray> allRows = new ArrayList<>();
     private final List<String> allTitles = new ArrayList<>(), allNotes = new ArrayList<>();
     private int liveIdx = -1, mineIdx = -1, curSet = -1;
+    /* Results rows (a league's finished games of the last week): shown on the Results tab, the leagues picking one */
+    private final java.util.Set<Integer> resRows = new java.util.HashSet<>();
     private final List<String> tabs = new ArrayList<>();
     private String tab = "", zone = "grid";          // zone: tabs | hero | side | rail | grid
     private int leagueSel = 0;
@@ -284,7 +287,7 @@ final class NativeSports extends FrameLayout {
     /** the rows, from the page */
     void setData(String json) {
         try { data = new JSONObject(json); pageJson = json; } catch (Exception e) { return; }
-        allRows.clear(); allTitles.clear(); allNotes.clear();
+        allRows.clear(); allTitles.clear(); allNotes.clear(); resRows.clear();
         JSONArray fy = data.optBoolean("setup") ? new JSONArray() : fyRow();
         fyKeys = keys(fy);
         off = fy.length() > 0 ? 1 : 0;
@@ -296,6 +299,7 @@ final class NativeSports extends FrameLayout {
             String t = o.optString("title"), tl = t.toLowerCase(java.util.Locale.US);
             if (tl.startsWith("live now")) liveIdx = allRows.size();
             else if (tl.startsWith("my teams")) mineIdx = allRows.size();
+            if (o.optBoolean("res")) resRows.add(allRows.size());
             allRows.add(o.optJSONArray("items") == null ? new JSONArray() : o.optJSONArray("items"));
             allTitles.add(t); allNotes.add(o.optString("note"));
         }
@@ -330,9 +334,13 @@ final class NativeSports extends FrameLayout {
         tabs.add("Today");
         if (mineIdx >= 0) tabs.add("My Teams");
         if (off == 1) tabs.add("Fantasy");
+        if (!resRows.isEmpty()) tabs.add("Results");
         tabs.add("Standings");
         if (!tabs.contains(tab)) tab = tabs.get(0);
+        String wasLg = rail.lgAt(leagueSel);
         rail.rebuild();
+        int lgNow = rail.indexOf(wasLg);                 // (the league you were on, wherever it is now)
+        if (lgNow >= 0) leagueSel = lgNow;
         if (leagueSel >= rail.count()) leagueSel = 0;
         paintRibbon();
         applySet(false);
@@ -480,6 +488,8 @@ final class NativeSports extends FrameLayout {
     private void applySet(boolean smooth) {
         if (tab.equals("Standings")) { standings.show(); order(); } else standings.hide();
         String curKey = curItem() != null ? curItem().optString("k").split(":")[0] : null;
+        // (the leagues are for today's games, or on Results for the games played: the same league kept when it's in both)
+        if (rail.results != tab.equals("Results")) { String was = rail.lgAt(leagueSel); rail.rebuild(); int at = rail.indexOf(was); leagueSel = at >= 0 ? at : 0; }
         int idx = tab.equals("Live Now") ? liveIdx : tab.equals("My Teams") ? mineIdx : tab.equals("Fantasy") ? (off == 1 ? 0 : -1) : rail.rowOf(leagueSel);
         boolean same = idx == curSet;
         curSet = idx;
@@ -489,6 +499,7 @@ final class NativeSports extends FrameLayout {
             String t = tab.equals("Live Now") ? "Live now" : tab.equals("My Teams") ? "My teams" : tab.equals("Fantasy") ? "My fantasy team" : allTitles.get(idx);
             titles.add(t); notes.add(allNotes.get(idx));
         } else if (tab.equals("Today")) { rows.add(new JSONArray()); titles.add("Today"); notes.add("Pick your sports and teams — OK on Today"); }
+        else if (tab.equals("Results")) { rows.add(new JSONArray()); titles.add("Results"); notes.add("No finished games in the last week"); }
         r = 0;
         if (!same) { cols.clear(); scrolls.clear(); }
         else if (curKey != null && !rows.isEmpty()) {
@@ -789,8 +800,8 @@ final class NativeSports extends FrameLayout {
         }
         if (zone.equals("rail")) {
             if (d == 'l' && leagueSel == 0) { h.leftEdge(); return true; }
-            if (d == 'l' && leagueSel > 0) { leagueSel--; tab = "Today"; applySet(true); }
-            else if (d == 'r' && leagueSel < rail.count() - 1) { leagueSel++; tab = "Today"; applySet(true); }
+            if (d == 'l' && leagueSel > 0) { leagueSel--; tab = railTab(); applySet(true); }
+            else if (d == 'r' && leagueSel < rail.count() - 1) { leagueSel++; tab = railTab(); applySet(true); }
             else if (d == 'u') { zone = heroOn ? "hero" : sideOn ? "side" : "tabs"; drawTabs(); focus(true); }
             else if (d == 'd') { zone = "grid"; focus(true); }
             rail.invalidate();
@@ -827,7 +838,7 @@ final class NativeSports extends FrameLayout {
         }
         if (rail.getVisibility() == VISIBLE && h.hit(rail, x, y, 0)) {
             float[] l = h.local(rail, x, y);
-            for (int i = 0; i < rail.chips.size(); i++) if (rail.chips.get(i).contains(l[0], l[1])) { leagueSel = i; tab = "Today"; zone = "grid"; applySet(true); rail.invalidate(); return "done"; }
+            for (int i = 0; i < rail.chips.size(); i++) if (rail.chips.get(i).contains(l[0], l[1])) { leagueSel = i; tab = railTab(); zone = "grid"; applySet(true); rail.invalidate(); return "done"; }
             return null;
         }
         for (Map.Entry<String, CardView> en : cardViews.entrySet()) {
@@ -839,6 +850,8 @@ final class NativeSports extends FrameLayout {
         }
         return null;
     }
+    /** the tab a league chip leads to: Results while you're on it, else Today */
+    private String railTab() { return tab.equals("Results") ? "Results" : "Today"; }
     /** the your-teams card for the game on the scoreboard (else the first) */
     private int sideOf(JSONObject g) {
         if (g != null) { String id = g.optString("k").split(":")[0]; for (int i = 0; i < sideItems.size(); i++) { JSONObject sg = sideItems.get(i).game; if (sg != null && sg.optString("k").split(":")[0].equals(id)) return i; } }
@@ -1151,6 +1164,7 @@ final class NativeSports extends FrameLayout {
         else if (live && it.has("outs")) foot = it.optInt("balls") + "–" + it.optInt("strikes") + " · " + it.optInt("outs") + (it.optInt("outs") == 1 ? " out" : " outs");
         else { String tv = it.optString("tv"); foot = !it.optString("extra").isEmpty() && tv.isEmpty() ? it.optString("extra") : tv; tvLine = !tv.isEmpty(); }
         if (post && foot.equals(it.optString("tv"))) foot = "";
+        if (post && foot.isEmpty()) foot = it.optString("day");          // (a finished game: the day it was played)
         float by = hh - 1.3f * R;
         Integer mine = playersIn.get(it.optString("k").split(":")[0]);
         float starW = 0;
@@ -1679,12 +1693,18 @@ final class NativeSports extends FrameLayout {
         private final Map<String, Bitmap> got = new HashMap<>();
         final List<RectF> chips = new ArrayList<>();               // where each chip was drawn (for a finger)
         Rail(android.content.Context c) { super(c); }
+        /** showing the leagues' Results rows (the Results tab) rather than their games today */
+        boolean results;
+        String lgAt(int i) { return i >= 0 && i < lgs.size() ? lgs.get(i) : ""; }
+        int indexOf(String lg) { return lgs.indexOf(lg); }
         int count() { return rowsOf.size(); }
         int rowOf(int i) { return i >= 0 && i < rowsOf.size() ? rowsOf.get(i)[0] : -1; }
         void rebuild() {
             rowsOf.clear(); names.clear(); icons.clear(); lgs.clear(); emoji.clear(); counts.clear();
+            results = tab.equals("Results");
             java.util.Set<String> seen = new java.util.HashSet<>();
             for (int i = off; i < allRows.size(); i++) {
+                if (resRows.contains(i) != results) continue;
                 JSONArray it = allRows.get(i);
                 String t = allTitles.get(i);
                 if (t.toLowerCase(java.util.Locale.US).startsWith("live now") || t.toLowerCase(java.util.Locale.US).startsWith("my teams") || it.length() == 0) continue;
@@ -1734,7 +1754,7 @@ final class NativeSports extends FrameLayout {
         @Override protected void onDraw(Canvas c) {
             lay();
             float d = (SportsLook.CTRL_H - 1f) * R;
-            int cur = tab.equals("Today") ? leagueSel : -1;
+            int cur = tab.equals("Today") || tab.equals("Results") ? leagueSel : -1;
             boolean foc = zone.equals("rail");
             for (int i = 0; i < chips.size(); i++) {
                 RectF chip = chips.get(i);

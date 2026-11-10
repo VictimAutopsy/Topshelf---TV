@@ -155,8 +155,39 @@ final class SportsData {
     private void refresh() {
         loadAll(false, true, new Runnable() { @Override public void run() {
             push();
-            loadAll(false, false, new Runnable() { @Override public void run() { push(); schedule(); } });
+            loadAll(false, false, new Runnable() { @Override public void run() { push(); schedule(); loadPast(); } });
         } });
+    }
+    /* Results: the games already played. Yesterday's and today's come with the scores above; each day before
+       that (back a week) is fetched once per league, a day at a time (ESPN doesn't take date ranges for every
+       league), and kept while TopShelf runs: a finished day doesn't change. */
+    private static final int PAST_DAYS = 7;
+    private final Map<String, List<Ev>> pastDays = new HashMap<>();          // "league|yyyymmdd" → that day's games
+    private final Set<String> pastBusy = new HashSet<>();
+    private void loadPast() {
+        final int[] left = { 0 };
+        Set<String> keep = new HashSet<>();
+        for (final String id : leagues()) {
+            final Lg lg = league(id);
+            if (lg == null || lg.cards) continue;
+            for (int n = -PAST_DAYS; n <= -2; n++) {
+                final String day = ymd(dayOffset(n)), key = id + "|" + day;
+                keep.add(key);
+                if (pastDays.containsKey(key) || !pastBusy.add(key)) continue;
+                left[0]++;
+                net.execute(new Runnable() { @Override public void run() {
+                    List<Ev> l = null;
+                    try { l = events(lg, get(scoreUrl(lg, day))); } catch (Throwable ignored) { }
+                    final List<Ev> res = l;
+                    main.post(new Runnable() { @Override public void run() {
+                        pastBusy.remove(key);
+                        if (res != null) pastDays.put(key, res);
+                        if (--left[0] == 0) { Diag.ev("sports: results for the last " + PAST_DAYS + " days are in (" + pastDays.size() + " league-days)"); push(); }
+                    } });
+                } });
+            }
+        }
+        pastDays.keySet().retainAll(keep);
     }
     /** the team picker changed your sports or teams */
     void prefsChanged() {
@@ -1271,9 +1302,9 @@ final class SportsData {
     private static boolean sameDay(Calendar a, Calendar b) { return a.get(Calendar.YEAR) == b.get(Calendar.YEAR) && a.get(Calendar.DAY_OF_YEAR) == b.get(Calendar.DAY_OF_YEAR); }
     private static int stOrder(String s) { return s.equals("in") ? 0 : s.equals("pre") ? 1 : 2; }
 
-    private static final class Row { String id, title, note = ""; List<Ev> items = new ArrayList<>(); boolean editAtEnd; }
+    private static final class Row { String id, title, note = ""; List<Ev> items = new ArrayList<>(); boolean editAtEnd, res; }
 
-    private List<Row> buildRows(Map<String, List<Ev>> evs, List<String> lgs, Set<String> busyNow, Map<String, String> errNow) {
+    private List<Row> buildRows(Map<String, List<Ev>> evs, List<String> lgs, Set<String> busyNow, Map<String, String> errNow, Map<String, List<Ev>> pastNow) {
         List<Ev> all = new ArrayList<>();
         for (String id : lgs) { List<Ev> l = evs.get(id); if (l != null) all.addAll(l); }
         List<Row> rows = new ArrayList<>();
@@ -1318,7 +1349,31 @@ final class SportsData {
             r.title = title; r.items = new ArrayList<>(items.subList(0, Math.min(40, items.size())));
             rows.add(r);
         }
+        /* Results (its own tab): each league's finished games of the last week, the newest first. After every
+           other row, so those keep their places. */
+        long since = System.currentTimeMillis() - (PAST_DAYS + 1) * DAY;
+        for (String id : lgs) {
+            Lg lg = league(id);
+            LinkedHashMap<String, Ev> done = new LinkedHashMap<>();
+            for (Map.Entry<String, List<Ev>> en : pastNow.entrySet()) if (en.getKey().startsWith(id + "|")) for (Ev e : en.getValue()) if (e.state.equals("post") && e.at > since) done.put(e.id, e);
+            List<Ev> l = evs.get(id);
+            if (l != null) for (Ev e : l) if (e.state.equals("post") && e.at > since) done.put(e.id, e);      // (the newest copy wins)
+            if (done.isEmpty()) continue;
+            List<Ev> items = new ArrayList<>(done.values());
+            Collections.sort(items, new Comparator<Ev>() { @Override public int compare(Ev a, Ev b) { return Long.compare(b.at, a.at); } });
+            Row r = new Row(); r.id = "res-" + id; r.res = true; r.title = lg.name + " · Results";
+            r.items = new ArrayList<>(items.subList(0, Math.min(60, items.size())));
+            rows.add(r);
+        }
         return rows;
+    }
+    /** the day a finished game was played: Today, Yesterday, or "Sun, Nov 8" */
+    private static String dayOf(long at) {
+        Calendar d = Calendar.getInstance(); d.setTimeInMillis(at);
+        Calendar today = Calendar.getInstance(), y = Calendar.getInstance(); y.add(Calendar.DAY_OF_YEAR, -1);
+        if (sameDay(d, today)) return "Today";
+        if (sameDay(d, y)) return "Yesterday";
+        return new java.text.SimpleDateFormat("EEE, MMM d", Locale.US).format(d.getTime());
     }
 
     private JSONObject itemOut(Ev e, String rowId, int c) throws Exception {
@@ -1337,6 +1392,7 @@ final class SportsData {
          .put("when", when).put("detail", e.detail).put("at", e.at).put("card", e.card).put("venue", e.venue).put("tv", tv).put("tvOn", has);
         JSONArray nets = new JSONArray(); for (int i = 0; i < e.nets.size() && i < 4; i++) nets.put(e.nets.get(i));
         o.put("nets", nets);
+        if (post) o.put("day", dayOf(e.at));
         o.put("bell", !post && has && Reminders.has(h, m.get(0).ch.u, e.at));
         JSONArray teams = new JSONArray();
         for (Team x : e.teams) teams.put(new JSONObject().put("id", x.id).put("name", x.name).put("full", x.full.isEmpty() ? x.name : x.full).put("rec", x.rec).put("score", x.score)
@@ -1368,6 +1424,7 @@ final class SportsData {
         final Set<String> busyNow = new HashSet<>(busy);
         final Map<String, String> errNow = new HashMap<>(errs);
         final Map<String, Long> tNow = new HashMap<>(t);
+        final Map<String, List<Ev>> pastNow = new HashMap<>(pastDays);
         final int tok = ++pushTok;
         final long t0 = android.os.SystemClock.uptimeMillis();
         work.execute(new Runnable() { @Override public void run() {
@@ -1381,12 +1438,12 @@ final class SportsData {
                 if (setup) {
                     rowsOut.put(new JSONObject().put("title", "").put("note", "").put("items", new JSONArray().put(editItem())));
                     shown.add(Collections.<Ev>singletonList(null));
-                } else for (Row r : buildRows(evs, lgs, busyNow, errNow)) {
+                } else for (Row r : buildRows(evs, lgs, busyNow, errNow, pastNow)) {
                     JSONArray items = new JSONArray();
                     List<Ev> sh = new ArrayList<>();
                     for (int c = 0; c < r.items.size(); c++) { items.put(itemOut(r.items.get(c), r.id, c)); sh.add(r.items.get(c)); }
                     if (r.editAtEnd) { items.put(editItem()); sh.add(null); }
-                    rowsOut.put(new JSONObject().put("title", r.title).put("note", r.note).put("items", items));
+                    rowsOut.put(new JSONObject().put("title", r.title).put("note", r.note).put("items", items).put("res", r.res));
                     shown.add(sh);
                 }
                 long tmax = 0; int failed = 0, live = 0; boolean anyBusy = false;
