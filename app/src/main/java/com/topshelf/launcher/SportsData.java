@@ -908,9 +908,10 @@ final class SportsData {
             for (String n : ev.nets) for (Object[] c : netChans(n)) add(out, (NativeLive.Ch) c[0], (Double) c[1], "network", null);
             List<Hit> list = new ArrayList<>(out.values());
             Collections.sort(list, new Comparator<Hit>() { @Override public int compare(Hit a, Hit b) { return Double.compare(b.score, a.score); } });
+            List<Hit> every = list;
             list = keepStrong(list);
             if (list.size() > 6) list = new ArrayList<>(list.subList(0, 6));
-            match.put(ev.id, new Object[] { System.currentTimeMillis(), list });
+            match.put(ev.id, new Object[] { System.currentTimeMillis(), list, every });
             return list;
         }
         // 1. the TV guide: a programme around kick-off that names the teams
@@ -944,10 +945,22 @@ final class SportsData {
             int c = Double.compare(b.score, a.score);
             return c != 0 ? c : (fv.contains(b.ch.u) ? 1 : 0) - (fv.contains(a.ch.u) ? 1 : 0);
         } });
+        List<Hit> every = list;
         list = keepStrong(list);
         if (list.size() > 6) list = new ArrayList<>(list.subList(0, 6));
-        match.put(ev.id, new Object[] { System.currentTimeMillis(), list });
+        match.put(ev.id, new Object[] { System.currentTimeMillis(), list, every });
         return list;
+    }
+    /** how a game matched one channel, out of every channel it matched (not just the six offered): a big game is
+        on more than six channels, and the one you're on dropped out, so a smaller game that only shared a
+        nickname with it was taken instead (MNF's Vikings → Cleveland State's) (worker thread) */
+    @SuppressWarnings("unchecked")
+    Hit matchOn(Ev ev, String url) {
+        List<Hit> top = match(ev);
+        Object[] m = match.get(ev.id);
+        List<Hit> all = m != null && m.length > 2 ? (List<Hit>) m[2] : top;
+        for (Hit x : all) if (x.ch.u.equals(url)) return x;
+        return null;
     }
     private static boolean strong(String t, String num, List<String> names) {
         if (!num.isEmpty() && t.contains(num)) return true;
@@ -1060,12 +1073,15 @@ final class SportsData {
         final List<Ev> all = new ArrayList<>();
         for (List<Ev> l : ev.values()) all.addAll(l);
         work.execute(new Runnable() { @Override public void run() {
-            Ev best = null;
+            Ev best = null; double bestScore = -1;
             long now = System.currentTimeMillis();
             for (Ev e : all) {
                 boolean near = e.state.equals("in") || (e.state.equals("pre") && e.at - now < 45 * 60000L);
                 if (!near) continue;
-                for (Hit x : match(e)) if (x.ch.u.equals(url)) { if (best == null || (e.state.equals("in") && !best.state.equals("in"))) best = e; break; }
+                Hit x = matchOn(e, url);
+                if (x == null) continue;
+                double sc = x.score + (e.state.equals("in") ? 2 : 0);     // the best match wins, as on the page
+                if (best == null || sc > bestScore) { best = e; bestScore = sc; }
             }
             final JSONObject g = best == null ? null : gameJson(best);
             main.post(new Runnable() { @Override public void run() { cb.found(g); } });

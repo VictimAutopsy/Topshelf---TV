@@ -308,8 +308,9 @@ function spMatch(ev) {
     }
     for (const net of ev.nets) for (const [ch, sc] of spNetChans(net)) add(ch, sc, 'network');
     let list = [...out.values()].sort((a, b) => b.score - a.score);
+    const all = list;
     if (list.some(x => x.score >= 1.2)) list = list.filter(x => x.score >= 1.2);
-    SP.match[ev.id] = { t: Date.now(), list: list.slice(0, 6) };
+    SP.match[ev.id] = { t: Date.now(), list: list.slice(0, 6), all };
     return SP.match[ev.id].list;
   }
   // 1. the TV guide: a programme around kick-off that names the teams
@@ -338,10 +339,18 @@ function spMatch(ev) {
   // 3. the game's TV networks
   for (const net of ev.nets) for (const [ch, sc] of spNetChans(net)) add(ch, sc, 'network');
   let list = [...out.values()].sort((a, b) => b.score - a.score || (LV.favs.has(b.ch.u) - LV.favs.has(a.ch.u)));
+  const all = list;
   if (list.some(x => x.score >= 1.2)) list = list.filter(x => x.score >= 1.2);
   list = list.slice(0, 6);
-  SP.match[ev.id] = { t: Date.now(), list };
+  SP.match[ev.id] = { t: Date.now(), list, all };
   return list;
+}
+/* how a game matched one channel, out of every channel it matched (not just the six offered): a big game is
+   on more than six channels, and the one you're on dropped out of the list, so a smaller game that only
+   shared a nickname with it was taken instead (MNF's Vikings → Cleveland State's) */
+function spMatchOn(ev, u) {
+  const top = spMatch(ev), c = SP.match[ev.id];
+  return ((c && c.all) || top).find(x => x.ch.u === u);
 }
 
 /* ---------------------------------------------------------------- rows */
@@ -1097,7 +1106,7 @@ async function spGameFor(u, req) {
     for (const { lg, evs } of lists) for (const ev of evs) {
       const near = ev.state === 'in' || (ev.state === 'pre' && ev.at - now < 45 * 60000) || (ev.state === 'post' && now - (ev.end || ev.at + 4 * 3600000) < 30 * 60000);
       if (!near) continue;
-      const m = spMatch(ev).find(x => x.ch.u === u);
+      const m = spMatchOn(ev, u);
       if (!m) continue;
       const score = m.score + (ev.state === 'in' ? 2 : 0);
       if (!best || score > best.score) best = { score, lg, ev };
