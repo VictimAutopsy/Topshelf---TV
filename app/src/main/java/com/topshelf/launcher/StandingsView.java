@@ -1,14 +1,15 @@
 package com.topshelf.launcher;
 
+import android.animation.ValueAnimator;
 import android.graphics.Bitmap;
 import android.graphics.Canvas;
 import android.graphics.Color;
-import android.graphics.DashPathEffect;
 import android.graphics.LinearGradient;
 import android.graphics.Paint;
 import android.graphics.RectF;
 import android.graphics.Shader;
 import android.graphics.Typeface;
+import android.os.SystemClock;
 import android.text.TextPaint;
 import android.text.TextUtils;
 import android.view.View;
@@ -30,53 +31,58 @@ import java.util.Map;
 import java.util.Set;
 
 /**
- * Sports › Standings: each league's tables, from ESPN (the same place the scores come from).
+ * Sports › Standings, from ESPN (where the scores come from).
  *
- * The leagues you follow come first in the chips across the top; under them, where the league has them, the views:
- * Division, Conference (MLB: League) and Overall. The tables have the columns that sport uses (records at home and
- * away, in the division, the last ten, point / run / goal difference, the streak…), as many as fit; clinch letters
- * after the names (explained under the tables) and eliminated teams dimmed. In a conference view the teams go in
- * playoff-seed order with the playoff line drawn (and the NBA's play-in line), and a CUT column saying how far each
- * team is above or below it; soccer tables show their zones (Champions League, relegation…) as ESPN marks them.
- *
- * ▼ goes into the tables (to your team, when one is there), ▲ ▼ ◀ ▶ move between teams, OK opens the team's page:
- * its record and place, the last ten in order, the games coming up and the latest results (OK on one: watch it on
- * your channel, remind me, the game page) and its leaders. Kept ten minutes (a team's page five).
+ * One board per league and view, made to be read from the couch:
+ *  - the leagues as text tabs on the left, the views (Division, Conference — League for MLB — and Overall) as one
+ *    switch on the right;
+ *  - the two conferences side by side (AFC | NFC, East | West, AL | NL), so a whole league is in sight at once:
+ *    the rows take the height there is (2.3–2.95 rem) and only scroll when even that won't do (college);
+ *  - a thin rail down the left edge says where a team stands: green in a playoff spot, amber in the NBA's
+ *    play-in, soccer's zones in ESPN's own colours (with their key beside the table);
+ *  - the column the league ranks by (PCT, or PTS) is the bright one; point / run / goal difference is a small bar
+ *    either side of zero; clinch letters after the names, eliminated teams faded;
+ *  - in a conference view the teams are in seed order with the playoff line (and the play-in line) as a gap with
+ *    its name in it, and LINE: how far above or below it each team is;
+ *  - the chosen team glows in its own colours (the one place team colour is used) and the glow glides as you
+ *    move; the footer says, in a sentence, where that team stands.
+ * OK opens the team's page: its colours across the top with its record, places and form, then the next game,
+ * the games after it, its results (OK on any: watch on your channel, remind me, the game page) and its leaders.
+ * Tables are kept ten minutes, a team's page five.
  */
 final class StandingsView extends View {
-    private static final int CARD = 0xFF131A23, EDGE = 0xFF222C38, DIM = 0xFF8E99A8, GOLD = 0xFFFFC23D, OUT = 0xFF6C7684,
-            WIN = 0xFF3DDC84, LOSS = 0xFFFF5A5F, LINE = 0xCCFFC23D;
-    /** {id, ESPN sport, ESPN league, name} */
+    // the palette: three greys for text, two surfaces, and colour only where it means something
+    private static final int INK = 0xFFF2F5F8, SUB = 0xFFA3AEBC, TER = 0xFF6B7787, PANEL = 0xFF111821, EDGE = 0xFF1F2935,
+            TRACK = 0xFF161E28, IN = 0xFF3DDC84, AMBER = 0xFFFFC23D, RED = 0xFFFF6B6B, BG = 0xFF0A0E13;
+    /** {id, ESPN sport, ESPN league, name, tab} */
     private static final String[][] LEAGUES = {
-        { "nfl", "football", "nfl", "NFL" }, { "nba", "basketball", "nba", "NBA" }, { "mlb", "baseball", "mlb", "MLB" },
-        { "nhl", "hockey", "nhl", "NHL" }, { "wnba", "basketball", "wnba", "WNBA" }, { "cfb", "football", "college-football", "College Football" },
-        { "cbb", "basketball", "mens-college-basketball", "Men's College Hoops" }, { "mls", "soccer", "usa.1", "MLS" },
-        { "epl", "soccer", "eng.1", "Premier League" }, { "ucl", "soccer", "uefa.champions", "Champions League" }, { "laliga", "soccer", "esp.1", "La Liga" } };
+        { "nfl", "football", "nfl", "NFL", "NFL" }, { "nba", "basketball", "nba", "NBA", "NBA" }, { "mlb", "baseball", "mlb", "MLB", "MLB" },
+        { "nhl", "hockey", "nhl", "NHL", "NHL" }, { "wnba", "basketball", "wnba", "WNBA", "WNBA" },
+        { "cfb", "football", "college-football", "College Football", "NCAAF" },
+        { "cbb", "basketball", "mens-college-basketball", "Men's College Hoops", "NCAAM" }, { "mls", "soccer", "usa.1", "MLS", "MLS" },
+        { "epl", "soccer", "eng.1", "Premier League", "Premier League" }, { "ucl", "soccer", "uefa.champions", "Champions League", "Champions League" },
+        { "laliga", "soccer", "esp.1", "La Liga", "La Liga" } };
 
     private final NativeHome h;
     private final float R;
-    private final Typeface cond;
     private final TextPaint t = new TextPaint(Paint.ANTI_ALIAS_FLAG);
     private final Paint p = new Paint(Paint.ANTI_ALIAS_FLAG | Paint.FILTER_BITMAP_FLAG);
     private final RectF rf = new RectF();
+    private final Typeface fMed, fSemi;
+    private final boolean motion;
 
     private final List<String[]> chips = new ArrayList<>();
     private int sel;
-    /** where the remote is: 0 the leagues, 1 the views, 2 a team in the tables */
+    /** where the remote is: 0 the leagues, 1 the views, 2 a team on the board */
     private int focus;
-    private float scroll, scrollT, contentH;
-    private final Map<String, Object[]> cache = new HashMap<>();          // league → {time, groups}
+    private float scroll, scrollT;
+    private final Map<String, Object[]> cache = new HashMap<>();          // league → {time, groups, root name}
     private final Set<String> loading = new HashSet<>();
     private final Map<String, String> errors = new HashMap<>();
     private final Map<String, Bitmap> logos = new HashMap<>();
+    private final Map<String, Integer> colors = new HashMap<>();           // "lg:id" → the team's colour
     private final Set<String> favs = new HashSet<>();
     private final Map<String, Integer> viewSel = new HashMap<>();
-    // the tables shown (made from the groups for the league and view), and the team chosen in them
-    private List<Table> shown = new ArrayList<>();
-    private String shownKey = "";
-    private int ti, ri;
-    private final List<RectF> chipHits = new ArrayList<>(), viewHits = new ArrayList<>();
-    private final List<Object[]> legend = new ArrayList<>();               // {color or 0, mark, text}
 
     private static final class Col {
         final String label; final String[] keys; final float w; final int prio;
@@ -88,17 +94,44 @@ final class StandingsView extends View {
         double w, l, tie, pts, pct, seed, rank;
         final Map<String, String> s = new HashMap<>();
     }
-    private static final class Group { String name, parent; List<Row> rows = new ArrayList<>(); }
-    private static final class Table {
-        String name = ""; List<Row> rows = new ArrayList<>(); List<Col> cols = new ArrayList<>(); List<String[]> vals = new ArrayList<>();
-        boolean seeded, seedTags; int cut, cut2;
-        int[] fit; float x, y, w, hh, rowH;
+    private static final class Group { String name = "", parent = "", parentAbbr = ""; final List<Row> rows = new ArrayList<>(); }
+    /** a run of teams on the board: a division, a conference, or half of a long table (whole: all of it) */
+    private static final class Block {
+        String title = ""; final List<Row> rows = new ArrayList<>(); final List<String[]> vals = new ArrayList<>();
+        int rank0, cut, cut2; boolean seeded, zoneBySeed; List<Row> whole;
     }
+    /** one of the board's columns */
+    private static final class Pane {
+        String title = "", note = ""; final List<Block> blocks = new ArrayList<>();
+        float x, y, w, hh;
+        final List<Row> flat = new ArrayList<>(); final List<Float> rowY = new ArrayList<>(); final List<Block> of = new ArrayList<>(); final List<Integer> idx = new ArrayList<>();
+    }
+    // the board shown, and the team chosen on it
+    private final List<Pane> panes = new ArrayList<>();
+    private List<Col> cols = new ArrayList<>();
+    private int[] fit = new int[0];
+    private float rowH, boardH, sideW;
+    private double diffMax = 1;
+    private String boardKey = "";
+    private final List<Object[]> zones = new ArrayList<>();                // {colour, text}: soccer's key, beside the table
+    private final List<Object[]> legend = new ArrayList<>();               // {colour or 0, mark, text}: the footer's key
+    private int pi, ri;
+    private long enterAt;
+    // the glides: the chosen team's glow, the views' thumb, the league underline
+    private final RectF glow = new RectF();
+    private boolean glowSnap = true;
+    private float tabX = -1, tabW, thumbX = -1, thumbW;
+    private boolean anim;
+    private final List<RectF> chipHits = new ArrayList<>(), viewHits = new ArrayList<>();
 
     StandingsView(NativeHome host) {
         super(host.getContext());
         h = host; R = host.R;
-        cond = Typeface.create("sans-serif-condensed", Typeface.BOLD);
+        fMed = host.fMed; fSemi = host.fSemi;
+        t.setFontFeatureSettings("tnum");          // figures line up in their columns
+        boolean m = true;
+        try { m = ValueAnimator.areAnimatorsEnabled(); } catch (Throwable ignored) { }
+        motion = m;
     }
 
     /** the leagues: yours first (Settings › Sports & teams), then the rest */
@@ -124,7 +157,7 @@ final class StandingsView extends View {
         readLeagues();
         sel = 0; for (int i = 0; i < chips.size(); i++) if (chips.get(i)[0].equals(was)) sel = i;
         setVisibility(VISIBLE);
-        shownKey = "";
+        boardKey = "";
         load();
         invalidate();
     }
@@ -132,17 +165,23 @@ final class StandingsView extends View {
     boolean shownNow() { return getVisibility() == VISIBLE; }
     void focusIn() { focus = 0; invalidate(); }
 
-    // ------------------------------------------------------------------ the views
+    // ------------------------------------------------------------------ views and the board
 
     private String lgId() { return chips.isEmpty() ? "" : chips.get(sel)[0]; }
-    /** the views a league has (none for one table, or college conferences) */
+    @SuppressWarnings("unchecked")
+    private List<Group> groups() { Object[] c = cache.get(lgId()); return c == null ? null : (List<Group>) c[1]; }
+    /** the league's own name in ESPN's answer (groups right under it are conferences, not divisions) */
+    private String rootName() { Object[] c = cache.get(lgId()); return c == null || c.length < 3 ? "" : (String) c[2]; }
+    private boolean hasDivisions() {
+        List<Group> gs = groups();
+        if (gs == null) return false;
+        for (Group g : gs) if (!g.parent.equals(rootName())) return true;
+        return false;
+    }
     private List<String> views() {
         List<String> v = new ArrayList<>();
-        List<Group> gs = groups();
-        String id = lgId();
-        boolean divs = false;
-        if (gs != null) { Set<String> ps = new HashSet<>(); for (Group g : gs) ps.add(g.parent); divs = ps.size() > 1 || (ps.size() == 1 && gs.size() > 1 && !ps.contains(rootName())); }
-        switch (id) {
+        boolean divs = hasDivisions();
+        switch (lgId()) {
             case "nfl": case "nba": case "nhl": if (divs) v.add("Division"); v.add("Conference"); v.add("Overall"); break;
             case "mlb": if (divs) v.add("Division"); v.add("League"); v.add("Overall"); break;
             case "wnba": case "mls": v.add("Conference"); v.add("Overall"); break;
@@ -150,98 +189,13 @@ final class StandingsView extends View {
         }
         return v;
     }
-    /** the league's own name in ESPN's answer (groups right under it are conferences, not divisions) */
-    private String rootName() { Object[] c = cache.get(lgId()); return c == null || c.length < 3 ? "" : (String) c[2]; }
     private int viewIndex() {
         List<String> v = views();
         Integer i = viewSel.get(lgId());
-        if (i == null) { i = 0; if (lgId().equals("nba")) i = v.indexOf("Conference"); if (i < 0) i = 0; }
+        if (i == null) { i = lgId().equals("nba") ? v.indexOf("Conference") : 0; if (i < 0) i = 0; }
         return Math.max(0, Math.min(v.size() - 1, i));
     }
     private String view() { List<String> v = views(); return v.isEmpty() ? "" : v.get(viewIndex()); }
-
-    @SuppressWarnings("unchecked")
-    private List<Group> groups() { Object[] c = cache.get(lgId()); return c == null ? null : (List<Group>) c[1]; }
-
-    /** the tables for the league and view (made again when either changes or new standings come) */
-    private void tables() {
-        List<Group> gs = groups();
-        Object[] c = cache.get(lgId());
-        String key = lgId() + "|" + view() + "|" + (c == null ? 0 : c[0]) + "|" + getWidth();
-        if (key.equals(shownKey)) return;
-        shownKey = key;
-        shown = new ArrayList<>(); legend.clear();
-        if (gs == null || chips.isEmpty()) return;
-        String[] lg = chips.get(sel);
-        String v = view();
-        List<Table> out = new ArrayList<>();
-        if (v.equals("Overall")) {
-            Table tb = new Table(); tb.name = chips.get(sel)[3];
-            for (Group g : gs) tb.rows.addAll(g.rows);
-            tb.seeded = sortRows(tb.rows, true);
-            out.add(tb);
-        } else if (v.equals("Conference") || v.equals("League")) {
-            boolean merge = false; for (Group g : gs) if (!g.parent.equals(rootName())) merge = true;
-            Map<String, Table> by = new LinkedHashMap<>();
-            for (Group g : gs) {
-                String k = merge ? g.parent : g.name;
-                Table tb = by.get(k);
-                if (tb == null) { tb = new Table(); tb.name = k; by.put(k, tb); }
-                tb.rows.addAll(g.rows);
-            }
-            for (Table tb : by.values()) { tb.seeded = sortRows(tb.rows, true); out.add(tb); }
-        } else {
-            for (Group g : gs) { Table tb = new Table(); tb.name = g.name; tb.rows.addAll(g.rows); tb.seeded = sortRows(tb.rows, false); out.add(tb); }
-        }
-        // the playoff line: where the league's seeds stop (a conference's, or WNBA's whole league)
-        int[] cut = cutFor(lg[0]);
-        boolean confView = v.equals("Conference") || v.equals("League");
-        for (Table tb : out) {
-            boolean points = lg[1].equals("hockey") || lg[1].equals("soccer");
-            if (cut[0] > 0 && tb.rows.size() > cut[0]) {
-                boolean here = lg[0].equals("wnba") ? v.equals("Overall") : confView;
-                boolean needSeeds = !lg[0].equals("wnba") && !lg[0].equals("mls");
-                if (here && (tb.seeded || !needSeeds)) { tb.cut = cut[0]; tb.cut2 = cut[1] > 0 && tb.rows.size() > cut[1] ? cut[1] : 0; }
-            }
-            if (cut[0] > 0 && v.equals("Division") && allSeeds(tb.rows)) tb.seedTags = true;
-            tb.cols = cols(lg[1], lg[0]);
-            if (tb.cut > 0) tb.cols.add(new Col("CUT", 4.4f, 1, "#cut"));
-            Row lead = null;
-            for (Row r : tb.rows) if (lead == null || (r.w - r.l) > (lead.w - lead.l)) lead = r;
-            for (int i = 0; i < tb.rows.size(); i++) {
-                Row r = tb.rows.get(i);
-                String[] vs = new String[tb.cols.size()];
-                for (int k = 0; k < tb.cols.size(); k++) {
-                    String ck = tb.cols.get(k).keys[0];
-                    if (ck.equals("#gb")) vs[k] = lead == null ? "" : gb(lead, r);
-                    else if (ck.equals("#cut")) vs[k] = toCut(tb, i, points);
-                    else { String s = r.s.get(tb.cols.get(k).label); vs[k] = s == null ? "" : s; }
-                }
-                tb.vals.add(vs);
-            }
-            // a column nobody has a value in (ties in a season without any) goes
-            for (int k = tb.cols.size() - 1; k >= 0; k--) {
-                boolean any = false;
-                for (String[] vs : tb.vals) { String x = vs[k]; if (!x.isEmpty() && !x.equals("-") && !((tb.cols.get(k).label.equals("T") || tb.cols.get(k).label.equals("OTL")) && x.equals("0"))) { any = true; break; } }
-                if (!any) {
-                    tb.cols.remove(k);
-                    for (int i = 0; i < tb.vals.size(); i++) { String[] o = tb.vals.get(i), nv = new String[o.length - 1]; for (int a = 0, b = 0; a < o.length; a++) if (a != k) nv[b++] = o[a]; tb.vals.set(i, nv); }
-                }
-            }
-            if (!tb.rows.isEmpty()) shown.add(tb);
-        }
-        // what the marks mean (only those shown)
-        Set<String> letters = new java.util.TreeSet<>(); Map<String, Integer> zones = new LinkedHashMap<>();
-        boolean anyCut = false, anyCut2 = false;
-        for (Table tb : shown) {
-            if (tb.cut > 0) anyCut = true; if (tb.cut2 > 0) anyCut2 = true;
-            for (Row r : tb.rows) { if (!r.clinch.isEmpty()) letters.add(r.clinch); if (r.noteColor != 0 && !r.noteText.isEmpty() && !zones.containsKey(r.noteText)) zones.put(r.noteText, r.noteColor); }
-        }
-        for (Map.Entry<String, Integer> z : zones.entrySet()) legend.add(new Object[] { z.getValue(), "", z.getKey() });
-        if (anyCut) legend.add(new Object[] { LINE, "line", lg[0].equals("nba") ? "the playoff line (top 6)" : "the playoff line" });
-        if (anyCut2) legend.add(new Object[] { LINE, "dash", "the play-in line (7–10)" });
-        for (String m : letters) legend.add(new Object[] { 0, m, clinchMeaning(lg[0], m) });
-    }
 
     /** {the seeds that make the playoffs, the play-in's last seed} */
     private static int[] cutFor(String lg) {
@@ -262,107 +216,266 @@ final class StandingsView extends View {
             case "y": return lg.equals("nfl") || lg.equals("mlb") ? "clinched a wild card" : "clinched the division";
             case "z": return lg.equals("nfl") || lg.equals("mlb") ? "clinched the division" : lg.equals("nba") ? "clinched the top seed" : "clinched the conference";
             case "*": return lg.equals("nfl") ? "clinched the division and a bye" : "clinched a bye";
-            case "p": return "Presidents' Trophy";
+            case "p": return "won the Presidents' Trophy";
             case "pb": case "pi": return "clinched a play-in spot";
             case "w": return "clinched a wild card";
             default: return "";
         }
     }
+    private static boolean pointsSport(String sport) { return sport.equals("hockey") || sport.equals("soccer"); }
 
+    /** the board for the league and view (made again when either changes, new standings come, or the size does) */
+    private void board() {
+        Object[] c = cache.get(lgId());
+        String key = lgId() + "|" + view() + "|" + (c == null ? 0 : c[0]) + "|" + getWidth() + "x" + getHeight();
+        if (key.equals(boardKey)) return;
+        boolean sameBoard = boardKey.startsWith(lgId() + "|" + view() + "|");
+        boardKey = key;
+        panes.clear(); legend.clear(); zones.clear();
+        List<Group> gs = groups();
+        if (gs == null || chips.isEmpty() || getWidth() == 0) return;
+        if (!sameBoard) { enterAt = SystemClock.uptimeMillis(); glowSnap = true; }
+        String[] lg = chips.get(sel);
+        String v = view(), sport = lg[1];
+        int[] cut = cutFor(lg[0]);
+        boolean needSeeds = !lg[0].equals("wnba") && !lg[0].equals("mls");
+        Map<String, List<Group>> confs = new LinkedHashMap<>();
+        for (Group g : gs) { List<Group> l = confs.get(g.parent); if (l == null) { l = new ArrayList<>(); confs.put(g.parent, l); } l.add(g); }
+        boolean divs = hasDivisions();
+        boolean leagueSeeds = true; for (Group g : gs) if (!allSeeds(g.rows)) leagueSeeds = false;
+        if (v.equals("Division") && divs) {
+            // each conference a column, its divisions in it; the rail marks who holds a playoff seed today
+            for (List<Group> cg : confs.values()) {
+                Pane pn = new Pane();
+                for (Group g : cg) {
+                    Block b = new Block(); b.title = g.name; b.rows.addAll(g.rows);
+                    b.zoneBySeed = leagueSeeds && cut[0] > 0;
+                    pn.blocks.add(b);
+                }
+                panes.add(pn);
+            }
+        } else if (v.equals("Conference") || v.equals("League")) {
+            List<List<Group>> parts = new ArrayList<>();
+            if (divs) parts.addAll(confs.values());
+            else for (Group g : gs) { List<Group> one = new ArrayList<>(); one.add(g); parts.add(one); }
+            for (List<Group> part : parts) {
+                Pane pn = new Pane(); pn.title = divs ? confTitle(part.get(0), lg[0]) : part.get(0).name;
+                Block b = new Block();
+                for (Group g : part) b.rows.addAll(g.rows);
+                b.seeded = sortRows(b.rows, true);
+                if (cut[0] > 0 && b.rows.size() > cut[0] && (b.seeded || !needSeeds) && !lg[0].equals("wnba")) { b.cut = cut[0]; b.cut2 = cut[1] > 0 && b.rows.size() > cut[1] ? cut[1] : 0; }
+                pn.blocks.add(b); pn.note = playoffNote(b);
+                panes.add(pn);
+            }
+        } else if (v.equals("Overall")) {
+            List<Row> all = new ArrayList<>(); for (Group g : gs) all.addAll(g.rows);
+            sortRows(all, true);
+            split(all, lg[0].equals("wnba") && all.size() > cut[0] ? cut[0] : 0);
+        } else if (gs.size() == 1) {
+            List<Row> all = new ArrayList<>(gs.get(0).rows);
+            sortRows(all, false);
+            if (all.size() <= 22) { Pane pn = new Pane(); Block b = new Block(); b.rows.addAll(all); pn.blocks.add(b); panes.add(pn); }
+            else split(all, 0);
+        } else {
+            // many conferences (college): two columns, each conference to the shorter one
+            Pane a = new Pane(), b = new Pane(); int na = 0, nb = 0;
+            for (Group g : gs) {
+                Block bl = new Block(); bl.title = g.name; bl.rows.addAll(g.rows);
+                if (na <= nb) { a.blocks.add(bl); na += g.rows.size() + 2; } else { b.blocks.add(bl); nb += g.rows.size() + 2; }
+            }
+            panes.add(a); if (!b.blocks.isEmpty()) panes.add(b);
+        }
+        // the columns: the sport's, LINE where there's a playoff line; then the figures
+        cols = cols(sport, lg[0]);
+        boolean anyCut = false; for (Pane pn : panes) for (Block b : pn.blocks) if (b.cut > 0) anyCut = true;
+        if (anyCut) cols.add(new Col("LINE", 4.4f, 1, "#line"));
+        diffMax = 1;
+        for (Pane pn : panes) for (Block b : pn.blocks) {
+            Row lead = null; for (Row r : b.rows) if (lead == null || (r.w - r.l) > (lead.w - lead.l)) lead = r;
+            for (int i = 0; i < b.rows.size(); i++) {
+                Row r = b.rows.get(i);
+                String[] vs = new String[cols.size()];
+                for (int k = 0; k < cols.size(); k++) {
+                    String ck = cols.get(k).keys[0], lab = cols.get(k).label;
+                    if (ck.equals("#gb")) vs[k] = lead == null ? "" : gb(lead, r);
+                    else if (ck.equals("#line")) vs[k] = b.cut > 0 ? toLine(b, i, pointsSport(sport)) : "";
+                    else { String s = r.s.get(lab); vs[k] = s == null ? "" : s; }
+                    if (lab.equals("DIFF") || lab.equals("GD")) diffMax = Math.max(diffMax, Math.abs(numOf(vs[k])));
+                }
+                b.vals.add(vs);
+            }
+        }
+        // a column nobody has a value in (ties in a season without any) goes
+        for (int k = cols.size() - 1; k >= 0; k--) {
+            boolean any = false;
+            String lab = cols.get(k).label;
+            outer:
+            for (Pane pn : panes) for (Block b : pn.blocks) for (String[] vs : b.vals) {
+                String x = vs[k];
+                if (!x.isEmpty() && !x.equals("-") && !((lab.equals("T") || lab.equals("OTL")) && x.equals("0"))) { any = true; break outer; }
+            }
+            if (!any) {
+                cols.remove(k);
+                for (Pane pn : panes) for (Block b : pn.blocks) for (int i = 0; i < b.vals.size(); i++) {
+                    String[] o = b.vals.get(i), nv = new String[o.length - 1];
+                    for (int a = 0, z = 0; a < o.length; a++) if (a != k) nv[z++] = o[a];
+                    b.vals.set(i, nv);
+                }
+            }
+        }
+        // what the marks mean (only those on the board)
+        Set<String> letters = new java.util.TreeSet<>();
+        Map<String, Integer> zn = new LinkedHashMap<>();
+        boolean inZone = false, playIn = false;
+        for (Pane pn : panes) for (Block b : pn.blocks) for (int i = 0; i < b.rows.size(); i++) {
+            Row r = b.rows.get(i);
+            if (!r.clinch.isEmpty() && !clinchMeaning(lg[0], r.clinch).isEmpty()) letters.add(r.clinch);
+            if (r.noteColor != 0 && !r.noteText.isEmpty() && !zn.containsKey(r.noteText)) zn.put(r.noteText, r.noteColor);
+            int z = zone(b, i, lg[0]);
+            if (z == IN && r.noteColor == 0) inZone = true; else if (z == AMBER && r.noteColor == 0) playIn = true;
+        }
+        if (inZone) legend.add(new Object[] { IN, "rail", "In a playoff spot" });
+        if (playIn) legend.add(new Object[] { AMBER, "rail", "Play-in" });
+        for (String m : letters) legend.add(new Object[] { 0, m, clinchMeaning(lg[0], m) });
+        for (Map.Entry<String, Integer> z : zn.entrySet()) zones.add(new Object[] { z.getValue(), z.getKey() });
+        if (panes.size() > 1) { for (Object[] z : zones) legend.add(new Object[] { z[0], "rail", z[1] }); zones.clear(); }
+        layout();
+    }
+    /** a long table in two columns, ranked straight through (1–16 | 17–32) */
+    private void split(List<Row> all, int cut) {
+        int half = (all.size() + 1) / 2;
+        for (int part = 0; part < 2; part++) {
+            Pane pn = new Pane(); Block b = new Block();
+            int from = part == 0 ? 0 : half, to = part == 0 ? half : all.size();
+            b.rows.addAll(all.subList(from, to)); b.rank0 = from; b.cut = cut; b.whole = all;
+            pn.blocks.add(b);
+            if (!b.rows.isEmpty()) panes.add(pn);
+        }
+    }
+    private static String confTitle(Group g, String lg) { return lg.equals("nfl") && !g.parentAbbr.isEmpty() ? g.parentAbbr : g.parent; }
+    private static String playoffNote(Block b) {
+        if (b.cut <= 0) return "";
+        if (b.cut2 > 0) return b.cut + " make the playoffs, " + (b.cut + 1) + "–" + b.cut2 + " the play-in";
+        return b.cut + " make the playoffs";
+    }
+    /** the rail's colour for a team: soccer's zone, in a playoff spot, in the play-in, or none */
+    private int zone(Block b, int i, String lg) {
+        Row r = b.rows.get(i);
+        if (r.noteColor != 0) return r.noteColor;
+        int g = b.rank0 + i;
+        if (b.cut > 0) return g < b.cut ? IN : b.cut2 > 0 && g < b.cut2 ? AMBER : 0;
+        if (b.zoneBySeed && r.seed > 0) { int[] c = cutFor(lg); if (r.seed <= c[0]) return IN; if (c[1] > 0 && r.seed <= c[1]) return AMBER; }
+        return 0;
+    }
     /** games behind the leader (wins and losses) */
     private static String gb(Row lead, Row r) {
         double g = ((lead.w - r.w) + (r.l - lead.l)) / 2;
         return Math.abs(g) < .01 ? "-" : half(g);
     }
-    /** how far above (+) or below (−) the playoff line: games for a won-lost league, points for hockey and soccer */
-    private static String toCut(Table tb, int i, boolean points) {
-        Row me = tb.rows.get(i), ref = tb.rows.get(i < tb.cut ? tb.cut : tb.cut - 1);
-        double d = points ? me.pts - ref.pts : ((me.w + me.tie / 2 - (ref.w + ref.tie / 2)) + (ref.l + ref.tie / 2 - (me.l + me.tie / 2))) / 2;
+    /** how far above (+) or below (−) the playoff line: games, or points for hockey and soccer */
+    private static String toLine(Block b, int i, boolean points) {
+        List<Row> rows = b.whole != null ? b.whole : b.rows;
+        int at = b.rank0 + i, cut = b.cut;
+        if (cut <= 0 || cut >= rows.size()) return "";
+        Row me = rows.get(at), ref = rows.get(at < cut ? cut : cut - 1);
+        double d = gap(me, ref, points);
         if (Math.abs(d) < .01) return "0";
         return (d > 0 ? "+" : "−") + half(Math.abs(d));
+    }
+    /** how far a is ahead of b: games (ties count half) or points */
+    private static double gap(Row a, Row b, boolean points) {
+        if (points) return a.pts - b.pts;
+        return ((a.w + a.tie / 2 - (b.w + b.tie / 2)) + (b.l + b.tie / 2 - (a.l + a.tie / 2))) / 2;
     }
     private static String half(double g) {
         double a = Math.abs(g);
         return Math.abs(a - Math.round(a)) < .01 ? String.valueOf(Math.round(g)) : String.format(Locale.US, "%.1f", g);
     }
+    private static double numOf(String s) {
+        if (s == null || s.isEmpty()) return 0;
+        try { return Double.parseDouble(s.replace("+", "").replace("−", "-").replace(",", "")); } catch (Exception e) { return 0; }
+    }
+    private static String ordinal(int n) {
+        int m = n % 100;
+        return n + (m >= 11 && m <= 13 ? "th" : n % 10 == 1 ? "st" : n % 10 == 2 ? "nd" : n % 10 == 3 ? "rd" : "th");
+    }
+
+    // ------------------------------------------------------------------ the remote
 
     /** ◀ ▶ ▲ ▼; false: ▲ from the leagues (back up to the tabs) */
     boolean move(char d) {
-        if (team != null) {
-            int n = teamItems().size();
-            if (d == 'u' && tsel > 0) tsel--;
-            else if (d == 'd' && tsel < n - 1) tsel++;
-            invalidate();
-            return true;
-        }
+        if (team != null) { teamMove(d); invalidate(); return true; }
         boolean hasViews = views().size() > 1;
         if (focus == 0) {
             if (d == 'l' || d == 'r') {
                 int n = Math.max(0, Math.min(chips.size() - 1, sel + (d == 'r' ? 1 : -1)));
-                if (n != sel) { sel = n; scroll = scrollT = 0; ti = ri = 0; shownKey = ""; load(); }
-            } else if (d == 'u') { focus = 0; invalidate(); return false; }
-            else if (d == 'd') { if (hasViews) focus = 1; else intoTables(); }
+                if (n != sel) { sel = n; scroll = scrollT = 0; pi = ri = 0; boardKey = ""; load(); }
+            } else if (d == 'u') { invalidate(); return false; }
+            else if (d == 'd') { if (hasViews) focus = 1; else intoBoard(); }
         } else if (focus == 1) {
             if (d == 'l' || d == 'r') {
                 List<String> v = views();
                 int n = Math.max(0, Math.min(v.size() - 1, viewIndex() + (d == 'r' ? 1 : -1)));
-                if (n != viewIndex()) { viewSel.put(lgId(), n); shownKey = ""; scroll = scrollT = 0; ti = ri = 0; }
+                if (n != viewIndex()) { viewSel.put(lgId(), n); boardKey = ""; scroll = scrollT = 0; pi = ri = 0; }
             } else if (d == 'u') focus = 0;
-            else if (d == 'd') intoTables();
+            else if (d == 'd') intoBoard();
         } else {
-            tables(); layout();
-            if (shown.isEmpty()) { focus = hasViews ? 1 : 0; invalidate(); return true; }
-            ti = Math.min(ti, shown.size() - 1);
-            Table tb = shown.get(ti);
-            int per = perLine();
+            board();
+            if (panes.isEmpty()) { focus = hasViews ? 1 : 0; invalidate(); return true; }
+            pi = Math.min(pi, panes.size() - 1);
+            Pane pn = panes.get(pi);
+            ri = Math.min(ri, pn.flat.size() - 1);
             if (d == 'u') {
                 if (ri > 0) ri--;
-                else if (ti - per >= 0) { ti -= per; ri = shown.get(ti).rows.size() - 1; }
                 else { focus = hasViews ? 1 : 0; scrollT = 0; }
-            } else if (d == 'd') {
-                if (ri < tb.rows.size() - 1) ri++;
-                else if (ti + per < shown.size()) { ti += per; ri = 0; }
-                else if (ti + 1 < shown.size() && (ti + 1) / per > ti / per) { ti++; ri = 0; }
-            } else if (d == 'l') { if (ti % per > 0) { ti--; ri = Math.min(ri, shown.get(ti).rows.size() - 1); } }
-            else if (d == 'r') { if (ti % per < per - 1 && ti + 1 < shown.size()) { ti++; ri = Math.min(ri, shown.get(ti).rows.size() - 1); } }
+            } else if (d == 'd') { if (ri < pn.flat.size() - 1) ri++; }
+            else {
+                int to = pi + (d == 'r' ? 1 : -1);
+                if (to >= 0 && to < panes.size()) {
+                    // the team level with this one in the other column
+                    float y = pn.rowY.get(ri);
+                    Pane o = panes.get(to); int best = 0; float bd = Float.MAX_VALUE;
+                    for (int k = 0; k < o.rowY.size(); k++) { float dd = Math.abs(o.rowY.get(k) - y); if (dd < bd) { bd = dd; best = k; } }
+                    pi = to; ri = best;
+                }
+            }
             follow();
         }
         invalidate();
         return true;
     }
-    /** into the tables: at your team when it's in them, else at the top */
-    private void intoTables() {
-        tables(); layout();
-        if (shown.isEmpty()) return;
-        focus = 2; ti = 0; ri = 0;
+    /** onto the board: at your team when it's there, else the top */
+    private void intoBoard() {
+        board();
+        if (panes.isEmpty()) return;
+        focus = 2; pi = 0; ri = 0; glowSnap = true;
         String lg = lgId();
         outer:
-        for (int a = 0; a < shown.size(); a++) for (int b = 0; b < shown.get(a).rows.size(); b++) if (favs.contains(lg + ":" + shown.get(a).rows.get(b).id)) { ti = a; ri = b; break outer; }
+        for (int a = 0; a < panes.size(); a++) for (int b = 0; b < panes.get(a).flat.size(); b++) if (favs.contains(lg + ":" + panes.get(a).flat.get(b).id)) { pi = a; ri = b; break outer; }
         follow();
     }
+    private float boardTop() { return 4.9f * R; }
+    private float footTop() { return getHeight() - 3.1f * R; }
     /** the chosen team kept in sight */
     private void follow() {
-        if (focus != 2 || ti >= shown.size()) return;
-        Table tb = shown.get(ti);
-        float top = topY(), y0 = tb.y + 4.6f * R + ri * tb.rowH, y1 = y0 + tb.rowH;
-        float viewH = getHeight() - top - R;
-        if (ti < perLine() && ri < 3) { scrollT = 0; return; }
-        if (y0 - scrollT < top + 1.5f * R) scrollT = Math.max(0, y0 - top - 3 * R);
-        else if (y1 - scrollT > top + viewH) scrollT = Math.max(0, y1 - top - viewH + 2 * R);
-        scrollT = Math.max(0, Math.min(scrollT, Math.max(0, contentH - (getHeight() - top))));
+        if (focus != 2 || pi >= panes.size()) return;
+        Pane pn = panes.get(pi);
+        if (ri >= pn.rowY.size()) return;
+        float y0 = pn.rowY.get(ri), y1 = y0 + rowH, top = boardTop(), bot = footTop() - .6f * R;
+        if (boardH <= bot - top) { scrollT = 0; return; }
+        if (y0 - scrollT < top + 2 * R) scrollT = Math.max(0, y0 - top - 4 * R);
+        else if (y1 - scrollT > bot - R) scrollT = y1 - bot + 4 * R;
+        scrollT = Math.max(0, Math.min(scrollT, boardH - (bot - top)));
     }
 
     void ok() {
-        if (team != null) {
-            List<SportsData.Ev> it = teamItems();
-            if (tsel < it.size()) h.sportsData().openEvent(it.get(tsel));
-            return;
-        }
-        if (focus == 0) { if (views().size() > 1) focus = 1; else intoTables(); invalidate(); return; }
-        if (focus == 1) { intoTables(); invalidate(); return; }
-        if (ti < shown.size() && ri < shown.get(ti).rows.size()) openTeam(shown.get(ti).rows.get(ri), chips.get(sel));
+        if (team != null) { List<SportsData.Ev> it = teamList(tcol); if (tsel < it.size()) h.sportsData().openEvent(it.get(tsel)); return; }
+        if (cache.get(lgId()) == null && errors.containsKey(lgId())) { load(); invalidate(); return; }
+        if (focus == 0) { if (views().size() > 1) focus = 1; else intoBoard(); invalidate(); return; }
+        if (focus == 1) { intoBoard(); invalidate(); return; }
+        if (pi < panes.size() && ri < panes.get(pi).flat.size()) openTeam(panes.get(pi).flat.get(ri), chips.get(sel));
     }
-    /** BACK: a team's page closes, the tables go back to the leagues; false at the leagues */
+    /** BACK: a team's page closes, the board goes back to the leagues; false at the leagues */
     boolean back() {
         if (team != null) { closeTeam(); invalidate(); return true; }
         if (focus != 0) { focus = 0; scrollT = 0; invalidate(); return true; }
@@ -372,20 +485,19 @@ final class StandingsView extends View {
     /** a finger (phones): a league, a view, a team or a team's game; "ok" when OK should open what's under it */
     String tapAt(float x, float y) {
         if (team != null) {
-            for (int i = 0; i < teamHits.size(); i++) if (teamHits.get(i).contains(x, y)) { tsel = i; invalidate(); return "ok"; }
+            for (Object[] hit : teamHits) if (((RectF) hit[0]).contains(x, y)) { tcol = (Integer) hit[1]; tsel = (Integer) hit[2]; invalidate(); return "ok"; }
             return null;
         }
         for (int i = 0; i < chipHits.size(); i++) if (chipHits.get(i).contains(x, y)) {
-            focus = 0; if (i != sel) { sel = i; scroll = scrollT = 0; ti = ri = 0; shownKey = ""; load(); }
+            focus = 0; if (i != sel) { sel = i; scroll = scrollT = 0; pi = ri = 0; boardKey = ""; load(); }
             invalidate(); return "done";
         }
-        for (int i = 0; i < viewHits.size(); i++) if (viewHits.get(i).contains(x, y)) { focus = 1; viewSel.put(lgId(), i); shownKey = ""; scroll = scrollT = 0; ti = ri = 0; invalidate(); return "done"; }
+        for (int i = 0; i < viewHits.size(); i++) if (viewHits.get(i).contains(x, y)) { focus = 1; viewSel.put(lgId(), i); boardKey = ""; scroll = scrollT = 0; pi = ri = 0; invalidate(); return "done"; }
         float cy = y + scroll;
-        for (int a = 0; a < shown.size(); a++) {
-            Table tb = shown.get(a);
-            if (x < tb.x || x > tb.x + tb.w) continue;
-            float r0 = tb.y + 4.6f * R;
-            if (cy >= r0 && cy < r0 + tb.rows.size() * tb.rowH) { focus = 2; ti = a; ri = (int) ((cy - r0) / tb.rowH); invalidate(); return "ok"; }
+        for (int a = 0; a < panes.size(); a++) {
+            Pane pn = panes.get(a);
+            if (x < pn.x || x > pn.x + pn.w) continue;
+            for (int k = 0; k < pn.rowY.size(); k++) if (cy >= pn.rowY.get(k) && cy < pn.rowY.get(k) + rowH) { focus = 2; pi = a; ri = k; invalidate(); return "ok"; }
         }
         return null;
     }
@@ -410,23 +522,56 @@ final class StandingsView extends View {
                     if (d == null) { err = "ESPN didn't answer"; continue; }
                     JSONObject j = new JSONObject(new String(d, "UTF-8"));
                     List<Group> got = new ArrayList<>();
-                    collect(j, j.optString("name"), got, lg[1]);
+                    collect(j, j.optString("name"), j.optString("abbreviation"), got, lg[1]);
                     if (!got.isEmpty()) { gs = got; root = j.optString("name"); break; }
                     err = "no standings yet";
                 } catch (Exception e) { err = String.valueOf(e.getMessage()); }
             }
+            // the teams' colours (one call: every team in the league), for the chosen row's glow and team pages
+            final Map<String, Integer> cl = new HashMap<>();
+            if (gs != null) {
+                JSONObject tj = json(SportsData.ESPN + "/" + lg[1] + "/" + lg[2] + "/teams?limit=500");
+                try {
+                    JSONArray ts = tj.getJSONArray("sports").getJSONObject(0).getJSONArray("leagues").getJSONObject(0).getJSONArray("teams");
+                    for (int i = 0; i < ts.length(); i++) {
+                        JSONObject tm = ts.getJSONObject(i).optJSONObject("team"); if (tm == null) continue;
+                        int col = hex(tm.optString("color")), alt = hex(tm.optString("alternateColor"));
+                        if (col != 0 || alt != 0) cl.put(lg[0] + ":" + tm.optString("id"), pick(col, alt));
+                    }
+                } catch (Exception ignored) { }
+            }
             final List<Group> fg = gs; final String fe = err, fr = root;
-            Diag.ev("standings: " + lg[3] + " · " + (fg == null ? "none (" + fe + ")" : fg.size() + " groups"));
+            Diag.ev("standings: " + lg[3] + " · " + (fg == null ? "none (" + fe + ")" : fg.size() + " groups, " + cl.size() + " team colours"));
             post(new Runnable() { @Override public void run() {
                 loading.remove(lg[0]);
                 if (fg != null) {
                     cache.put(lg[0], new Object[] { System.currentTimeMillis(), fg, fr });
+                    colors.putAll(cl);
                     for (Group g : fg) for (Row r : g.rows) wantLogo(r.logo);
                 } else errors.put(lg[0], fe);
-                shownKey = "";
+                boardKey = "";
                 invalidate();
             } });
         } }, "standings").start();
+    }
+    private static int hex(String s) {
+        if (s == null || !s.matches("[0-9a-fA-F]{6}")) return 0;
+        return 0xFF000000 | Integer.parseInt(s, 16);
+    }
+    private static double lum(int c) { return (.2126 * Color.red(c) + .7152 * Color.green(c) + .0722 * Color.blue(c)) / 255; }
+    /** the team colour that will show on a dark screen: its main one, else the other when the main is black */
+    private static int pick(int col, int alt) {
+        if (col == 0) return alt;
+        if (alt == 0) return col;
+        if (lum(col) < .06 && lum(alt) > lum(col) && lum(alt) < .9) return alt;
+        return col;
+    }
+    /** lifted until it glows on the dark board (navy and black would otherwise disappear) */
+    private static int lift(int c, double to) {
+        double l = lum(c);
+        if (l >= to) return c;
+        float k = (float) Math.min(1, (to - l) / Math.max(.01, 1 - l) * 1.15);
+        return Color.rgb((int) (Color.red(c) + (255 - Color.red(c)) * k), (int) (Color.green(c) + (255 - Color.green(c)) * k), (int) (Color.blue(c) + (255 - Color.blue(c)) * k));
     }
     private void wantLogo(final String u) {
         if (u == null || u.isEmpty() || logos.containsKey(u)) return;
@@ -435,9 +580,7 @@ final class StandingsView extends View {
         h.imgs.load("stand2:" + u, new HomeImages.Source() { @Override public byte[] bytes() throws Exception { return darkFirst(u); } }, s, s,
                 new HomeImages.Done() { @Override public void done(Bitmap b) { if (b != null) { logos.put(u, b); invalidate(); } } });
     }
-
-    /** ESPN's logo made for dark backgrounds (…/500-dark/…) when it has one, else the plain one: the plain logos
-        are drawn for white pages, and dark ones (Bruins, Penguins, Kings…) all but vanished on the cards */
+    /** ESPN's logo made for dark backgrounds (…/500-dark/…) when it has one, else the plain one */
     static byte[] darkFirst(String u) throws Exception {
         String d = u.contains("/500/") ? u.replace("/500/", "/500-dark/") : null;
         if (d != null) { try { byte[] b = HomeImages.http(d, null); if (b != null && b.length > 200) return b; } catch (Exception ignored) { } }
@@ -447,18 +590,19 @@ final class StandingsView extends View {
         college), one table (soccer) */
     private static int level(String id) { return id.equals("nfl") || id.equals("mlb") || id.equals("nhl") || id.equals("nba") ? 3 : 2; }
     /** every part of the answer with a table in it (a league, its conferences, their divisions), the deepest ones */
-    private void collect(JSONObject node, String parent, List<Group> out, String sport) {
+    private void collect(JSONObject node, String parent, String parentAbbr, List<Group> out, String sport) {
         int before = out.size();
         JSONArray ch = node.optJSONArray("children");
-        if (ch != null) for (int i = 0; i < ch.length(); i++) { JSONObject c = ch.optJSONObject(i); if (c != null) collect(c, node.optString("name", parent), out, sport); }
-        if (out.size() > before) return;                       // (the deeper tables are the ones shown)
+        if (ch != null) for (int i = 0; i < ch.length(); i++) { JSONObject c = ch.optJSONObject(i); if (c != null) collect(c, node.optString("name", parent), node.optString("abbreviation", ""), out, sport); }
+        if (out.size() > before) return;
         JSONObject st = node.optJSONObject("standings");
         JSONArray en = st == null ? null : st.optJSONArray("entries");
         if (en == null || en.length() == 0) return;
         Group g = new Group();
         g.name = node.optString("name", parent);
-        g.parent = parent;
+        g.parent = parent; g.parentAbbr = parentAbbr;
         List<Col> all = cols(sport, "");
+        boolean pts = pointsSport(sport);
         for (int i = 0; i < en.length(); i++) {
             JSONObject e = en.optJSONObject(i); if (e == null) continue;
             JSONObject tm = e.optJSONObject("team"); if (tm == null) continue;
@@ -472,7 +616,7 @@ final class StandingsView extends View {
             JSONArray stats = e.optJSONArray("stats");
             for (Col c : all) if (!c.keys[0].startsWith("#")) r.s.put(c.label, stat(stats, c.keys));
             r.w = z(num(stats, "wins")); r.l = z(num(stats, "losses")); r.tie = z(num(stats, "ties"));
-            r.pts = sport.equals("hockey") || sport.equals("soccer") ? z(num(stats, "points")) : 0; r.pct = num(stats, "winPercent"); r.seed = z(num(stats, "playoffSeed")); r.rank = z(num(stats, "rank"));
+            r.pts = pts ? z(num(stats, "points")) : 0; r.pct = num(stats, "winPercent"); r.seed = z(num(stats, "playoffSeed")); r.rank = z(num(stats, "rank"));
             String cl = stat(stats, new String[] { "clincher" }).trim().toLowerCase(Locale.US);
             r.clinch = cl.equals("-") || cl.length() > 3 ? "" : cl;
             JSONObject note = e.optJSONObject("note");
@@ -485,42 +629,42 @@ final class StandingsView extends View {
         sortRows(g.rows, false);
         if (!g.rows.isEmpty()) out.add(g);
     }
-    /** the columns, most wanted first by prio (1 always, 2 then 3 then 4 as there's room); #… are worked out here */
+    /** the columns: the must-haves at prio 1, then 2, 3, 4 as there's room; #… are worked out here */
     private static List<Col> cols(String sport, String lg) {
         List<Col> c = new ArrayList<>();
         switch (sport) {
             case "football":
-                c.add(new Col("W", 3f, 1, "wins", "W")); c.add(new Col("L", 3f, 1, "losses", "L")); c.add(new Col("T", 3f, 1, "ties", "T"));
+                c.add(new Col("W", 3f, 1, "wins", "W")); c.add(new Col("L", 3f, 1, "losses", "L")); c.add(new Col("T", 2.8f, 1, "ties", "T"));
                 c.add(new Col("PCT", 4.4f, 1, "winPercent", "PCT"));
-                c.add(new Col("HOME", 4.6f, 3, "home", "Home")); c.add(new Col("AWAY", 4.6f, 3, "road", "away", "Road"));
-                c.add(new Col("DIV", 4.6f, 3, "vsdiv", "vs. Div.", "divisionRecord")); c.add(new Col("CONF", 4.6f, lg.equals("cfb") ? 2 : 4, "vsconf", "vs. Conf.", "conferenceRecord"));
+                c.add(new Col("HOME", 5.2f, 3, "home", "Home")); c.add(new Col("AWAY", 5.2f, 3, "road", "away", "Road"));
+                c.add(new Col("DIV", 5.2f, 3, "vsdiv", "vs. Div.", "divisionRecord")); c.add(new Col("CONF", 5.2f, lg.equals("cfb") ? 2 : 4, "vsconf", "vs. Conf.", "conferenceRecord"));
                 c.add(new Col("PF", 4f, 4, "pointsFor", "PF")); c.add(new Col("PA", 4f, 4, "pointsAgainst", "PA"));
-                c.add(new Col("DIFF", 4.4f, 2, "pointDifferential", "differential", "DIFF")); c.add(new Col("STRK", 4f, 2, "streak", "STRK"));
+                c.add(new Col("DIFF", 7.6f, 2, "pointDifferential", "differential", "DIFF")); c.add(new Col("STRK", 3.8f, 2, "streak", "STRK"));
                 break;
             case "hockey":
-                c.add(new Col("GP", 3.4f, 1, "gamesPlayed", "GP")); c.add(new Col("W", 3.2f, 1, "wins", "W")); c.add(new Col("L", 3.2f, 1, "losses", "L"));
-                c.add(new Col("OTL", 3.6f, 1, "otLosses", "overtimeLosses", "OTLosses", "OTL")); c.add(new Col("PTS", 3.8f, 1, "points", "PTS"));
-                c.add(new Col("HOME", 5.8f, 3, "home", "Home")); c.add(new Col("AWAY", 5.8f, 3, "road", "away", "Road"));
-                c.add(new Col("L10", 5.8f, 2, "lasttengames", "Last Ten Games", "L10")); c.add(new Col("DIFF", 4.2f, 3, "differential", "pointDifferential", "DIFF"));
-                c.add(new Col("STRK", 4f, 2, "streak", "STRK"));
+                c.add(new Col("GP", 3.2f, 1, "gamesPlayed", "GP")); c.add(new Col("W", 3f, 1, "wins", "W")); c.add(new Col("L", 3f, 1, "losses", "L"));
+                c.add(new Col("OTL", 3.4f, 1, "otLosses", "overtimeLosses", "OTLosses", "OTL")); c.add(new Col("PTS", 3.8f, 1, "points", "PTS"));
+                c.add(new Col("HOME", 5.8f, 4, "home", "Home")); c.add(new Col("AWAY", 5.8f, 4, "road", "away", "Road"));
+                c.add(new Col("L10", 5.8f, 2, "lasttengames", "Last Ten Games", "L10")); c.add(new Col("DIFF", 7.6f, 2, "differential", "pointDifferential", "DIFF"));
+                c.add(new Col("STRK", 3.8f, 3, "streak", "STRK"));
                 break;
             case "soccer":
-                c.add(new Col("GP", 3.4f, 1, "gamesPlayed", "GP")); c.add(new Col("W", 3f, 1, "wins", "W")); c.add(new Col("D", 3f, 1, "ties", "D", "T"));
+                c.add(new Col("GP", 3.2f, 1, "gamesPlayed", "GP")); c.add(new Col("W", 3f, 1, "wins", "W")); c.add(new Col("D", 3f, 1, "ties", "D", "T"));
                 c.add(new Col("L", 3f, 1, "losses", "L")); c.add(new Col("GF", 3.4f, 3, "pointsFor", "F", "GF")); c.add(new Col("GA", 3.4f, 3, "pointsAgainst", "A", "GA"));
-                c.add(new Col("GD", 3.8f, 2, "pointDifferential", "GD")); c.add(new Col("PTS", 3.8f, 1, "points", "P", "PTS"));
+                c.add(new Col("GD", 7.6f, 2, "pointDifferential", "GD")); c.add(new Col("PTS", 3.8f, 1, "points", "P", "PTS"));
                 break;
             case "baseball":
                 c.add(new Col("W", 3.2f, 1, "wins", "W")); c.add(new Col("L", 3.2f, 1, "losses", "L")); c.add(new Col("PCT", 4.4f, 1, "winPercent", "PCT"));
-                c.add(new Col("GB", 3.8f, 1, "#gb")); c.add(new Col("HOME", 4.8f, 3, "home", "Home")); c.add(new Col("AWAY", 4.8f, 3, "road", "away", "Road"));
-                c.add(new Col("L10", 4.2f, 2, "lasttengames", "Last Ten Games", "L10")); c.add(new Col("DIFF", 4.2f, 3, "pointDifferential", "differential", "DIFF"));
-                c.add(new Col("STRK", 4f, 2, "streak", "STRK"));
+                c.add(new Col("GB", 3.6f, 1, "#gb")); c.add(new Col("HOME", 5.2f, 3, "home", "Home")); c.add(new Col("AWAY", 5.2f, 3, "road", "away", "Road"));
+                c.add(new Col("L10", 4.4f, 2, "lasttengames", "Last Ten Games", "L10")); c.add(new Col("DIFF", 7.6f, 2, "pointDifferential", "differential", "DIFF"));
+                c.add(new Col("STRK", 3.8f, 2, "streak", "STRK"));
                 break;
             default:     // basketball
                 c.add(new Col("W", 3.2f, 1, "wins", "W")); c.add(new Col("L", 3.2f, 1, "losses", "L")); c.add(new Col("PCT", 4.4f, 1, "winPercent", "PCT"));
-                c.add(new Col("GB", 3.8f, 1, "#gb")); c.add(new Col("HOME", 4.6f, 3, "home", "Home")); c.add(new Col("AWAY", 4.6f, 3, "road", "away", "Road"));
-                c.add(new Col("CONF", 4.6f, lg.equals("cbb") ? 2 : 4, "vsconf", "vs. Conf.", "conferenceRecord"));
-                c.add(new Col("L10", 4.2f, 2, "lasttengames", "Last Ten Games", "L10")); c.add(new Col("DIFF", 4.4f, 3, "differential", "pointDifferential", "DIFF"));
-                c.add(new Col("STRK", 4f, 2, "streak", "STRK"));
+                c.add(new Col("GB", 3.6f, 1, "#gb")); c.add(new Col("HOME", 5.2f, 3, "home", "Home")); c.add(new Col("AWAY", 5.2f, 3, "road", "away", "Road"));
+                c.add(new Col("CONF", 5.2f, lg.equals("cbb") ? 2 : 4, "vsconf", "vs. Conf.", "conferenceRecord"));
+                c.add(new Col("L10", 4.4f, 2, "lasttengames", "Last Ten Games", "L10")); c.add(new Col("DIFF", 7.6f, 3, "differential", "pointDifferential", "DIFF"));
+                c.add(new Col("STRK", 3.8f, 2, "streak", "STRK"));
                 break;
         }
         return c;
@@ -543,8 +687,8 @@ final class StandingsView extends View {
         return Double.NaN;
     }
     private static boolean allSeeds(List<Row> rs) { for (Row r : rs) if (r.seed <= 0) return false; return !rs.isEmpty(); }
-    /** as the league ranks them: playoff seed (or rank) when every team has a different one, else points, else
-        win %, then wins; true when it went by seed */
+    /** as the league ranks them: playoff seed (or rank) when every team has one (a different one, merging
+        divisions), else points, else win %, then wins; true when it went by seed */
     private static boolean sortRows(List<Row> rs, boolean distinct) {
         boolean seeds = allSeeds(rs), ranks = true;
         for (Row r : rs) if (r.rank <= 0) ranks = false;
@@ -561,39 +705,114 @@ final class StandingsView extends View {
         return seeds;
     }
     private static double z(double v) { return Double.isNaN(v) ? 0 : v; }
+    private static JSONObject json(String u) {
+        try { byte[] b = HomeImages.http(u, null); return b == null ? null : new JSONObject(new String(b, "UTF-8")); } catch (Exception e) { return null; }
+    }
+
+    // ------------------------------------------------------------------ where a team stands, in words
+
+    private Group groupOf(Row r) { List<Group> gs = groups(); if (gs != null) for (Group g : gs) if (g.rows.contains(r)) return g; return null; }
+    /** the team's conference (or its table, without divisions), ranked as the league ranks it */
+    private List<Row> confRows(Group g) {
+        List<Row> rs = new ArrayList<>();
+        List<Group> gs = groups(); if (gs == null || g == null) return rs;
+        if (!hasDivisions()) rs.addAll(g.rows);
+        else for (Group x : gs) if (x.parent.equals(g.parent)) rs.addAll(x.rows);
+        sortRows(rs, true);
+        return rs;
+    }
+    private String confName(Group g) {
+        if (g == null) return "";
+        if (!hasDivisions()) return g.name;
+        if (!g.parentAbbr.isEmpty() && g.parentAbbr.length() <= 4) return g.parentAbbr;
+        return g.parent;
+    }
+    /** "Cowboys are 2nd in the NFC East and 10th in the NFC, 1.5 games out of a playoff spot." */
+    private String sentence(Row r) {
+        String lg = lgId(), sport = chips.get(sel)[1];
+        Group g = groupOf(r);
+        if (g == null) return r.name;
+        List<String> places = new ArrayList<>();
+        String status = "";
+        if (sport.equals("soccer")) {
+            List<Row> rs = new ArrayList<>(g.rows); sortRows(rs, false);
+            int at = rs.indexOf(r);
+            places.add(ordinal(at + 1));
+            if (at == 0 && rs.size() > 1) { double d = r.pts - rs.get(1).pts; status = d > 0 ? half(d) + (d == 1 ? " point" : " points") + " clear at the top" : "top on goal difference"; }
+            else if (at > 0) { double d = rs.get(0).pts - r.pts; status = half(d) + (d == 1 ? " point" : " points") + " behind the leaders"; }
+            if (!r.noteText.isEmpty()) status += (status.isEmpty() ? "" : ", ") + "in the " + r.noteText + " places";
+        } else {
+            boolean divs = hasDivisions();
+            if (divs) places.add(ordinal(g.rows.indexOf(r) + 1) + " in the " + g.name);
+            List<Row> conf = confRows(g);
+            int at = conf.indexOf(r);
+            String cn = confName(g);
+            if (at >= 0) places.add(ordinal(at + 1) + " in the " + cn);
+            int[] cut = cutFor(lg);
+            if (cut[0] > 0 && at >= 0 && conf.size() > cut[0] && (allSeeds(conf) || lg.equals("mls")) && !lg.equals("wnba")) {
+                if (at < cut[0]) status = "the " + (cn.length() <= 4 ? cn + "'s " : "") + ordinal(at + 1) + " seed";
+                else if (cut[1] > 0 && at < cut[1]) status = "in the play-in as the " + ordinal(at + 1) + " seed";
+                else {
+                    boolean pts = pointsSport(sport);
+                    double d = gap(conf.get(cut[0] - 1), r, pts);
+                    status = d > 0 ? half(d) + " " + (pts ? (d == 1 ? "point" : "points") : (d == 1 ? "game" : "games")) + " out of a playoff spot" : "level with the last team in, outside on tiebreakers";
+                }
+            }
+        }
+        StringBuilder b = new StringBuilder(r.name).append(" are ");
+        for (int i = 0; i < places.size(); i++) { if (i > 0) b.append(" and "); b.append(places.get(i)); }
+        if (!status.isEmpty()) b.append(", ").append(status);
+        b.append('.');
+        String cm = clinchMeaning(lg, r.clinch);
+        if (r.clinch.equals("e")) b.append(" Out of playoff contention.");
+        else if (!cm.isEmpty()) b.append(" They've ").append(cm).append('.');
+        return b.toString();
+    }
 
     // ------------------------------------------------------------------ a team's page
 
     private static final class TeamData {
         long at; boolean loading = true; String err = "", summary = "", record = "", leadLabel = "";
+        int color;
         final List<SportsData.Ev> next = new ArrayList<>(), past = new ArrayList<>();
         JSONArray leaders;
     }
     private Row team;
     private String[] teamLg;
     private TeamData td;
-    private int tsel;
-    private Bitmap teamLogo;
+    private int tcol, tsel;
+    private long teamAt;
+    private Bitmap teamLogo, featLogo;
+    private String featFor = "";
     private final Map<String, TeamData> teamCache = new HashMap<>();
-    private final List<RectF> teamHits = new ArrayList<>();
+    private final List<Object[]> teamHits = new ArrayList<>();             // {rect, column, index}
 
-    private List<SportsData.Ev> teamItems() {
+    /** column 0: the next game and the ones after it; column 1: results, newest first */
+    private List<SportsData.Ev> teamList(int col) {
         List<SportsData.Ev> l = new ArrayList<>();
         if (td == null) return l;
-        for (int i = 0; i < Math.min(4, td.next.size()); i++) l.add(td.next.get(i));
-        for (int i = 0; i < Math.min(6, td.past.size()); i++) l.add(td.past.get(i));
+        if (col == 0) for (int i = 0; i < Math.min(4, td.next.size()); i++) l.add(td.next.get(i));
+        else for (int i = 0; i < Math.min(7, td.past.size()); i++) l.add(td.past.get(i));
         return l;
     }
-    private void closeTeam() { team = null; td = null; teamLogo = null; teamHits.clear(); }
+    private void teamMove(char d) {
+        int n = teamList(tcol).size();
+        if (d == 'u' && tsel > 0) tsel--;
+        else if (d == 'd' && tsel < n - 1) tsel++;
+        else if (d == 'l' && tcol == 1 && !teamList(0).isEmpty()) { tcol = 0; tsel = Math.min(tsel, teamList(0).size() - 1); }
+        else if (d == 'r' && tcol == 0 && !teamList(1).isEmpty()) { tcol = 1; tsel = Math.min(tsel, teamList(1).size() - 1); }
+    }
+    private void closeTeam() { team = null; td = null; teamLogo = null; featLogo = null; featFor = ""; teamHits.clear(); glowSnap = true; }
 
     private void openTeam(final Row r, final String[] lg) {
-        team = r; teamLg = lg; tsel = 0; teamLogo = null;
-        final int s = Math.round(6 * R);
-        if (!r.logo.isEmpty()) h.imgs.load("standbig2:" + r.logo, new HomeImages.Source() { @Override public byte[] bytes() throws Exception { return darkFirst(r.logo); } }, s, s,
+        team = r; teamLg = lg; tcol = 0; tsel = 0; teamLogo = null; featLogo = null; featFor = "";
+        teamAt = SystemClock.uptimeMillis();
+        final int s = Math.round(8 * R);
+        if (!r.logo.isEmpty()) h.imgs.load("standbig3:" + r.logo, new HomeImages.Source() { @Override public byte[] bytes() throws Exception { return darkFirst(r.logo); } }, s, s,
                 new HomeImages.Done() { @Override public void done(Bitmap b) { if (team == r) { teamLogo = b; invalidate(); } } });
         final String key = lg[0] + ":" + r.id;
         TeamData have = teamCache.get(key);
-        if (have != null && System.currentTimeMillis() - have.at < 5 * 60000L) { td = have; for (SportsData.Ev e : teamItems()) for (SportsData.Team x : e.teams) wantLogo(x.logo); invalidate(); return; }
+        if (have != null && System.currentTimeMillis() - have.at < 5 * 60000L) { td = have; tcol = have.next.isEmpty() && !have.past.isEmpty() ? 1 : 0; afterTeam(); invalidate(); return; }
         td = new TeamData();
         invalidate();
         Diag.ev("standings: team page · " + lg[3] + " " + r.abbr);
@@ -604,15 +823,26 @@ final class StandingsView extends View {
             post(new Runnable() { @Override public void run() {
                 teamCache.put(key, d);
                 if (team != r) return;
-                td = d; tsel = 0;
-                for (SportsData.Ev e : teamItems()) for (SportsData.Team x : e.teams) wantLogo(x.logo);
+                td = d; tcol = d.next.isEmpty() && !d.past.isEmpty() ? 1 : 0; tsel = 0;
+                afterTeam();
                 if (!d.err.isEmpty()) Diag.ev("standings: team page couldn't load · " + d.err);
                 invalidate();
             } });
         } }, "standings-team").start();
     }
-    /** ESPN's team (its place and record), its schedule (the soccer one in two: results, then fixtures), and the
-        leaders from its next game's preview (the season's), else its last game */
+    /** the logos the page needs: every opponent small, the next one big */
+    private void afterTeam() {
+        for (int c = 0; c < 2; c++) for (SportsData.Ev e : teamList(c)) for (SportsData.Team x : e.teams) wantLogo(x.logo);
+        if (td == null || td.next.isEmpty()) return;
+        final SportsData.Team opp = other(td.next.get(0), team.id);
+        if (opp == null || opp.logo.isEmpty()) return;
+        final Row was = team; featFor = opp.logo;
+        final int s = Math.round(5 * R);
+        h.imgs.load("standfeat:" + opp.logo, new HomeImages.Source() { @Override public byte[] bytes() throws Exception { return darkFirst(opp.logo); } }, s, s,
+                new HomeImages.Done() { @Override public void done(Bitmap b) { if (team == was) { featLogo = b; invalidate(); } } });
+    }
+    /** ESPN's team (its place, record and colour), its schedule (soccer's in two: results, then fixtures), and
+        the leaders from its next game's preview (the season's), else its last game */
     private static void fill(TeamData d, Row r, String[] lg) throws Exception {
         SportsData.Lg L = SportsData.league(lg[0]);
         if (L == null) { d.err = "this league has no schedule here"; return; }
@@ -621,6 +851,7 @@ final class StandingsView extends View {
         JSONObject tm = info == null ? null : info.optJSONObject("team");
         if (tm != null) {
             d.summary = tm.optString("standingSummary");
+            d.color = pick(hex(tm.optString("color")), hex(tm.optString("alternateColor")));
             JSONObject rec = tm.optJSONObject("record");
             JSONArray items = rec == null ? null : rec.optJSONArray("items");
             if (items != null && items.length() > 0 && items.optJSONObject(0) != null) d.record = items.optJSONObject(0).optString("summary");
@@ -649,416 +880,625 @@ final class StandingsView extends View {
                 JSONObject t = one == null ? null : one.optJSONObject("team");
                 if (t != null && t.optString("id").equals(r.id)) { d.leaders = one.optJSONArray("leaders"); break; }
             }
-            d.leadLabel = src.state.equals("pre") ? "SEASON LEADERS" : src.state.equals("in") ? "LEADERS · THIS GAME" : "LEADERS · LAST GAME";
+            d.leadLabel = src.state.equals("pre") ? "Season leaders" : src.state.equals("in") ? "Leaders this game" : "Leaders last game";
         }
     }
-    private static JSONObject json(String u) {
-        try { byte[] b = HomeImages.http(u, null); return b == null ? null : new JSONObject(new String(b, "UTF-8")); } catch (Exception e) { return null; }
-    }
-
-    // ------------------------------------------------------------------ drawing
-
-    private float topY() { return views().size() > 1 ? 8.4f * R : 5.2f * R; }
-    private int perLine() { return shown.size() <= 1 ? 1 : 2; }
-    /** where each table goes, and which of its columns fit */
-    private void layout() {
-        int w = getWidth();
-        if (w == 0) return;
-        float pad = 4 * R, gap = 1.6f * R, top = topY();
-        int n = perLine();
-        float cw = n == 1 ? Math.min(w - 2 * pad, 100 * R) : (w - 2 * pad - gap) / 2;
-        // the rows as roomy as the screen allows with everything in sight (2.45–2.85 rem), else a set height and scrolling
-        int rowsSum = 0, lines = 0, lineMax = 0;
-        for (int i = 0; i < shown.size(); i++) { lineMax = Math.max(lineMax, shown.get(i).rows.size()); if (i % n == n - 1 || i == shown.size() - 1) { rowsSum += lineMax; lines++; lineMax = 0; } }
-        float avail = getHeight() - top - 1.5f * R - legendH(w - 2 * pad);
-        float fitH = rowsSum == 0 ? 0 : (avail - lines * 5.8f * R - (lines - 1) * gap) / rowsSum;
-        float rowH = fitH >= 2.45f * R ? Math.min(2.85f * R, fitH) : 0;
-        float y = top, lineH = 0;
-        for (int i = 0; i < shown.size(); i++) {
-            Table tb = shown.get(i);
-            int col = i % n;
-            tb.rowH = rowH > 0 ? rowH : tb.rows.size() > 16 ? 2.45f * R : 2.7f * R;
-            tb.w = cw; tb.x = n == 1 ? (w - cw) / 2f : pad + col * (cw + gap); tb.y = y;
-            tb.hh = 4.6f * R + tb.rows.size() * tb.rowH + 1.2f * R;
-            // the columns that fit: the name keeps 11 rem; the least wanted go first, from the right
-            float room = cw - 2.4f * R - 4.6f * R - 11 * R;
-            List<Integer> keep = new ArrayList<>(); for (int k = 0; k < tb.cols.size(); k++) keep.add(k);
-            for (int pr = 4; pr >= 2; pr--) {
-                float sum = 0; for (int k : keep) sum += tb.cols.get(k).w * R;
-                for (int k = keep.size() - 1; k >= 0 && sum > room; k--) if (tb.cols.get(keep.get(k)).prio == pr) { sum -= tb.cols.get(keep.get(k)).w * R; keep.remove(k); }
-            }
-            tb.fit = new int[keep.size()]; for (int k = 0; k < keep.size(); k++) tb.fit[k] = keep.get(k);
-            lineH = Math.max(lineH, tb.hh);
-            if (col == n - 1 || i == shown.size() - 1) { y += lineH + gap; lineH = 0; }
-        }
-        contentH = y - top + legendH(w - 2 * pad) + 2 * R;
-    }
-
-    @Override protected void onDraw(Canvas c) {
-        int w = getWidth(), hh = getHeight();
-        float pad = 4 * R;
-        boolean moving = false;
-        if (Math.abs(scroll - scrollT) > .5f) { scroll += (scrollT - scroll) * .25f; moving = true; } else scroll = scrollT;
-        if (team != null) { drawTeam(c, w, hh); return; }
-        // the leagues
-        float cy = 1.9f * R;
-        t.setTypeface(cond); t.setTextSize(1.35f * R);
-        float selX0 = 0, selX1;
-        float[] ws = new float[chips.size()];
-        for (int i = 0; i < chips.size(); i++) ws[i] = t.measureText(chips.get(i)[3]) + 2.6f * R;
-        for (int i = 0; i < sel; i++) selX0 += ws[i] + .8f * R;
-        selX1 = selX0 + (sel < ws.length ? ws[sel] : 0);
-        float shift = Math.max(0, selX1 - (w - 2 * pad));
-        chipHits.clear();
-        c.save(); c.clipRect(0, 0, w, 3.8f * R);
-        float x = pad - shift;
-        for (int i = 0; i < chips.size(); i++) {
-            boolean on = i == sel;
-            rf.set(x, cy - 1.45f * R, x + ws[i], cy + 1.45f * R);
-            chipHits.add(new RectF(rf));
-            p.setStyle(Paint.Style.FILL); p.setColor(on ? (focus == 0 ? GOLD : 0xFFE8EDF2) : 0xFF1A222D);
-            c.drawRoundRect(rf, 1.45f * R, 1.45f * R, p);
-            t.setColor(on ? 0xFF0A0E13 : 0xFFC6CED8); t.setTextAlign(Paint.Align.CENTER);
-            c.drawText(chips.get(i)[3], rf.centerX(), cy + .48f * R, t);
-            x += ws[i] + .8f * R;
-        }
-        c.restore();
-        t.setTextAlign(Paint.Align.LEFT);
-        if (chips.isEmpty()) return;
-        // the views
-        viewHits.clear();
-        List<String> vs = views();
-        if (vs.size() > 1) {
-            float vy = 5.8f * R; x = pad;
-            t.setTypeface(h.fSemi); t.setTextSize(1.15f * R);
-            int vi = viewIndex();
-            for (int i = 0; i < vs.size(); i++) {
-                boolean on = i == vi;
-                float tw = t.measureText(vs.get(i)) + 2.4f * R;
-                rf.set(x, vy - 1.15f * R, x + tw, vy + 1.15f * R);
-                viewHits.add(new RectF(rf));
-                if (on) { p.setStyle(Paint.Style.FILL); p.setColor(focus == 1 ? GOLD : 0x33FFFFFF); c.drawRoundRect(rf, 1.15f * R, 1.15f * R, p); }
-                else { p.setStyle(Paint.Style.STROKE); p.setStrokeWidth(Math.max(1, .08f * R)); p.setColor(0x33FFFFFF); c.drawRoundRect(rf, 1.15f * R, 1.15f * R, p); p.setStyle(Paint.Style.FILL); }
-                t.setColor(on && focus == 1 ? 0xFF0A0E13 : on ? Color.WHITE : 0xFFAEB7C2); t.setTextAlign(Paint.Align.CENTER);
-                c.drawText(vs.get(i), rf.centerX(), vy + .42f * R, t);
-                x += tw + .7f * R;
-            }
-            t.setTextAlign(Paint.Align.LEFT);
-            if (focus == 2) {
-                t.setTypeface(h.fMed); t.setTextSize(1.05f * R); t.setColor(DIM); t.setTextAlign(Paint.Align.RIGHT);
-                c.drawText("OK on a team: its games and leaders", w - pad, vy + .4f * R, t);
-                t.setTextAlign(Paint.Align.LEFT);
-            }
-        }
-        String id = lgId();
-        Object[] got = cache.get(id);
-        float top = topY();
-        if (got == null) {
-            t.setTypeface(h.fMed); t.setTextSize(1.5f * R); t.setColor(DIM);
-            String e = errors.get(id);
-            c.drawText(e != null ? "Couldn't load " + chips.get(sel)[3] + " standings (" + e + ")" : "Loading " + chips.get(sel)[3] + " standings…", pad, top + 3 * R, t);
-            if (moving) postInvalidateOnAnimation();
-            return;
-        }
-        tables(); layout();
-        c.save(); c.clipRect(0, top - 1.2f * R, w, hh); c.translate(0, -scroll);
-        for (int i = 0; i < shown.size(); i++) {
-            Table tb = shown.get(i);
-            if (tb.y + tb.hh > scroll && tb.y < scroll + hh) drawTable(c, tb, id, focus == 2 && i == ti ? ri : -1);
-        }
-        float ly = 0; for (Table tb : shown) ly = Math.max(ly, tb.y + tb.hh);
-        drawLegend(c, pad, ly + 1.6f * R, w - 2 * pad);
-        c.restore();
-        if (moving) postInvalidateOnAnimation();
-    }
-
-    private void drawTable(Canvas c, Table g, String lg, int chosen) {
-        float x = g.x, y = g.y, w = g.w, rowH = g.rowH, headH = 4.6f * R, rad = 1.3f * R;
-        // the card: a little lighter at the top, a hairline edge, and a band behind the title and column names
-        rf.set(x, y, x + w, y + g.hh);
-        p.setStyle(Paint.Style.FILL);
-        p.setShader(new LinearGradient(0, y, 0, y + g.hh, 0xFF17202B, 0xFF10161E, Shader.TileMode.CLAMP));
-        c.drawRoundRect(rf, rad, rad, p);
-        p.setShader(null);
-        c.save(); c.clipRect(x, y, x + w, y + headH - .2f * R);
-        p.setColor(0x0FFFFFFF); c.drawRoundRect(rf, rad, rad, p);
-        c.restore();
-        p.setColor(0x14FFFFFF); c.drawRect(x, y + headH - .2f * R, x + w, y + headH - .2f * R + Math.max(1, .07f * R), p);
-        p.setStyle(Paint.Style.STROKE); p.setStrokeWidth(Math.max(1, .08f * R)); p.setColor(EDGE); c.drawRoundRect(rf, rad, rad, p); p.setStyle(Paint.Style.FILL);
-        float in = 1.3f * R;
-        // the title, with a small gold mark before it
-        if (!g.name.isEmpty()) {
-            p.setColor(GOLD); rf.set(x + in, y + 1f * R, x + in + .3f * R, y + 2.4f * R); c.drawRoundRect(rf, .15f * R, .15f * R, p);
-            t.setTypeface(cond); t.setTextSize(1.5f * R); t.setColor(Color.WHITE); t.setTextAlign(Paint.Align.LEFT); t.setLetterSpacing(.04f);
-            c.drawText(TextUtils.ellipsize(g.name.toUpperCase(Locale.US), t, w - 2 * in - R, TextUtils.TruncateAt.END).toString(), x + in + .9f * R, y + 2.25f * R, t);
-            t.setLetterSpacing(0);
-        }
-        int[] fit = g.fit == null ? new int[0] : g.fit;
-        float[] cx = new float[fit.length];
-        float rx = x + w - in;
-        for (int k = fit.length - 1; k >= 0; k--) { cx[k] = rx; rx -= g.cols.get(fit[k]).w * R; }
-        // the column the league ranks by (points, else win %) stands out: a faint band, the figures bright and bold
-        String keyCol = lg.equals("nhl") || lg.equals("mls") || lg.equals("epl") || lg.equals("ucl") || lg.equals("laliga") ? "PTS" : "PCT";
-        int keyK = -1; for (int k = 0; k < fit.length; k++) if (g.cols.get(fit[k]).label.equals(keyCol)) keyK = k;
-        if (keyK >= 0) {
-            float kw = g.cols.get(fit[keyK]).w * R;
-            p.setColor(0x0CFFFFFF); rf.set(cx[keyK] - kw + .4f * R, y + headH - .2f * R, cx[keyK] + .5f * R, y + g.hh - .6f * R); c.drawRect(rf, p);
-        }
-        t.setTypeface(h.fSemi); t.setTextSize(1f * R); t.setTextAlign(Paint.Align.RIGHT); t.setLetterSpacing(.06f);
-        for (int k = 0; k < fit.length; k++) { Col col = g.cols.get(fit[k]); t.setColor(col.label.equals("CUT") ? LINE : k == keyK ? 0xFFE8EDF2 : DIM); c.drawText(col.label, cx[k], y + 3.95f * R, t); }
-        t.setLetterSpacing(0);
-        float ls = 2.1f * R, lx = x + in + 2.6f * R;
-        float nameMax = rx - (lx + ls + .8f * R) - .8f * R;
-        for (int i = 0; i < g.rows.size(); i++) {
-            Row r = g.rows.get(i);
-            float ry = y + headH + i * rowH;
-            boolean fav = favs.contains(lg + ":" + r.id), out = r.clinch.equals("e"), on = i == chosen;
-            boolean inNow = g.cut > 0 && i < g.cut, playIn = g.cut2 > 0 && i >= g.cut && i < g.cut2;
-            if (fav) { p.setColor(0x22FFC23D); rf.set(x + .35f * R, ry + .1f * R, x + w - .35f * R, ry + rowH - .1f * R); c.drawRoundRect(rf, .7f * R, .7f * R, p); }
-            if (on) {
-                p.setColor(0x30FFFFFF); rf.set(x + .35f * R, ry + .1f * R, x + w - .35f * R, ry + rowH - .1f * R); c.drawRoundRect(rf, .7f * R, .7f * R, p);
-                p.setStyle(Paint.Style.STROKE); p.setStrokeWidth(.18f * R); p.setColor(fav ? GOLD : Color.WHITE); c.drawRoundRect(rf, .7f * R, .7f * R, p); p.setStyle(Paint.Style.FILL);
-            }
-            // a hairline between teams (none where the playoff lines go)
-            boolean lineHere = (g.cut > 0 && i == g.cut - 1) || (g.cut2 > 0 && i == g.cut2 - 1);
-            if (i < g.rows.size() - 1 && !lineHere && !on && !fav) { p.setColor(0x0FFFFFFF); c.drawRect(x + in, ry + rowH - Math.max(1, .06f * R), x + w - in, ry + rowH, p); }
-            if (r.noteColor != 0) { p.setColor(r.noteColor); rf.set(x + .45f * R, ry + .35f * R, x + .8f * R, ry + rowH - .35f * R); c.drawRoundRect(rf, .17f * R, .17f * R, p); }
-            float base = ry + rowH / 2 + .48f * R, mid = ry + rowH / 2;
-            // the place (or seed): in a playoff spot, a filled green dot behind it; in the play-in, gold
-            int seedNo = g.seeded ? (int) r.seed : i + 1;
-            float nx0 = x + in + 1.05f * R;
-            if (inNow || playIn) { p.setColor(inNow ? 0x383DDC84 : 0x33FFC23D); c.drawCircle(nx0, mid, 1f * R, p); }
-            t.setTypeface(cond); t.setTextSize(1.15f * R); t.setTextAlign(Paint.Align.CENTER);
-            t.setColor(inNow ? WIN : playIn ? GOLD : DIM);
-            c.drawText(String.valueOf(seedNo), nx0, mid + .42f * R, t);
-            Bitmap b = logos.get(r.logo);
-            if (b != null) { p.setAlpha(out ? 100 : 255); rf.set(lx, mid - ls / 2, lx + ls, mid + ls / 2); c.drawBitmap(b, null, rf, p); p.setAlpha(255); }
-            // the name, then its marks: the clinch letter, and in a division table the seed it holds now
-            String mark = r.clinch;
-            String seedTag = g.seedTags && r.seed > 0 && r.seed <= cutFor(lg)[0] ? "#" + (int) r.seed : g.seedTags && cutFor(lg)[1] > 0 && r.seed > 0 && r.seed <= cutFor(lg)[1] ? "#" + (int) r.seed : "";
-            t.setTypeface(cond); t.setTextSize(1.05f * R);
-            float markW = (mark.isEmpty() ? 0 : t.measureText(mark) + .7f * R) + (seedTag.isEmpty() ? 0 : t.measureText(seedTag) + 1f * R);
-            t.setTypeface(h.fSemi); t.setTextSize(1.4f * R); t.setColor(out ? OUT : fav ? GOLD : Color.WHITE); t.setTextAlign(Paint.Align.LEFT);
-            String nm = TextUtils.ellipsize(r.name, t, Math.max(3 * R, nameMax - markW), TextUtils.TruncateAt.END).toString();
-            float nx = lx + ls + .8f * R;
-            c.drawText(nm, nx, base, t);
-            float mx = nx + t.measureText(nm) + .55f * R;
-            t.setTypeface(cond); t.setTextSize(1.05f * R);
-            if (!mark.isEmpty()) { t.setColor(out ? OUT : WIN); c.drawText(mark, mx, base - .12f * R, t); mx += t.measureText(mark) + .7f * R; }
-            if (!seedTag.isEmpty()) {
-                boolean held = r.seed <= cutFor(lg)[0];
-                float tw = t.measureText(seedTag);
-                rf.set(mx - .35f * R, mid - .8f * R, mx + tw + .35f * R, mid + .8f * R);
-                p.setColor(held ? 0x333DDC84 : 0x33FFC23D); c.drawRoundRect(rf, .8f * R, .8f * R, p);
-                t.setColor(held ? WIN : GOLD); c.drawText(seedTag, mx, base - .12f * R, t);
-            }
-            // the figures: the ranking column bright, streaks and differences in green / red, the rest softer
-            t.setTextSize(1.35f * R); t.setTextAlign(Paint.Align.RIGHT);
-            String[] vs = g.vals.get(i);
-            for (int k = 0; k < fit.length; k++) {
-                String v = fit[k] < vs.length ? vs[fit[k]] : "";
-                String lab = g.cols.get(fit[k]).label;
-                int col;
-                if (out) col = OUT;
-                else if (lab.equals("CUT")) col = v.startsWith("+") ? WIN : v.startsWith("−") ? 0xFFFF8A8E : 0xFFDDE3EA;
-                else if (lab.equals("STRK")) col = v.startsWith("W") ? 0xFF7BE3A8 : v.startsWith("L") ? 0xFFFF9196 : 0xFFB8C2CE;
-                else if (lab.equals("DIFF") || lab.equals("GD")) col = v.startsWith("+") ? 0xFF7BE3A8 : v.startsWith("-") || v.startsWith("−") ? 0xFFFF9196 : 0xFFB8C2CE;
-                else if (k == keyK) col = fav ? GOLD : Color.WHITE;
-                else col = fav ? 0xFFFFD77A : 0xFFB8C2CE;
-                t.setTypeface(k == keyK ? h.fSemi : cond);
-                t.setColor(col);
-                c.drawText(v, cx[k], base, t);
-            }
-            // the playoff line under the last seed in, the play-in line under the last seed in it
-            if (g.cut > 0 && i == g.cut - 1) line(c, x + .6f * R, ry + rowH, x + w - .6f * R, false);
-            if (g.cut2 > 0 && i == g.cut2 - 1) line(c, x + .6f * R, ry + rowH, x + w - .6f * R, true);
-        }
-        t.setTextAlign(Paint.Align.LEFT);
-    }
-    private void line(Canvas c, float x0, float y, float x1, boolean dashed) {
-        p.setStyle(Paint.Style.STROKE); p.setStrokeWidth(Math.max(2, .16f * R)); p.setColor(LINE);
-        if (dashed) p.setPathEffect(new DashPathEffect(new float[] { .8f * R, .6f * R }, 0));
-        c.drawLine(x0, y, x1, y, p);
-        p.setPathEffect(null); p.setStyle(Paint.Style.FILL);
-    }
-    private float legendH(float w) { return legend.isEmpty() ? 0 : legendRows(w) * 2.2f * R + R; }
-    private int legendRows(float w) {
-        t.setTypeface(h.fMed); t.setTextSize(1.1f * R);
-        float x = 0; int rows = 1;
-        for (Object[] it : legend) { float iw = 3 * R + t.measureText((String) it[2]) + 2 * R; if (x + iw > w && x > 0) { rows++; x = 0; } x += iw; }
-        return rows;
-    }
-    private void drawLegend(Canvas c, float x0, float y, float w) {
-        if (legend.isEmpty()) return;
-        t.setTextAlign(Paint.Align.LEFT);
-        float x = 0, base = y + 1.4f * R;
-        for (Object[] it : legend) {
-            int col = (Integer) it[0]; String mark = (String) it[1], text = (String) it[2];
-            t.setTypeface(h.fMed); t.setTextSize(1.1f * R);
-            float iw = 3 * R + t.measureText(text) + 2 * R;
-            if (x + iw > w && x > 0) { x = 0; base += 2.2f * R; }
-            float lx = x0 + x;
-            if (mark.equals("line") || mark.equals("dash")) line(c, lx, base - .4f * R, lx + 2.2f * R, mark.equals("dash"));
-            else if (mark.isEmpty()) { p.setColor(col); rf.set(lx + .6f * R, base - 1f * R, lx + 1f * R, base + .2f * R); c.drawRect(rf, p); }
-            else { t.setTypeface(cond); t.setTextSize(1.15f * R); t.setColor(mark.equals("e") ? OUT : WIN); c.drawText(mark, lx + .4f * R, base, t); }
-            t.setTypeface(h.fMed); t.setTextSize(1.1f * R); t.setColor(DIM);
-            c.drawText(text, lx + 3 * R, base, t);
-            x += iw;
-        }
-    }
-
-    private void drawTeam(Canvas c, int w, int hh) {
-        float pad = 4 * R, y = 1.2f * R;
-        Row r = team;
-        teamHits.clear();
-        // the team: logo, name, record and place, on a band across the top
-        float ls = 6 * R;
-        rf.set(pad - 1.2f * R, y - .6f * R, w - pad + 1.2f * R, y + ls + .6f * R);
-        p.setShader(new LinearGradient(rf.left, 0, rf.right, 0, 0xFF1B2533, 0xFF10161E, Shader.TileMode.CLAMP));
-        c.drawRoundRect(rf, 1.4f * R, 1.4f * R, p); p.setShader(null);
-        p.setStyle(Paint.Style.STROKE); p.setStrokeWidth(Math.max(1, .08f * R)); p.setColor(EDGE); c.drawRoundRect(rf, 1.4f * R, 1.4f * R, p); p.setStyle(Paint.Style.FILL);
-        if (teamLogo != null) { rf.set(pad, y, pad + ls, y + ls); c.drawBitmap(teamLogo, null, rf, p); }
-        float tx = pad + ls + 1.6f * R;
-        t.setTextAlign(Paint.Align.LEFT);
-        t.setTypeface(h.fSemi); t.setTextSize(2.6f * R); t.setColor(Color.WHITE);
-        c.drawText(TextUtils.ellipsize(r.full, t, w * .55f, TextUtils.TruncateAt.END).toString(), tx, y + 2.9f * R, t);
-        String rec = td != null && !td.record.isEmpty() ? td.record : recordOf(r);
-        String sub = rec + (td != null && !td.summary.isEmpty() ? "  ·  " + td.summary : "") + (r.clinch.isEmpty() || clinchMeaning(teamLg[0], r.clinch).isEmpty() ? "" : "  ·  " + clinchMeaning(teamLg[0], r.clinch));
-        t.setTypeface(h.fMed); t.setTextSize(1.45f * R); t.setColor(0xFFC6CED8);
-        c.drawText(TextUtils.ellipsize(sub, t, w * .6f, TextUtils.TruncateAt.END).toString(), tx, y + 5.2f * R, t);
-        // the last ten, in order (oldest on the left)
-        if (td != null && !td.past.isEmpty()) {
-            int n = Math.min(10, td.past.size());
-            float d = 1.25f * R, gap = .55f * R, x1 = w - pad, x0 = x1 - n * d - (n - 1) * gap;
-            t.setTypeface(h.fSemi); t.setTextSize(1f * R); t.setColor(DIM); t.setTextAlign(Paint.Align.RIGHT);
-            c.drawText("LAST " + n, x1, y + 2f * R, t);
-            for (int i = 0; i < n; i++) {
-                SportsData.Ev e = td.past.get(n - 1 - i);
-                int res = result(e, r.id);
-                p.setColor(res > 0 ? WIN : res < 0 ? LOSS : 0xFF8E99A8);
-                c.drawCircle(x0 + i * (d + gap) + d / 2, y + 3.6f * R, d / 2, p);
-            }
-            t.setTextAlign(Paint.Align.LEFT);
-        }
-        float top = y + ls + 2 * R;
-        if (td == null || td.loading) {
-            t.setTypeface(h.fMed); t.setTextSize(1.5f * R); t.setColor(DIM);
-            c.drawText("Loading " + r.name + "'s games…", pad, top + 2 * R, t);
-            return;
-        }
-        if (!td.err.isEmpty() && td.next.isEmpty() && td.past.isEmpty()) {
-            t.setTypeface(h.fMed); t.setTextSize(1.5f * R); t.setColor(DIM);
-            c.drawText("Couldn't load " + r.name + "'s games (" + td.err + ")", pad, top + 2 * R, t);
-            return;
-        }
-        float colW = (w - 2 * pad) * .6f, rx = pad + colW + 2 * R, rw = w - pad - rx;
-        float rowH = 3.3f * R;
-        List<SportsData.Ev> items = teamItems();
-        int nNext = Math.min(4, td.next.size());
-        float yy = top;
-        c.save(); c.clipRect(0, top - R, w, hh);
-        for (int sec = 0; sec < 2; sec++) {
-            int from = sec == 0 ? 0 : nNext, to = sec == 0 ? nNext : items.size();
-            head(c, sec == 0 ? "COMING UP" : "RESULTS", pad, yy + 1.2f * R);
-            yy += 2.2f * R;
-            if (from == to) { t.setTypeface(h.fMed); t.setTextSize(1.25f * R); t.setColor(DIM); c.drawText(sec == 0 ? "No games scheduled" : "No results yet this season", pad + R, yy + 2 * R, t); yy += rowH + R; continue; }
-            for (int i = from; i < to; i++) {
-                SportsData.Ev e = items.get(i);
-                rf.set(pad, yy, pad + colW, yy + rowH - .4f * R);
-                teamHits.add(new RectF(rf));
-                boolean on = i == tsel;
-                p.setColor(on ? 0x2EFFFFFF : CARD); c.drawRoundRect(rf, .8f * R, .8f * R, p);
-                if (on) { p.setStyle(Paint.Style.STROKE); p.setStrokeWidth(.16f * R); p.setColor(Color.WHITE); c.drawRoundRect(rf, .8f * R, .8f * R, p); p.setStyle(Paint.Style.FILL); }
-                gameRow(c, e, r.id, pad, yy, colW, rowH - .4f * R);
-                yy += rowH;
-            }
-            yy += 1.2f * R;
-        }
-        // the leaders
-        float ly = top;
-        if (td.leaders != null && td.leaders.length() > 0) {
-            head(c, td.leadLabel, rx, ly + 1.2f * R);
-            ly += 2.2f * R;
-            int n = Math.min(6, td.leaders.length());
-            for (int k = 0; k < n; k++) {
-                JSONObject cat = td.leaders.optJSONObject(k);
-                JSONArray who = cat == null ? null : cat.optJSONArray("leaders");
-                JSONObject one = who == null ? null : who.optJSONObject(0);
-                if (one == null) continue;
-                JSONObject ath = one.optJSONObject("athlete");
-                rf.set(rx, ly, rx + rw, ly + 4.4f * R - .4f * R);
-                p.setColor(CARD); c.drawRoundRect(rf, .8f * R, .8f * R, p);
-                t.setTypeface(cond); t.setTextSize(1f * R); t.setColor(DIM);
-                c.drawText(cat.optString("displayName").toUpperCase(Locale.US), rx + R, ly + 1.5f * R, t);
-                t.setTypeface(h.fSemi); t.setTextSize(1.35f * R); t.setColor(Color.WHITE);
-                c.drawText(TextUtils.ellipsize(ath == null ? "" : ath.optString("displayName"), t, rw * .48f, TextUtils.TruncateAt.END).toString(), rx + R, ly + 3.3f * R, t);
-                t.setTypeface(h.fMed); t.setTextSize(1.25f * R); t.setColor(0xFFDCE3EA); t.setTextAlign(Paint.Align.RIGHT);
-                c.drawText(TextUtils.ellipsize(one.optString("displayValue"), t, rw * .48f, TextUtils.TruncateAt.END).toString(), rx + rw - R, ly + 3.3f * R, t);
-                t.setTextAlign(Paint.Align.LEFT);
-                ly += 4.4f * R;
-            }
-        }
-        c.restore();
-        t.setTypeface(h.fMed); t.setTextSize(1.05f * R); t.setColor(DIM); t.setTextAlign(Paint.Align.RIGHT);
-        c.drawText("OK on a game: watch it, remind me, the game page  ·  BACK: the standings", w - pad, hh - 1.2f * R, t);
-        t.setTextAlign(Paint.Align.LEFT);
-    }
-    private void head(Canvas c, String s, float x, float y) {
-        p.setColor(GOLD); rf.set(x, y - 1.05f * R, x + .3f * R, y + .1f * R); c.drawRoundRect(rf, .15f * R, .15f * R, p);
-        t.setTypeface(cond); t.setTextSize(1.25f * R); t.setColor(0xFFC6CED8); t.setTextAlign(Paint.Align.LEFT); t.setLetterSpacing(.08f);
-        c.drawText(s, x + .8f * R, y, t);
-        t.setLetterSpacing(0);
-    }
-    /** one game: when (or W/L), vs/@ the other team, then the score or where it's on */
-    private void gameRow(Canvas c, SportsData.Ev e, String us, float x, float y, float w, float rh) {
-        SportsData.Team me = null, them = null;
-        for (SportsData.Team tm : e.teams) if (tm.id.equals(us)) me = tm; else them = tm;
-        if (me == null) { me = e.teams.get(0); them = e.teams.get(1); }
-        if (them == null) them = me;
-        float base = y + rh / 2 + .45f * R, cx = x + R;
-        boolean post = e.state.equals("post") || e.done, live = e.state.equals("in");
-        t.setTextAlign(Paint.Align.LEFT);
-        if (post) {
-            int res = result(e, us);
-            String b = res > 0 ? "W" : res < 0 ? "L" : e.lg.equals("epl") || e.lg.equals("mls") || e.lg.equals("ucl") || e.lg.equals("laliga") ? "D" : "T";
-            rf.set(cx, y + rh / 2 - .95f * R, cx + 1.9f * R, y + rh / 2 + .95f * R);
-            p.setColor(res > 0 ? WIN : res < 0 ? LOSS : 0xFF5A6472); c.drawRoundRect(rf, .45f * R, .45f * R, p);
-            t.setTypeface(cond); t.setTextSize(1.2f * R); t.setColor(0xFF0A0E13); t.setTextAlign(Paint.Align.CENTER);
-            c.drawText(b, rf.centerX(), base - .05f * R, t); t.setTextAlign(Paint.Align.LEFT);
-            t.setTypeface(h.fMed); t.setTextSize(1.2f * R); t.setColor(DIM);
-            c.drawText(new SimpleDateFormat("EEE M/d", Locale.US).format(new Date(e.at)), cx + 2.8f * R, base, t);
-        } else {
-            t.setTypeface(h.fSemi); t.setTextSize(1.2f * R); t.setColor(live ? LOSS : 0xFFC6CED8);
-            c.drawText(TextUtils.ellipsize(h.sportsData().when(e), t, 11.5f * R, TextUtils.TruncateAt.END).toString(), cx, base, t);
-        }
-        float ox = x + 13.2f * R;
-        t.setTypeface(h.fMed); t.setTextSize(1.2f * R); t.setColor(DIM);
-        c.drawText(me.home ? "vs" : "@", ox, base, t);
-        Bitmap b = logos.get(them.logo);
-        float ls = 1.9f * R, lx = ox + 2.2f * R;
-        if (b != null) { rf.set(lx, y + (rh - ls) / 2, lx + ls, y + (rh + ls) / 2); c.drawBitmap(b, null, rf, p); }
-        String right = post || live ? me.score + "–" + them.score : SportsData.join(e.nets, 2, ", ");
-        t.setTypeface(cond); t.setTextSize(1.35f * R);
-        float rwid = right.isEmpty() ? 0 : t.measureText(right);
-        t.setTypeface(h.fSemi); t.setTextSize(1.35f * R); t.setColor(Color.WHITE);
-        c.drawText(TextUtils.ellipsize(them.name, t, Math.max(4 * R, x + w - R - rwid - 1.4f * R - (lx + ls + .7f * R)), TextUtils.TruncateAt.END).toString(), lx + ls + .7f * R, base, t);
-        if (!right.isEmpty()) {
-            t.setTypeface(cond); t.setTextSize(1.35f * R); t.setColor(post || live ? Color.WHITE : DIM); t.setTextAlign(Paint.Align.RIGHT);
-            c.drawText(right, x + w - R, base, t); t.setTextAlign(Paint.Align.LEFT);
-        }
-    }
+    private static SportsData.Team other(SportsData.Ev e, String us) { for (SportsData.Team x : e.teams) if (!x.id.equals(us)) return x; return null; }
+    private static SportsData.Team ours(SportsData.Ev e, String us) { for (SportsData.Team x : e.teams) if (x.id.equals(us)) return x; return null; }
     /** 1 won, -1 lost, 0 a tie / draw (or no score) */
     private static int result(SportsData.Ev e, String us) {
-        SportsData.Team me = null, them = null;
-        for (SportsData.Team tm : e.teams) if (tm.id.equals(us)) me = tm; else them = tm;
+        SportsData.Team me = ours(e, us), them = other(e, us);
         if (me == null || them == null) return 0;
         if (me.winner) return 1;
         if (them.winner) return -1;
         try { double a = Double.parseDouble(me.score), b = Double.parseDouble(them.score); return a > b ? 1 : a < b ? -1 : 0; } catch (Exception ex) { return 0; }
     }
-    private static String recordOf(Row r) {
-        String s = (int) r.w + "-" + (int) r.l;
-        if (r.tie > 0) s += "-" + (int) r.tie;
-        return s;
+    private static String recordOf(Row r) { String s = (int) r.w + "-" + (int) r.l; if (r.tie > 0) s += "-" + (int) r.tie; return s; }
+    private int teamColor(Row r) {
+        Integer c = colors.get(lgId() + ":" + r.id);
+        if (c != null) return c;
+        return td != null && td.color != 0 && r == team ? td.color : 0xFF3A4A60;
     }
+
+    // ------------------------------------------------------------------ layout
+
+    /** where each column and team goes, how tall the rows are, and which columns fit */
+    private void layout() {
+        int w = getWidth();
+        if (w == 0 || panes.isEmpty()) return;
+        float pad = 4 * R, gap = 2 * R, top = boardTop(), avail = footTop() - .6f * R - top;
+        boolean side = panes.size() == 1 && !zones.isEmpty();
+        sideW = side ? 26 * R : 0;
+        float pw = panes.size() >= 2 ? (w - 2 * pad - gap) / 2 : side ? w - 2 * pad - gap - sideW : Math.min(w - 2 * pad, 86 * R);
+        // the row height: as roomy as the screen allows with every team in sight
+        float best = Float.MAX_VALUE;
+        for (Pane pn : panes) {
+            int rows = 0; for (Block b : pn.blocks) rows += b.rows.size();
+            if (rows > 0) best = Math.min(best, (avail - fixedH(pn)) / rows);
+        }
+        rowH = best >= 2.3f * R ? Math.min(2.95f * R, best) : 2.45f * R;
+        boardH = 0;
+        for (int i = 0; i < panes.size(); i++) {
+            Pane pn = panes.get(i);
+            pn.w = pw; pn.x = panes.size() >= 2 ? pad + i * (pw + gap) : pad;
+            pn.y = top;
+            pn.flat.clear(); pn.rowY.clear(); pn.of.clear(); pn.idx.clear();
+            float y = top + (pn.title.isEmpty() ? 0 : 3.4f * R) + 2.4f * R;
+            for (Block b : pn.blocks) {
+                if (!b.title.isEmpty()) y += 2.3f * R;
+                for (int k = 0; k < b.rows.size(); k++) {
+                    pn.flat.add(b.rows.get(k)); pn.rowY.add(y); pn.of.add(b); pn.idx.add(k);
+                    y += rowH;
+                    if (lineAfter(b, k)) y += 1.5f * R;
+                }
+            }
+            pn.hh = y + .8f * R - top;
+            boardH = Math.max(boardH, pn.hh);
+        }
+        // the columns that fit: the least wanted go first, from the right
+        float room = pw - 1.3f * R - 6.8f * R - 9 * R;
+        List<Integer> keep = new ArrayList<>(); for (int k = 0; k < cols.size(); k++) keep.add(k);
+        for (int pr = 4; pr >= 2; pr--) {
+            float sum = 0; for (int k : keep) sum += cols.get(k).w * R;
+            for (int k = keep.size() - 1; k >= 0 && sum > room; k--) if (cols.get(keep.get(k)).prio == pr) { sum -= cols.get(keep.get(k)).w * R; keep.remove(k); }
+        }
+        // home without away (or the other way round) reads as a mistake: both or neither
+        int home = -1, away = -1;
+        for (int k = 0; k < keep.size(); k++) { String l = cols.get(keep.get(k)).label; if (l.equals("HOME")) home = k; else if (l.equals("AWAY")) away = k; }
+        if ((home < 0) != (away < 0)) keep.remove(Integer.valueOf(keep.get(Math.max(home, away))));
+        fit = new int[keep.size()]; for (int k = 0; k < keep.size(); k++) fit[k] = keep.get(k);
+        wide = pw >= 60 * R;
+    }
+    /** a wide single table has room for full names (Manchester United, not Man United) */
+    private boolean wide;
+    /** a playoff (or play-in) line after this team, inside the block */
+    private static boolean lineAfter(Block b, int k) {
+        int g = b.rank0 + k;
+        if (k >= b.rows.size() - 1) return false;
+        return (b.cut > 0 && g == b.cut - 1) || (b.cut2 > 0 && g == b.cut2 - 1);
+    }
+    private float fixedH(Pane pn) {
+        float f = (pn.title.isEmpty() ? 0 : 3.4f * R) + 2.4f * R + .8f * R;
+        for (Block b : pn.blocks) {
+            if (!b.title.isEmpty()) f += 2.3f * R;
+            for (int k = 0; k < b.rows.size(); k++) if (lineAfter(b, k)) f += 1.5f * R;
+        }
+        return f;
+    }
+
+    // ------------------------------------------------------------------ drawing the board
+
+    private float ease(float a) { a = Math.max(0, Math.min(1, a)); return 1 - (1 - a) * (1 - a) * (1 - a); }
+
+    @Override protected void onDraw(Canvas c) {
+        anim = false;
+        if (Math.abs(scroll - scrollT) > .5f && motion) { scroll += (scrollT - scroll) * .25f; anim = true; } else scroll = scrollT;
+        if (team != null) drawTeam(c, getWidth(), getHeight());
+        else drawBoard(c, getWidth(), getHeight());
+        if (anim) postInvalidateOnAnimation();
+    }
+
+    private void drawBoard(Canvas c, int w, int hh) {
+        float pad = 4 * R;
+        drawTop(c, w);
+        if (chips.isEmpty()) return;
+        Object[] got = cache.get(lgId());
+        if (got == null) {
+            String e = errors.get(lgId());
+            if (e != null) {
+                text(c, "ESPN didn't send the " + chips.get(sel)[3] + " standings (" + e + ").", pad, boardTop() + 3 * R, fMed, 1.4f, SUB, Paint.Align.LEFT);
+                text(c, "Press OK to try again.", pad, boardTop() + 5.2f * R, fMed, 1.2f, TER, Paint.Align.LEFT);
+            } else skeleton(c, w);
+            return;
+        }
+        board();
+        if (panes.isEmpty()) { text(c, "No " + chips.get(sel)[3] + " standings yet.", pad, boardTop() + 3 * R, fMed, 1.4f, SUB, Paint.Align.LEFT); return; }
+        long now = SystemClock.uptimeMillis();
+        float top = boardTop(), bot = footTop() - .3f * R;
+        c.save(); c.clipRect(0, top - .2f * R, w, bot); c.translate(0, -scroll);
+        float[][] cx = new float[panes.size()][];
+        for (int i = 0; i < panes.size(); i++) cx[i] = paneBack(c, panes.get(i));
+        drawGlow(c);
+        for (int i = 0; i < panes.size(); i++) paneRows(c, panes.get(i), i, cx[i], now);
+        c.restore();
+        if (!zones.isEmpty() && panes.size() == 1) drawZones(c, panes.get(0).x + panes.get(0).w + 2 * R, top);
+        drawFoot(c, w);
+    }
+
+    /** the leagues (text tabs, the one shown underlined) and the views (one switch with a sliding thumb) */
+    private void drawTop(Canvas c, int w) {
+        float pad = 4 * R, by = 2.1f * R;
+        boolean here = team == null;
+        List<String> vs = views();
+        viewHits.clear();
+        float segL = w - pad;
+        if (vs.size() > 1) {
+            t.setTypeface(fSemi); t.setTextSize(1.15f * R);
+            float[] ws = new float[vs.size()]; float tw = .5f * R;
+            for (int i = 0; i < vs.size(); i++) { ws[i] = t.measureText(vs.get(i)) + 2.8f * R; tw += ws[i]; }
+            segL = w - pad - tw;
+            rf.set(segL, by - 1.35f * R, w - pad, by + 1.35f * R);
+            p.setColor(TRACK); c.drawRoundRect(rf, 1.35f * R, 1.35f * R, p);
+            stroke(c, rf, 1.35f * R, EDGE, Math.max(1, .07f * R));
+            int vi = viewIndex();
+            float ax = segL + .25f * R, tx = 0;
+            for (int i = 0; i < vs.size(); i++) { if (i == vi) tx = ax; viewHits.add(new RectF(ax, by - 1.35f * R, ax + ws[i], by + 1.35f * R)); ax += ws[i]; }
+            if (thumbX < 0 || !motion) { thumbX = tx; thumbW = ws[vi]; }
+            thumbX += (tx - thumbX) * .3f; thumbW += (ws[vi] - thumbW) * .3f;
+            if (Math.abs(thumbX - tx) > .5f || Math.abs(thumbW - ws[vi]) > .5f) anim = true; else { thumbX = tx; thumbW = ws[vi]; }
+            rf.set(thumbX, by - 1.1f * R, thumbX + thumbW, by + 1.1f * R);
+            p.setColor(focus == 1 && here ? AMBER : 0xFFE9EEF3); c.drawRoundRect(rf, 1.1f * R, 1.1f * R, p);
+            ax = segL + .25f * R;
+            for (int i = 0; i < vs.size(); i++) {
+                boolean under = Math.abs(thumbX + thumbW / 2 - (ax + ws[i] / 2)) < ws[i] / 2;
+                text(c, vs.get(i), ax + ws[i] / 2, by + .42f * R, fSemi, 1.15f, under ? BG : SUB, Paint.Align.CENTER);
+                ax += ws[i];
+            }
+        } else thumbX = -1;
+        // the leagues, shifted along when the one shown would be past the room
+        chipHits.clear();
+        if (chips.isEmpty()) return;
+        float room = segL - 3 * R - pad;
+        float[] ws = new float[chips.size()];
+        t.setTextSize(1.3f * R);
+        for (int i = 0; i < chips.size(); i++) { t.setTypeface(i == sel ? fSemi : fMed); ws[i] = t.measureText(chips.get(i)[4]); }
+        float selX0 = 0; for (int i = 0; i < sel; i++) selX0 += ws[i] + 2.2f * R;
+        float shift = Math.max(0, selX0 + ws[sel] - room + R);
+        c.save(); c.clipRect(pad - 1.4f * R, 0, segL - 1.5f * R, 4.4f * R);
+        float x = pad - shift, ux = 0;
+        boolean pill = focus == 0 && here;
+        for (int i = 0; i < chips.size(); i++) {
+            boolean on = i == sel;
+            chipHits.add(new RectF(x - 1.1f * R, 0, x + ws[i] + 1.1f * R, 4.2f * R));
+            if (on) {
+                ux = x;
+                if (pill) { rf.set(x - 1.1f * R, by - 1.35f * R, x + ws[i] + 1.1f * R, by + 1.35f * R); p.setColor(AMBER); c.drawRoundRect(rf, 1.35f * R, 1.35f * R, p); }
+            }
+            text(c, chips.get(i)[4], x, by + .45f * R, on ? fSemi : fMed, 1.3f, on ? (pill ? BG : INK) : TER, Paint.Align.LEFT);
+            x += ws[i] + 2.2f * R;
+        }
+        // the underline glides to the league shown
+        if (tabX < 0 || !motion) { tabX = ux; tabW = ws[sel]; }
+        tabX += (ux - tabX) * .3f; tabW += (ws[sel] - tabW) * .3f;
+        if (Math.abs(tabX - ux) > .5f || Math.abs(tabW - ws[sel]) > .5f) anim = true; else { tabX = ux; tabW = ws[sel]; }
+        if (!pill) { rf.set(tabX, by + 1.25f * R, tabX + tabW, by + 1.47f * R); p.setColor(INK); c.drawRoundRect(rf, .11f * R, .11f * R, p); }
+        c.restore();
+    }
+
+    /** a column's panel, its title and column names; returns where each figure column ends (its right edge) */
+    private float[] paneBack(Canvas c, Pane pn) {
+        float x = pn.x, y = pn.y, w = pn.w, in = 1.3f * R;
+        rf.set(x, y, x + w, y + pn.hh);
+        p.setColor(PANEL); c.drawRoundRect(rf, 1.2f * R, 1.2f * R, p);
+        stroke(c, rf, 1.2f * R, EDGE, Math.max(1, .07f * R));
+        float yy = y;
+        if (!pn.title.isEmpty()) {
+            text(c, pn.title, x + 1.4f * R, yy + 2.45f * R, fSemi, 1.7f, INK, Paint.Align.LEFT);
+            if (!pn.note.isEmpty()) { t.setTypeface(fSemi); t.setTextSize(1.7f * R); float tw = t.measureText(pn.title); text(c, pn.note, x + 1.4f * R + tw + R, yy + 2.45f * R, fMed, 1.15f, TER, Paint.Align.LEFT); }
+            yy += 3.4f * R;
+        }
+        float[] cx = new float[fit.length];
+        float rx = x + w - in;
+        for (int k = fit.length - 1; k >= 0; k--) { cx[k] = rx; rx -= cols.get(fit[k]).w * R; }
+        // the column the league ranks by: a faint band down it, its name brighter
+        int keyK = keyCol();
+        if (keyK >= 0) { float kw = cols.get(fit[keyK]).w * R; p.setColor(0x09FFFFFF); c.drawRect(cx[keyK] - kw + .6f * R, yy + .4f * R, cx[keyK] + .5f * R, y + pn.hh - .5f * R, p); }
+        boolean seeded = false; for (Block b : pn.blocks) if (b.seeded) seeded = true;
+        if (seeded) text(c, "Seed", x + 1.1f * R, yy + 1.6f * R, fSemi, .95f, TER, Paint.Align.LEFT);
+        for (int k = 0; k < fit.length; k++) text(c, cols.get(fit[k]).label, cx[k], yy + 1.6f * R, fSemi, .95f, k == keyK ? SUB : TER, Paint.Align.RIGHT);
+        p.setColor(EDGE); c.drawRect(x, yy + 2.2f * R, x + w, yy + 2.2f * R + Math.max(1, .07f * R), p);
+        int k0 = 0;
+        for (Block b : pn.blocks) {
+            if (!b.title.isEmpty() && k0 < pn.rowY.size()) text(c, b.title, x + 1.4f * R, pn.rowY.get(k0) - .7f * R, fSemi, 1.1f, SUB, Paint.Align.LEFT);
+            k0 += b.rows.size();
+        }
+        return cx;
+    }
+    private void paneRows(Canvas c, Pane pn, int pIndex, float[] cx, long now) {
+        String lg = lgId();
+        float x = pn.x, w = pn.w, in = 1.3f * R;
+        float logoS = Math.min(2.1f * R, rowH - .45f * R), lx = x + 3 * R + (2.1f * R - logoS) / 2, nx = x + 3 * R + 2.1f * R + .9f * R;
+        float nameMax = (fit.length > 0 ? cx[0] - cols.get(fit[0]).w * R : x + w - in) - nx - .8f * R;
+        int keyK = keyCol();
+        for (int k = 0; k < pn.flat.size(); k++) {
+            Block b = pn.of.get(k); int i = pn.idx.get(k);
+            float ry = pn.rowY.get(k);
+            boolean chosen = focus == 2 && pIndex == pi && k == ri;
+            // the entrance: each row fades and slides in a moment after the one above
+            float a = motion ? ease((now - enterAt - k * 16) / 260f) : 1;
+            int save = -1;
+            if (a < 1) { anim = true; save = c.saveLayerAlpha(x, ry, x + w, ry + rowH, (int) (a * 255)); c.translate((1 - a) * 1.4f * R, 0); }
+            drawRow(c, b, i, x, w, ry, cx, keyK, lx, logoS, nx, nameMax, chosen, lg, k == pn.flat.size() - 1);
+            if (save >= 0) c.restoreToCount(save);
+            // the playoff line (and the play-in's): a gap with its name in it
+            if (lineAfter(b, i)) {
+                boolean playIn = b.cut2 > 0 && b.rank0 + i == b.cut2 - 1;
+                sep(c, x, w, ry + rowH + .75f * R, playIn ? "Play-in line" : "Playoff line", playIn ? 0xB3FFC23D : AMBER, playIn);
+            }
+        }
+    }
+    private int keyCol() {
+        String want = pointsSport(chips.get(sel)[1]) ? "PTS" : "PCT";
+        for (int k = 0; k < fit.length; k++) if (cols.get(fit[k]).label.equals(want)) return k;
+        return -1;
+    }
+    private void drawRow(Canvas c, Block b, int i, float x, float w, float ry, float[] cx, int keyK,
+                         float lx, float logoS, float nx, float nameMax, boolean chosen, String lg, boolean last) {
+        Row r = b.rows.get(i);
+        float mid = ry + rowH / 2, base = mid + .46f * R;
+        boolean fav = favs.contains(lg + ":" + r.id), out = r.clinch.equals("e");
+        if (fav && !chosen) { p.setColor(0x14FFC23D); c.drawRect(x + .3f * R, ry, x + w - .3f * R, ry + rowH, p); }
+        if (!last && i < b.rows.size() - 1 && !lineAfter(b, i) && !chosen) { p.setColor(0x0BFFFFFF); c.drawRect(x + 1.3f * R, ry + rowH - Math.max(1, .06f * R), x + w - 1.3f * R, ry + rowH, p); }
+        // the rail: where this team stands (one run per zone)
+        int z = zone(b, i, lg);
+        if (z != 0) {
+            boolean prev = i > 0 && zone(b, i - 1, lg) == z && !lineAfter(b, i - 1), next = i < b.rows.size() - 1 && zone(b, i + 1, lg) == z && !lineAfter(b, i);
+            p.setColor(z); p.setAlpha(230);
+            c.drawRect(x, ry + (prev ? 0 : .3f * R), x + .28f * R, ry + rowH - (next ? 0 : .3f * R), p);
+            p.setAlpha(255);
+        }
+        int dimA = out ? 115 : 255;
+        int place = b.seeded ? (int) r.seed : b.rank0 + i + 1;
+        text(c, String.valueOf(place), x + 2.25f * R, base, fMed, 1.15f, alpha(chosen ? Color.WHITE : z != 0 ? INK : TER, dimA), Paint.Align.RIGHT);
+        Bitmap bm = logos.get(r.logo);
+        if (bm != null) { p.setAlpha(dimA); rf.set(lx, mid - logoS / 2, lx + logoS, mid + logoS / 2); c.drawBitmap(bm, null, rf, p); p.setAlpha(255); }
+        // the name, its clinch letter raised after it
+        String mark = r.clinch;
+        float markW = 0;
+        t.setTypeface(fSemi);
+        if (!mark.isEmpty()) { t.setTextSize(.95f * R); markW = t.measureText(mark) + .6f * R; }
+        t.setTextSize(1.4f * R);
+        String nm = TextUtils.ellipsize(wide ? r.full : r.name, t, Math.max(3 * R, nameMax - markW), TextUtils.TruncateAt.END).toString();
+        float nw = t.measureText(nm);
+        text(c, nm, nx, base, fSemi, 1.4f, alpha(chosen ? Color.WHITE : fav ? AMBER : INK, dimA), Paint.Align.LEFT);
+        if (!mark.isEmpty()) text(c, mark, nx + nw + .45f * R, base - .5f * R, fSemi, .95f, chosen ? Color.WHITE : out ? TER : IN, Paint.Align.LEFT);
+        // the figures
+        String[] vs = b.vals.get(i);
+        for (int k = 0; k < fit.length; k++) {
+            String v = fit[k] < vs.length ? vs[fit[k]] : "";
+            String lab = cols.get(fit[k]).label;
+            if (lab.equals("DIFF") || lab.equals("GD")) { diff(c, v, cx[k], cols.get(fit[k]).w * R, mid, base, chosen, dimA); continue; }
+            int col = chosen ? 0xEBFFFFFF : k == keyK ? INK : SUB;
+            if (lab.equals("LINE") && !chosen) col = v.startsWith("+") ? 0xFF86E8B4 : v.startsWith("−") ? 0xFFFF9A9A : SUB;
+            text(c, v, cx[k], base, k == keyK ? fSemi : fMed, 1.35f, alpha(col, dimA), Paint.Align.RIGHT);
+        }
+    }
+    /** the difference: a small bar either side of zero on a faint track, then the figure */
+    private void diff(Canvas c, String v, float right, float colW, float mid, float base, boolean chosen, int dimA) {
+        double d = numOf(v);
+        float bw = 3.4f * R, cxm = right - colW + .6f * R + bw / 2;
+        rf.set(cxm - bw / 2, mid - .22f * R, cxm + bw / 2, mid + .22f * R);
+        p.setColor(chosen ? 0x2EFFFFFF : 0x0FFFFFFF); c.drawRoundRect(rf, .22f * R, .22f * R, p);
+        float len = (float) Math.min(1, Math.abs(d) / diffMax) * bw / 2;
+        if (len > .5f) {
+            rf.set(d >= 0 ? cxm : cxm - len, mid - .22f * R, d >= 0 ? cxm + len : cxm, mid + .22f * R);
+            p.setColor(chosen ? Color.WHITE : d >= 0 ? IN : RED); p.setAlpha(Math.min(dimA, chosen ? 235 : 215)); c.drawRoundRect(rf, .22f * R, .22f * R, p); p.setAlpha(255);
+        }
+        p.setColor(chosen ? 0x80FFFFFF : 0x33FFFFFF); float hw = Math.max(.5f, .03f * R); c.drawRect(cxm - hw, mid - .45f * R, cxm + hw, mid + .45f * R, p);
+        String s = v.isEmpty() ? "" : d > 0 && !v.startsWith("+") ? "+" + v : v.replace("-", "−");
+        text(c, s, right, base, fMed, 1.3f, alpha(chosen ? 0xEBFFFFFF : SUB, dimA), Paint.Align.RIGHT);
+    }
+    /** a line across a column with its name in a gap in the middle */
+    private void sep(Canvas c, float x, float w, float y, String label, int col, boolean thin) {
+        t.setTypeface(fSemi); t.setTextSize(.95f * R);
+        float lw = t.measureText(label), mx = x + w / 2, sw = thin ? Math.max(1, .07f * R) : Math.max(1.5f, .12f * R);
+        p.setColor(col); p.setAlpha(thin ? 110 : 185);
+        c.drawRect(x + 1.3f * R, y - sw / 2, mx - lw / 2 - .8f * R, y + sw / 2, p);
+        c.drawRect(mx + lw / 2 + .8f * R, y - sw / 2, x + w - 1.3f * R, y + sw / 2, p);
+        p.setAlpha(255);
+        text(c, label, mx, y + .33f * R, fSemi, .95f, col, Paint.Align.CENTER);
+    }
+    /** the chosen team's glow: its own colour, strongest at the left, gliding from row to row (under the text) */
+    private void drawGlow(Canvas c) {
+        if (focus != 2 || pi >= panes.size() || ri >= panes.get(pi).flat.size()) { glowSnap = true; return; }
+        Pane pn = panes.get(pi);
+        float ry = pn.rowY.get(ri);
+        float l = pn.x + .3f * R, tp = ry + .08f * R, rt = pn.x + pn.w - .3f * R, bt = ry + rowH - .08f * R;
+        if (glowSnap || !motion) { glow.set(l, tp, rt, bt); glowSnap = false; }
+        else {
+            glow.left += (l - glow.left) * .32f; glow.right += (rt - glow.right) * .32f;
+            glow.top += (tp - glow.top) * .32f; glow.bottom += (bt - glow.bottom) * .32f;
+            if (Math.abs(glow.top - tp) > .5f || Math.abs(glow.left - l) > .5f) anim = true; else glow.set(l, tp, rt, bt);
+        }
+        int col = lift(teamColor(pn.flat.get(ri)), .2);
+        p.setShader(new LinearGradient(glow.left, 0, glow.right, 0, new int[] { withA(col, 245), withA(col, 120), withA(col, 46) }, new float[] { 0, .55f, 1 }, Shader.TileMode.CLAMP));
+        c.drawRoundRect(glow, .7f * R, .7f * R, p);
+        p.setShader(null);
+        stroke(c, glow, .7f * R, 0xD9FFFFFF, .12f * R);
+    }
+    /** soccer: what the coloured rails mean, beside the table */
+    private void drawZones(Canvas c, float x, float y) {
+        text(c, "Zones", x, y + 2.45f * R, fSemi, 1.4f, INK, Paint.Align.LEFT);
+        float yy = y + 5.2f * R;
+        Pane pn = panes.get(0);
+        for (Object[] z : zones) {
+            int col = (Integer) z[0]; String name = (String) z[1];
+            int from = -1, to = -1;
+            for (int k = 0; k < pn.flat.size(); k++) if (name.equals(pn.flat.get(k).noteText)) { if (from < 0) from = k; to = k; }
+            p.setColor(col); c.drawRect(x, yy - 1.1f * R, x + .28f * R, yy + 1.6f * R, p);
+            text(c, from < 0 ? "" : from == to ? ordinal(from + 1) : (from + 1) + "–" + (to + 1), x + 1.1f * R, yy - .05f * R, fSemi, 1.05f, SUB, Paint.Align.LEFT);
+            t.setTypeface(fMed); t.setTextSize(1.15f * R);
+            text(c, TextUtils.ellipsize(name, t, sideW - 1.4f * R, TextUtils.TruncateAt.END).toString(), x + 1.1f * R, yy + 1.4f * R, fMed, 1.15f, INK, Paint.Align.LEFT);
+            yy += 4.3f * R;
+        }
+    }
+    /** the footer: where the chosen team stands, and what the marks mean */
+    private void drawFoot(Canvas c, int w) {
+        float pad = 4 * R, fy = footTop();
+        p.setColor(EDGE); c.drawRect(pad, fy + .2f * R, w - pad, fy + .2f * R + Math.max(1, .07f * R), p);
+        float base = fy + 2.05f * R;
+        // the key, right to left, as much as fits beside the sentence
+        float x = w - pad, minX = w * .56f;
+        for (int i = legend.size() - 1; i >= 0; i--) {
+            Object[] it = legend.get(i);
+            int col = (Integer) it[0]; String mark = (String) it[1], label = (String) it[2];
+            t.setTypeface(fMed); t.setTextSize(1.05f * R); float lw = t.measureText(label);
+            float mw;
+            if (mark.equals("rail")) mw = .28f * R; else { t.setTypeface(fSemi); mw = t.measureText(mark); }
+            float iw = mw + .7f * R + lw;
+            if (x - iw < minX) break;
+            text(c, label, x, base, fMed, 1.05f, TER, Paint.Align.RIGHT);
+            float mx = x - lw - .7f * R;
+            if (mark.equals("rail")) { p.setColor(col); c.drawRect(mx - .28f * R, base - R, mx, base + .2f * R, p); }
+            else text(c, mark, mx, base, fSemi, 1.05f, mark.equals("e") ? TER : IN, Paint.Align.RIGHT);
+            x -= iw + 2.2f * R;
+        }
+        float maxW = x - pad - 2 * R;
+        if (focus == 2 && pi < panes.size() && ri < panes.get(pi).flat.size()) {
+            Row r = panes.get(pi).flat.get(ri);
+            t.setTypeface(fMed); t.setTextSize(1.2f * R);
+            String s = TextUtils.ellipsize(sentence(r), t, maxW, TextUtils.TruncateAt.END).toString();
+            if (s.startsWith(r.name)) {
+                text(c, r.name, pad, base, fSemi, 1.2f, INK, Paint.Align.LEFT);
+                t.setTypeface(fSemi); t.setTextSize(1.2f * R); float nw = t.measureText(r.name);
+                text(c, s.substring(r.name.length()), pad + nw, base, fMed, 1.2f, SUB, Paint.Align.LEFT);
+            } else text(c, s, pad, base, fMed, 1.2f, SUB, Paint.Align.LEFT);
+        } else {
+            String hint = focus == 0 ? "Left and right change the league. Down to choose a team." : "Left and right change the view. Down to choose a team.";
+            text(c, hint, pad, base, fMed, 1.1f, TER, Paint.Align.LEFT);
+        }
+    }
+    /** while the standings load: the board's shape, gently breathing */
+    private void skeleton(Canvas c, int w) {
+        float pad = 4 * R, gap = 2 * R, pw = (w - 2 * pad - gap) / 2, top = boardTop();
+        float k = (float) (.5 + .5 * Math.sin(SystemClock.uptimeMillis() / 380.0));
+        for (int pn = 0; pn < 2; pn++) {
+            float x = pad + pn * (pw + gap);
+            rf.set(x, top, x + pw, top + 40 * R); p.setColor(PANEL); c.drawRoundRect(rf, 1.2f * R, 1.2f * R, p);
+            for (int i = 0; i < 12; i++) {
+                float y = top + 3.2f * R + i * 3 * R;
+                p.setColor(TRACK); p.setAlpha((int) (150 + 80 * k));
+                rf.set(x + 3 * R, y, x + 5.1f * R, y + 2.1f * R); c.drawOval(rf, p);
+                rf.set(x + 6 * R, y + .6f * R, x + 6 * R + (8 + (i * 7 % 5)) * R, y + 1.5f * R); c.drawRoundRect(rf, .45f * R, .45f * R, p);
+                rf.set(x + pw - 22 * R, y + .6f * R, x + pw - 1.4f * R, y + 1.5f * R); c.drawRoundRect(rf, .45f * R, .45f * R, p);
+                p.setAlpha(255);
+            }
+        }
+        anim = true;
+    }
+
+    // ------------------------------------------------------------------ drawing the team page
+
+    private void drawTeam(Canvas c, int w, int hh) {
+        float pad = 4 * R;
+        Row r = team;
+        teamHits.clear();
+        float a = motion ? ease((SystemClock.uptimeMillis() - teamAt) / 300f) : 1;
+        int save;
+        if (a < 1) { anim = true; save = c.saveLayerAlpha(0, 0, w, hh, (int) (a * 255)); c.translate(0, (1 - a) * 1.5f * R); }
+        else save = c.save();
+        // the header: the team's colour from the left, its logo and name, and the numbers that say where it is
+        float hy = .6f * R, hH = 12 * R;
+        int col = lift(teamColor(r), .14);
+        rf.set(pad, hy, w - pad, hy + hH);
+        p.setShader(new LinearGradient(pad, 0, w - pad, 0, new int[] { withA(col, 255), withA(col, 95), PANEL }, new float[] { 0, .55f, 1 }, Shader.TileMode.CLAMP));
+        c.drawRoundRect(rf, 1.4f * R, 1.4f * R, p);
+        p.setShader(new LinearGradient(0, hy, 0, hy + hH, 0x0FFFFFFF, 0x40000000, Shader.TileMode.CLAMP));
+        c.drawRoundRect(rf, 1.4f * R, 1.4f * R, p);
+        p.setShader(null);
+        stroke(c, rf, 1.4f * R, 0x14FFFFFF, Math.max(1, .07f * R));
+        float ls = 8 * R, lx = pad + 2 * R;
+        if (teamLogo != null) { rf.set(lx, hy + (hH - ls) / 2, lx + ls, hy + (hH + ls) / 2); c.drawBitmap(teamLogo, null, rf, p); }
+        float nx = lx + ls + 2.2f * R;
+        t.setTypeface(fSemi); t.setTextSize(3 * R);
+        text(c, TextUtils.ellipsize(r.full, t, w * .5f, TextUtils.TruncateAt.END).toString(), nx, hy + 4.6f * R, fSemi, 3f, INK, Paint.Align.LEFT);
+        Group g = groupOf(r);
+        String sub = td != null && !td.summary.isEmpty() ? td.summary : g != null ? g.name : "";
+        text(c, sub, nx, hy + 6.6f * R, fMed, 1.3f, 0xB3FFFFFF, Paint.Align.LEFT);
+        float sx = nx;
+        for (String[] st : headline(r)) {
+            t.setTypeface(fSemi); t.setTextSize(1.9f * R); float vw = t.measureText(st[0]);
+            t.setTypeface(fMed); t.setTextSize(1f * R); float lw = t.measureText(st[1]);
+            if (sx + Math.max(vw, lw) > w * .72f) break;
+            text(c, st[0], sx, hy + 10 * R, fSemi, 1.9f, INK, Paint.Align.LEFT);
+            text(c, st[1], sx, hy + 11.3f * R, fMed, 1f, 0x9EFFFFFF, Paint.Align.LEFT);
+            sx += Math.max(vw, lw) + 3.2f * R;
+        }
+        // the form: the last results in order, oldest on the left
+        if (td != null && !td.past.isEmpty()) {
+            int n = Math.min(10, td.past.size());
+            float d = 1.6f * R, gp = .5f * R, x1 = w - pad - 2 * R, x0 = x1 - n * d - (n - 1) * gp;
+            text(c, "Last " + n, x1, hy + 4.3f * R, fMed, 1.05f, 0x9EFFFFFF, Paint.Align.RIGHT);
+            boolean soccer = teamLg[1].equals("soccer");
+            for (int i = 0; i < n; i++) {
+                int res = result(td.past.get(n - 1 - i), r.id);
+                rf.set(x0 + i * (d + gp), hy + 5.4f * R, x0 + i * (d + gp) + d, hy + 5.4f * R + d);
+                p.setColor(res > 0 ? IN : res < 0 ? RED : 0xFF8E99A8); p.setAlpha(235); c.drawRoundRect(rf, .4f * R, .4f * R, p); p.setAlpha(255);
+                text(c, res > 0 ? "W" : res < 0 ? "L" : soccer ? "D" : "T", rf.centerX(), rf.top + 1.15f * R, fSemi, .9f, BG, Paint.Align.CENTER);
+            }
+        }
+        float top = hy + hH + 2.4f * R;
+        if (td == null || td.loading) {
+            text(c, "Getting " + r.name + "'s games…", pad, top + 1.2f * R, fSemi, 1.35f, SUB, Paint.Align.LEFT);
+            float kk = (float) (.5 + .5 * Math.sin(SystemClock.uptimeMillis() / 380.0));
+            for (int i = 0; i < 3; i++) { float x = pad + i * 38 * R; rf.set(x, top + 2.4f * R, x + 35.6f * R, top + 12.9f * R); p.setColor(PANEL); p.setAlpha((int) (170 + 85 * kk)); c.drawRoundRect(rf, 1.2f * R, 1.2f * R, p); p.setAlpha(255); }
+            anim = true;
+            c.restoreToCount(save);
+            return;
+        }
+        float aw = 44 * R, ax = pad, bx = ax + aw + 2.4f * R, bw = 38 * R, cx = bx + bw + 2.4f * R, cw = w - pad - cx;
+        float fy = top + 2.4f * R, fh = 10.5f * R;
+        // the next game, large; the games after it
+        List<SportsData.Ev> nx0 = teamList(0);
+        text(c, "Next game", ax, top + 1.2f * R, fSemi, 1.35f, INK, Paint.Align.LEFT);
+        if (nx0.isEmpty()) {
+            rf.set(ax, fy, ax + aw, fy + 4 * R); p.setColor(PANEL); c.drawRoundRect(rf, 1.2f * R, 1.2f * R, p);
+            text(c, td.err.isEmpty() ? "No games scheduled." : "ESPN didn't send the schedule (" + td.err + ").", ax + 1.4f * R, fy + 2.5f * R, fMed, 1.2f, SUB, Paint.Align.LEFT);
+        } else {
+            SportsData.Ev e = nx0.get(0);
+            rf.set(ax, fy, ax + aw, fy + fh);
+            teamHits.add(new Object[] { new RectF(rf), 0, 0 });
+            p.setColor(PANEL); c.drawRoundRect(rf, 1.2f * R, 1.2f * R, p);
+            if (tcol == 0 && tsel == 0) chosenFill(c, rf, 1.2f * R, r);
+            SportsData.Team opp = other(e, r.id), me = ours(e, r.id);
+            if (featLogo != null && opp != null && opp.logo.equals(featFor)) { rf.set(ax + 2.4f * R, fy + (fh - 5 * R) / 2, ax + 7.4f * R, fy + (fh + 5 * R) / 2); c.drawBitmap(featLogo, null, rf, p); }
+            float tx = ax + 9.6f * R;
+            t.setTypeface(fSemi); t.setTextSize(2.1f * R);
+            String vs = (me != null && me.home ? "vs " : "at ") + (opp == null ? "" : opp.name);
+            boolean live = e.state.equals("in");
+            float scoreW = 0;
+            if (live && me != null && opp != null) { t.setTypeface(fSemi); t.setTextSize(2.4f * R); scoreW = t.measureText(me.score + "–" + opp.score) + 2 * R; t.setTextSize(2.1f * R); }
+            text(c, TextUtils.ellipsize(vs, t, aw - 11 * R - scoreW, TextUtils.TruncateAt.END).toString(), tx, fy + 3.7f * R, fSemi, 2.1f, INK, Paint.Align.LEFT);
+            if (live) {
+                rf.set(tx, fy + 4.9f * R, tx + 4.6f * R, fy + 6.7f * R); p.setColor(RED); c.drawRoundRect(rf, .9f * R, .9f * R, p);
+                text(c, "Live", rf.centerX(), fy + 6.15f * R, fSemi, 1.05f, Color.WHITE, Paint.Align.CENTER);
+                text(c, e.detail, tx + 5.4f * R, fy + 6.2f * R, fMed, 1.25f, SUB, Paint.Align.LEFT);
+                if (me != null && opp != null) text(c, me.score + "–" + opp.score, ax + aw - 1.6f * R, fy + 3.9f * R, fSemi, 2.4f, INK, Paint.Align.RIGHT);
+            } else {
+                String when = new SimpleDateFormat("EEEE, MMMM d", Locale.US).format(new Date(e.at)) + " at " + Reminders.time(h, e.at);
+                text(c, when, tx, fy + 6f * R, fMed, 1.25f, SUB, Paint.Align.LEFT);
+            }
+            if (!e.nets.isEmpty()) text(c, SportsData.join(e.nets, 3, ", "), tx, fy + 8.1f * R, fSemi, 1.15f, TER, Paint.Align.LEFT);
+            float gy = fy + fh + 3 * R;
+            if (nx0.size() > 1) text(c, "Coming up", ax, gy, fSemi, 1.35f, INK, Paint.Align.LEFT);
+            for (int i = 1; i < nx0.size(); i++) {
+                float y = gy + 1.2f * R + (i - 1) * 3.4f * R;
+                teamHits.add(new Object[] { new RectF(ax, y, ax + aw, y + 3 * R), 0, i });
+                listRow(c, nx0.get(i), r, ax, y, aw, tcol == 0 && tsel == i, false);
+            }
+        }
+        // results
+        List<SportsData.Ev> ps = teamList(1);
+        text(c, "Results", bx, top + 1.2f * R, fSemi, 1.35f, INK, Paint.Align.LEFT);
+        if (ps.isEmpty()) { rf.set(bx, fy, bx + bw, fy + 4 * R); p.setColor(PANEL); c.drawRoundRect(rf, 1.2f * R, 1.2f * R, p); text(c, "No results yet this season.", bx + 1.4f * R, fy + 2.5f * R, fMed, 1.2f, SUB, Paint.Align.LEFT); }
+        for (int i = 0; i < ps.size(); i++) {
+            float y = fy + i * 3.4f * R;
+            teamHits.add(new Object[] { new RectF(bx, y, bx + bw, y + 3 * R), 1, i });
+            listRow(c, ps.get(i), r, bx, y, bw, tcol == 1 && tsel == i, true);
+        }
+        // leaders
+        if (td.leaders != null && td.leaders.length() > 0 && cw > 18 * R) {
+            text(c, td.leadLabel, cx, top + 1.2f * R, fSemi, 1.35f, INK, Paint.Align.LEFT);
+            int shown = 0;
+            for (int k = 0; k < td.leaders.length() && shown < 5; k++) {
+                JSONObject cat = td.leaders.optJSONObject(k);
+                JSONArray who = cat == null ? null : cat.optJSONArray("leaders");
+                JSONObject one = who == null ? null : who.optJSONObject(0);
+                if (one == null) continue;
+                JSONObject ath = one.optJSONObject("athlete");
+                float y = fy + shown * 4.8f * R;
+                rf.set(cx, y, cx + cw, y + 4.4f * R); p.setColor(PANEL); c.drawRoundRect(rf, .8f * R, .8f * R, p);
+                text(c, cat.optString("displayName"), cx + 1.2f * R, y + 1.7f * R, fMed, 1.05f, TER, Paint.Align.LEFT);
+                t.setTypeface(fMed); t.setTextSize(1.15f * R);
+                String val = TextUtils.ellipsize(one.optString("displayValue"), t, cw * .45f, TextUtils.TruncateAt.END).toString();
+                float vw = t.measureText(val);
+                t.setTypeface(fSemi); t.setTextSize(1.3f * R);
+                text(c, TextUtils.ellipsize(ath == null ? "" : ath.optString("displayName"), t, Math.max(4 * R, cw - vw - 3.4f * R), TextUtils.TruncateAt.END).toString(), cx + 1.2f * R, y + 3.4f * R, fSemi, 1.3f, INK, Paint.Align.LEFT);
+                text(c, val, cx + cw - 1.2f * R, y + 3.4f * R, fMed, 1.15f, SUB, Paint.Align.RIGHT);
+                shown++;
+            }
+        }
+        // the footer
+        float fty = footTop();
+        p.setColor(EDGE); c.drawRect(pad, fty + .2f * R, w - pad, fty + .2f * R + Math.max(1, .07f * R), p);
+        text(c, "OK on a game to watch it, set a reminder or open the game page", pad, fty + 2.05f * R, fMed, 1.1f, TER, Paint.Align.LEFT);
+        text(c, "Back returns to the standings", w - pad, fty + 2.05f * R, fMed, 1.1f, TER, Paint.Align.RIGHT);
+        c.restoreToCount(save);
+    }
+    /** the chosen game: the team's colour from the left and a white edge, like the board's chosen row */
+    private void chosenFill(Canvas c, RectF box, float rad, Row r) {
+        int gc = lift(teamColor(r), .2);
+        p.setShader(new LinearGradient(box.left, 0, box.right, 0, withA(gc, 150), withA(gc, 22), Shader.TileMode.CLAMP));
+        c.drawRoundRect(box, rad, rad, p); p.setShader(null);
+        stroke(c, box, rad, 0xD9FFFFFF, .14f * R);
+    }
+    /** the header's numbers: record, places, the gap to the line (soccer: points and goal difference), streak */
+    private List<String[]> headline(Row r) {
+        List<String[]> out = new ArrayList<>();
+        String sport = teamLg[1], lg = teamLg[0];
+        out.add(new String[] { td != null && !td.record.isEmpty() ? td.record : recordOf(r), "Record" });
+        Group g = groupOf(r);
+        if (g == null) return out;
+        if (sport.equals("soccer")) {
+            List<Row> rs = new ArrayList<>(g.rows); sortRows(rs, false);
+            out.add(new String[] { ordinal(rs.indexOf(r) + 1), "Position" });
+            out.add(new String[] { String.valueOf((int) r.pts), "Points" });
+            String gd = r.s.get("GD"); if (gd != null && !gd.isEmpty()) out.add(new String[] { gd, "Goal difference" });
+            return out;
+        }
+        if (hasDivisions()) out.add(new String[] { ordinal(g.rows.indexOf(r) + 1), g.name });
+        List<Row> conf = confRows(g);
+        int at = conf.indexOf(r);
+        String cn = confName(g);
+        if (at >= 0) out.add(new String[] { ordinal(at + 1), cn.length() > 18 ? "Conference" : cn });
+        int[] cut = cutFor(lg);
+        if (cut[0] > 0 && at >= cut[0] && conf.size() > cut[0] && allSeeds(conf) && !lg.equals("wnba")) {
+            boolean pts = pointsSport(sport);
+            double d = gap(conf.get(cut[0] - 1), r, pts);
+            if (d > 0) out.add(new String[] { half(d), pts ? "Points out" : "Games out" });
+        }
+        String st = r.s.get("STRK"); if (st != null && !st.isEmpty()) out.add(new String[] { st, "Streak" });
+        return out;
+    }
+    /** a game in a list: the date (or W / L), vs / at, the other team, then the time and network, or the score */
+    private void listRow(Canvas c, SportsData.Ev e, Row us, float x, float y, float w, boolean on, boolean result) {
+        float rh = 3 * R, mid = y + rh / 2, base = mid + .45f * R;
+        rf.set(x, y, x + w, y + rh);
+        p.setColor(PANEL); c.drawRoundRect(rf, .8f * R, .8f * R, p);
+        if (on) chosenFill(c, new RectF(rf), .8f * R, us);
+        SportsData.Team me = ours(e, us.id), them = other(e, us.id);
+        if (me == null || them == null) return;
+        float cx = x + 1.2f * R;
+        if (result) {
+            int res = result(e, us.id);
+            rf.set(cx, mid - .85f * R, cx + 1.7f * R, mid + .85f * R);
+            p.setColor(res > 0 ? IN : res < 0 ? RED : 0xFF8E99A8); c.drawRoundRect(rf, .45f * R, .45f * R, p);
+            text(c, res > 0 ? "W" : res < 0 ? "L" : teamLg[1].equals("soccer") ? "D" : "T", rf.centerX(), mid + .38f * R, fSemi, 1f, BG, Paint.Align.CENTER);
+            cx += 2.6f * R;
+        } else {
+            text(c, new SimpleDateFormat("EEE, MMM d", Locale.US).format(new Date(e.at)), cx, base, fMed, 1.15f, on ? INK : SUB, Paint.Align.LEFT);
+            cx += 9.8f * R;
+        }
+        text(c, me.home ? "vs" : "at", cx, base, fMed, 1.15f, on ? SUB : TER, Paint.Align.LEFT);
+        Bitmap b = logos.get(them.logo);
+        float ls = 1.9f * R, lx = cx + 2.6f * R;
+        if (b != null) { rf.set(lx, mid - ls / 2, lx + ls, mid + ls / 2); c.drawBitmap(b, null, rf, p); }
+        String right = result || e.state.equals("in") ? me.score + "–" + them.score : Reminders.time(h, e.at) + (e.nets.isEmpty() ? "" : "  " + e.nets.get(0));
+        String date = result ? new SimpleDateFormat("MMM d", Locale.US).format(new Date(e.at)) : "";
+        t.setTypeface(result ? fSemi : fMed); t.setTextSize((result ? 1.3f : 1.1f) * R);
+        float rw = t.measureText(right);
+        t.setTypeface(fMed); t.setTextSize(1.1f * R);
+        float dw = date.isEmpty() ? 0 : t.measureText(date) + 1.6f * R;
+        t.setTypeface(fSemi); t.setTextSize(1.3f * R);
+        String nm = TextUtils.ellipsize(them.name, t, Math.max(4 * R, x + w - 1.2f * R - rw - dw - 1.2f * R - (lx + ls + .8f * R)), TextUtils.TruncateAt.END).toString();
+        text(c, nm, lx + ls + .8f * R, base, fSemi, 1.3f, INK, Paint.Align.LEFT);
+        if (!date.isEmpty()) text(c, date, x + w - 1.2f * R - rw - 1.6f * R, base, fMed, 1.1f, on ? SUB : TER, Paint.Align.RIGHT);
+        text(c, right, x + w - 1.2f * R, base, result ? fSemi : fMed, result ? 1.3f : 1.1f, result ? INK : on ? SUB : TER, Paint.Align.RIGHT);
+    }
+
+    // ------------------------------------------------------------------ small helpers
+
+    private void text(Canvas c, String s, float x, float y, Typeface tf, float size, int col, Paint.Align al) {
+        if (s == null || s.isEmpty()) return;
+        t.setTypeface(tf); t.setTextSize(size * R); t.setColor(col); t.setTextAlign(al);
+        c.drawText(s, x, y, t);
+        t.setTextAlign(Paint.Align.LEFT);
+    }
+    private void stroke(Canvas c, RectF r, float rad, int col, float wdt) {
+        p.setStyle(Paint.Style.STROKE); p.setStrokeWidth(wdt); p.setColor(col);
+        c.drawRoundRect(r, rad, rad, p);
+        p.setStyle(Paint.Style.FILL);
+    }
+    private static int withA(int c, int a) { return (c & 0x00FFFFFF) | (Math.max(0, Math.min(255, a)) << 24); }
+    private static int alpha(int c, int a) { return a >= 255 ? c : withA(c, Color.alpha(c) * a / 255); }
 }
