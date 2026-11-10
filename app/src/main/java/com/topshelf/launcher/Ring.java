@@ -280,14 +280,22 @@ final class Ring {
 
     // ================================================================== listening for the bell
 
+    /* one listener for the whole app: a second TopShelf screen (a second Home, or one made again before the old one
+       was closed) started a second listener, and the two logged in to Google's push servers as the same browser and
+       pushed each other off every minute, so the doorbell was deaf most of the time (seen in the Nov 9 reports) */
+    private static Ring current;
     void start() {
         if (!connected() || running) return;
+        Ring prev;
+        synchronized (Ring.class) { prev = current; current = this; }
+        if (prev != null && prev != this) { Diag.ev("ring: the earlier listener stopped (one at a time)"); prev.stop(); }
         running = true;
         thread = new Thread(new Runnable() { @Override public void run() { loop(); } }, "ring");
         thread.setDaemon(true);
         thread.start();
     }
     void stop() {
+        synchronized (Ring.class) { if (current == this) current = null; }
         running = false;
         try { if (sock != null) sock.close(); } catch (Throwable ignored) { }
         if (thread != null) thread.interrupt();
