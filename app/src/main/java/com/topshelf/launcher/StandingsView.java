@@ -638,31 +638,31 @@ final class StandingsView extends View {
                 c.add(new Col("HOME", 5.2f, 3, "home", "Home")); c.add(new Col("AWAY", 5.2f, 3, "road", "away", "Road"));
                 c.add(new Col("DIV", 5.2f, 3, "vsdiv", "vs. Div.", "divisionRecord")); c.add(new Col("CONF", 5.2f, lg.equals("cfb") ? 2 : 4, "vsconf", "vs. Conf.", "conferenceRecord"));
                 c.add(new Col("PF", 4f, 4, "pointsFor", "PF")); c.add(new Col("PA", 4f, 4, "pointsAgainst", "PA"));
-                c.add(new Col("DIFF", 7.6f, 2, "pointDifferential", "differential", "DIFF")); c.add(new Col("STRK", 3.8f, 2, "streak", "STRK"));
+                c.add(new Col("DIFF", 8f, 2, "pointDifferential", "differential", "DIFF")); c.add(new Col("STRK", 3.8f, 2, "streak", "STRK"));
                 break;
             case "hockey":
                 c.add(new Col("GP", 3.2f, 1, "gamesPlayed", "GP")); c.add(new Col("W", 3f, 1, "wins", "W")); c.add(new Col("L", 3f, 1, "losses", "L"));
                 c.add(new Col("OTL", 3.4f, 1, "otLosses", "overtimeLosses", "OTLosses", "OTL")); c.add(new Col("PTS", 3.8f, 1, "points", "PTS"));
                 c.add(new Col("HOME", 5.8f, 4, "home", "Home")); c.add(new Col("AWAY", 5.8f, 4, "road", "away", "Road"));
-                c.add(new Col("L10", 5.8f, 2, "lasttengames", "Last Ten Games", "L10")); c.add(new Col("DIFF", 7.6f, 2, "differential", "pointDifferential", "DIFF"));
+                c.add(new Col("L10", 5.8f, 2, "lasttengames", "Last Ten Games", "L10")); c.add(new Col("DIFF", 8f, 2, "differential", "pointDifferential", "DIFF"));
                 c.add(new Col("STRK", 3.8f, 3, "streak", "STRK"));
                 break;
             case "soccer":
                 c.add(new Col("GP", 3.2f, 1, "gamesPlayed", "GP")); c.add(new Col("W", 3f, 1, "wins", "W")); c.add(new Col("D", 3f, 1, "ties", "D", "T"));
                 c.add(new Col("L", 3f, 1, "losses", "L")); c.add(new Col("GF", 3.4f, 3, "pointsFor", "F", "GF")); c.add(new Col("GA", 3.4f, 3, "pointsAgainst", "A", "GA"));
-                c.add(new Col("GD", 7.6f, 2, "pointDifferential", "GD")); c.add(new Col("PTS", 3.8f, 1, "points", "P", "PTS"));
+                c.add(new Col("GD", 8f, 2, "pointDifferential", "GD")); c.add(new Col("PTS", 3.8f, 1, "points", "P", "PTS"));
                 break;
             case "baseball":
                 c.add(new Col("W", 3.2f, 1, "wins", "W")); c.add(new Col("L", 3.2f, 1, "losses", "L")); c.add(new Col("PCT", 4.4f, 1, "winPercent", "PCT"));
                 c.add(new Col("GB", 3.6f, 1, "#gb")); c.add(new Col("HOME", 5.2f, 3, "home", "Home")); c.add(new Col("AWAY", 5.2f, 3, "road", "away", "Road"));
-                c.add(new Col("L10", 4.4f, 2, "lasttengames", "Last Ten Games", "L10")); c.add(new Col("DIFF", 7.6f, 2, "pointDifferential", "differential", "DIFF"));
+                c.add(new Col("L10", 4.4f, 2, "lasttengames", "Last Ten Games", "L10")); c.add(new Col("DIFF", 8f, 2, "pointDifferential", "differential", "DIFF"));
                 c.add(new Col("STRK", 3.8f, 2, "streak", "STRK"));
                 break;
             default:     // basketball
                 c.add(new Col("W", 3.2f, 1, "wins", "W")); c.add(new Col("L", 3.2f, 1, "losses", "L")); c.add(new Col("PCT", 4.4f, 1, "winPercent", "PCT"));
                 c.add(new Col("GB", 3.6f, 1, "#gb")); c.add(new Col("HOME", 5.2f, 3, "home", "Home")); c.add(new Col("AWAY", 5.2f, 3, "road", "away", "Road"));
                 c.add(new Col("CONF", 5.2f, lg.equals("cbb") ? 2 : 4, "vsconf", "vs. Conf.", "conferenceRecord"));
-                c.add(new Col("L10", 4.4f, 2, "lasttengames", "Last Ten Games", "L10")); c.add(new Col("DIFF", 7.6f, 3, "differential", "pointDifferential", "DIFF"));
+                c.add(new Col("L10", 4.4f, 2, "lasttengames", "Last Ten Games", "L10")); c.add(new Col("DIFF", 8f, 3, "differential", "pointDifferential", "DIFF"));
                 c.add(new Col("STRK", 3.8f, 2, "streak", "STRK"));
                 break;
         }
@@ -1173,7 +1173,7 @@ final class StandingsView extends View {
     /** the difference: a small bar either side of zero on a faint track, then the figure */
     private void diff(Canvas c, String v, float right, float colW, float mid, float base, boolean chosen, int dimA) {
         double d = numOf(v);
-        float bw = 3.4f * R, cxm = right - colW + .6f * R + bw / 2;
+        float bw = 3f * R, cxm = right - colW + 1.5f * R + bw / 2;     // (clear of the column before it)
         rf.set(cxm - bw / 2, mid - .22f * R, cxm + bw / 2, mid + .22f * R);
         p.setColor(chosen ? 0x2EFFFFFF : 0x0FFFFFFF); c.drawRoundRect(rf, .22f * R, .22f * R, p);
         float len = (float) Math.min(1, Math.abs(d) / diffMax) * bw / 2;
