@@ -57,6 +57,7 @@ final class VodPlayer extends FrameLayout {
 
     VodPlayer(NativeHome host) {
         super(host.getContext());
+        setWillNotDraw(false);          // (it paints the black round the picture: onDraw)
         h = host; R = host.R;
         setClickable(true);
         loading = h.text(h.fSemi, 1.6f, Color.WHITE); loading.setGravity(Gravity.CENTER);
@@ -654,8 +655,44 @@ final class VodPlayer extends FrameLayout {
         preparedNext = true;
         Addons.get(getContext()).prepare(item.optString("type", "series"), next.optString("id"), stream, true, "the next episode");
     }
+    /* Round the picture, black is painted on every frame. A film wider than the screen leaves strips above and
+       below it, and nothing else draws there while a film plays (Home is put away and the app's window has no
+       background), so whatever was last drawn in them stayed: the controls, fading out, went from over the
+       picture but stayed in the strip under it, their top cut off where the picture begins. */
+    private final Paint maskP = new Paint();
+    private final RectF maskAt = new RectF();
+    private RectF picture() {
+        NativePlayer np = h.act.nativePlayer();
+        RectF r = np == null ? null : np.planeRect();
+        if (r == null) return null;
+        int[] me = new int[2];
+        getLocationInWindow(me);
+        r.offset(-me[0], -me[1]);
+        return r;
+    }
+    @Override protected void onDraw(Canvas c) {
+        super.onDraw(c);
+        if (!pictured) return;                       // (all black until the picture comes: the background)
+        int w = getWidth(), hh = getHeight();
+        RectF r = picture();
+        maskP.setColor(Color.BLACK);
+        if (r == null || r.width() < 8 || r.height() < 8) { maskAt.setEmpty(); c.drawRect(0, 0, w, hh, maskP); return; }
+        maskAt.set(r);
+        if (r.top > 0) c.drawRect(0, 0, w, r.top, maskP);
+        if (r.bottom < hh) c.drawRect(0, r.bottom, w, hh, maskP);
+        if (r.left > 0) c.drawRect(0, r.top, r.left, r.bottom, maskP);
+        if (r.right < w) c.drawRect(r.right, r.top, w, r.bottom, maskP);
+    }
+    /** the picture moved or changed shape: the black round it follows */
+    private void maskCheck() {
+        if (!pictured) return;
+        RectF r = picture();
+        if (r == null ? !maskAt.isEmpty() : !r.equals(maskAt)) invalidate();
+    }
+    private final Runnable maskLater = new Runnable() { @Override public void run() { invalidate(); } };
     private final Runnable tick = new Runnable() { @Override public void run() {
         keepHomeAway();
+        maskCheck();
         if (bar.getAlpha() > .05f) ctl.invalidate();
         checkSkip();
         checkUpNext();
@@ -690,6 +727,8 @@ final class VodPlayer extends FrameLayout {
         if (id != pid) return;
         if (!ev.equals("cues") && !ev.equals("cuesimg")) Diag.ev("vod: " + ev + (data == null || data.isEmpty() || ev.equals("tracks") ? "" : " " + (data.length() > 100 ? data.substring(0, 100) : data)));
         if (ev.equals("ready")) { pictured = true; removeCallbacks(noPicture); setBackgroundColor(Color.TRANSPARENT); }
+        // (the black round the picture: now, and once the picture's box has settled)
+        if (ev.equals("ready") || ev.equals("size")) { invalidate(); removeCallbacks(maskLater); postDelayed(maskLater, 120); }
         if (ev.equals("ready") || ev.equals("playing")) {
             ready = true;
             if (pictured) {
