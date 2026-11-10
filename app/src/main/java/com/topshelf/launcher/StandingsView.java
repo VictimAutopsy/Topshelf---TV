@@ -547,7 +547,6 @@ final class StandingsView extends View {
                 if (fg != null) {
                     cache.put(lg[0], new Object[] { System.currentTimeMillis(), fg, fr });
                     colors.putAll(cl);
-                    for (Group g : fg) for (Row r : g.rows) wantLogo(r.logo);
                 } else errors.put(lg[0], fe);
                 boardKey = "";
                 invalidate();
@@ -1089,7 +1088,7 @@ final class StandingsView extends View {
         p.setColor(EDGE); c.drawRect(x, yy + 2.2f * R, x + w, yy + 2.2f * R + Math.max(1, .07f * R), p);
         int k0 = 0;
         for (Block b : pn.blocks) {
-            if (!b.title.isEmpty() && k0 < pn.rowY.size()) text(c, b.title, x + 1.4f * R, pn.rowY.get(k0) - .7f * R, fSemi, 1.1f, SUB, Paint.Align.LEFT);
+            if (!b.title.isEmpty() && k0 < pn.rowY.size() && Math.abs(pn.rowY.get(k0) - (scroll + getHeight() / 2f)) < getHeight()) text(c, b.title, x + 1.4f * R, pn.rowY.get(k0) - .7f * R, fSemi, 1.1f, SUB, Paint.Align.LEFT);
             k0 += b.rows.size();
         }
         return cx;
@@ -1100,12 +1099,19 @@ final class StandingsView extends View {
         float logoS = Math.min(2.1f * R, rowH - .45f * R), lx = x + 3 * R + (2.1f * R - logoS) / 2, nx = x + 3 * R + 2.1f * R + .9f * R;
         float nameMax = (fit.length > 0 ? cx[0] - cols.get(fit[0]).w * R : x + w - in) - nx - .8f * R;
         int keyK = keyCol();
+        // only the rows in sight are drawn (college football has hundreds of teams)
+        float seeTop = boardTop() + scroll - rowH - 2 * R, seeBot = footTop() + scroll + R;
+        int first = -1;
         for (int k = 0; k < pn.flat.size(); k++) {
             Block b = pn.of.get(k); int i = pn.idx.get(k);
             float ry = pn.rowY.get(k);
+            if (ry < seeTop) continue;
+            if (ry > seeBot) break;
+            if (first < 0) first = k;
             boolean chosen = focus == 2 && pIndex == pi && k == ri;
-            // the entrance: each row fades and slides in a moment after the one above
-            float a = motion ? ease((now - enterAt - k * 16) / 260f) : 1;
+            // the entrance: each row in sight fades and slides in a moment after the one above (a screenful at most)
+            int nth = k - first;
+            float a = motion && nth < 24 ? ease((now - enterAt - nth * 16) / 260f) : 1;
             int save = -1;
             if (a < 1) { anim = true; save = c.saveLayerAlpha(x, ry, x + w, ry + rowH, (int) (a * 255)); c.translate((1 - a) * 1.4f * R, 0); }
             drawRow(c, b, i, x, w, ry, cx, keyK, lx, logoS, nx, nameMax, chosen, lg, k == pn.flat.size() - 1);
@@ -1140,6 +1146,7 @@ final class StandingsView extends View {
         int dimA = out ? 115 : 255;
         int place = b.seeded ? (int) r.seed : b.rank0 + i + 1;
         text(c, String.valueOf(place), x + 2.25f * R, base, fMed, 1.15f, alpha(chosen ? Color.WHITE : z != 0 ? INK : TER, dimA), Paint.Align.RIGHT);
+        wantLogo(r.logo);                         // (fetched when its row first comes into sight)
         Bitmap bm = logos.get(r.logo);
         if (bm != null) { p.setAlpha(dimA); rf.set(lx, mid - logoS / 2, lx + logoS, mid + logoS / 2); c.drawBitmap(bm, null, rf, p); p.setAlpha(255); }
         // the name, its clinch letter raised after it
