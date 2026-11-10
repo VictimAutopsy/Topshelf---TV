@@ -333,7 +333,7 @@ final class NativeStats extends View {
         float pad = 2.2f * R, x0 = pad, x1 = w - pad;
         float y = pad;
         // the title line
-        tTiny.setColor(0xFFFF6B5E);
+        tTiny.setColor(SportsLook.LIVE);
         c.drawText("LIVE STATS", x0, y + tTiny.getTextSize(), tTiny);
         tTiny.setColor(0x99FFFFFF);
         y += 1.9f * R;
@@ -399,7 +399,7 @@ final class NativeStats extends View {
             for (Model.Row r : g.rows) {
                 float rh = 2.3f * R;
                 if (cy + rh > top - rh && cy < bottom + rh) {
-                    if (r.active) { fill.setColor(0xFFFF6B5E); c.drawCircle(x0 + .3f * R, cy + 1.05f * R, .26f * R, fill); }
+                    if (r.active) { fill.setColor(SportsLook.LIVE); c.drawCircle(x0 + .3f * R, cy + 1.05f * R, .26f * R, fill); }
                     tBody.setColor(r.out ? 0x66FFFFFF : Color.WHITE);
                     float nameW = valX0 - x0 - 1.2f * R - 4.2f * R;
                     c.drawText(ell(r.name, tBody, nameW), x0 + 1.1f * R, cy + 1.35f * R, tBody);
@@ -431,7 +431,7 @@ final class NativeStats extends View {
         if (b == null) { drawStatus(c, x0, x1, y + R); return; }
         JSONArray fs = b.optJSONArray("fighters");
         String st = b.optString("state");
-        tTiny.setColor(st.equals("in") ? 0xFFFF6B5E : 0x99FFFFFF);
+        tTiny.setColor(st.equals("in") ? SportsLook.LIVE : 0x99FFFFFF);
         c.drawText((st.equals("in") ? "● ON NOW" : st.equals("post") ? "RESULT" : "UP NEXT") + "  ·  " + b.optString("cls") + (b.optString("detail").isEmpty() ? "" : "  ·  " + b.optString("detail")), x0, y + tTiny.getTextSize(), tTiny);
         tTiny.setColor(0x99FFFFFF);
         y += 2 * R;
@@ -448,7 +448,7 @@ final class NativeStats extends View {
             tSmall.setColor(0x99FFFFFF);
             c.drawText(ell(sp > 0 ? nm.substring(0, sp) : "", tSmall, colW - R), cx, y + tSmall.getTextSize(), tSmall);
             c.drawText(ell(sp > 0 ? nm.substring(sp + 1) : nm, tBig, colW - R), cx, y + 3.2f * R, setAlign(tBig, al));
-            tSmall.setColor(f.optBoolean("winner") ? 0xFF7CFF8A : 0xA6FFFFFF);
+            tSmall.setColor(f.optBoolean("winner") ? SportsLook.GREEN : 0xA6FFFFFF);
             c.drawText((f.optBoolean("winner") ? "Winner · " : "") + f.optString("rec"), cx, y + 4.8f * R, tSmall);
             tBold.setTextAlign(Paint.Align.LEFT); tSmall.setTextAlign(Paint.Align.LEFT); tBig.setTextAlign(Paint.Align.LEFT);
             List<String[]> p = profiles.get(f.optString("id"));
@@ -485,7 +485,7 @@ final class NativeStats extends View {
             String s2 = bb.optString("state");
             tBody.setColor(on ? Color.WHITE : 0xB3FFFFFF);
             c.drawText(ell(vs, tBody, (x1 - x0) * .62f), x0 + .2f * R, cy + 1.4f * R, tBody);
-            tSmall.setTextAlign(Paint.Align.RIGHT); tSmall.setColor(s2.equals("in") ? 0xFFFF6B5E : 0x80FFFFFF);
+            tSmall.setTextAlign(Paint.Align.RIGHT); tSmall.setColor(s2.equals("in") ? SportsLook.LIVE : 0x80FFFFFF);
             c.drawText(s2.equals("in") ? "● Live" : s2.equals("post") ? "Final" : bb.optString("cls"), x1 - .2f * R, cy + 1.4f * R, tSmall);
             tSmall.setTextAlign(Paint.Align.LEFT); tSmall.setColor(0xA6FFFFFF);
             cy += 2.2f * R;

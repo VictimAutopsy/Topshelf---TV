@@ -1098,7 +1098,9 @@ final class SportsData {
         } });
     }
     /** More: the game's page (a fight card: its menu) */
-    void details(Ev e) {
+    void details(Ev e) { details(e, null); }
+    /** …growing out of somewhere on the screen (the scoreboard) */
+    void details(Ev e, android.graphics.RectF from) {
         Lg lg = league(e.lg);
         if (e.card || e.teams.size() != 2 || lg == null) { openEv(e); return; }
         JSONArray ts = new JSONArray();
@@ -1106,7 +1108,7 @@ final class SportsData {
             for (Team t : e.teams) ts.put(new JSONObject().put("name", t.name).put("abbr", t.abbr).put("id", t.id).put("color", t.color).put("alt", t.alt)
                     .put("logo", t.logo).put("score", t.score).put("rec", t.rec).put("winner", t.winner).put("lines", new JSONArray()));
         } catch (Exception ignored) { }
-        h.openGamePage(lg.sport, lg.league, e.id, ts);
+        h.openGamePage(lg.sport, lg.league, e.id, ts, e, from);
     }
     /** the game's menu (watch on…, remind me, game page) */
     void menuFor(Ev e) { openEv(e); }
@@ -1337,7 +1339,7 @@ final class SportsData {
         o.put("nets", nets);
         o.put("bell", !post && has && Reminders.has(h, m.get(0).ch.u, e.at));
         JSONArray teams = new JSONArray();
-        for (Team x : e.teams) teams.put(new JSONObject().put("name", x.name).put("full", x.full.isEmpty() ? x.name : x.full).put("rec", x.rec).put("score", x.score)
+        for (Team x : e.teams) teams.put(new JSONObject().put("id", x.id).put("name", x.name).put("full", x.full.isEmpty() ? x.name : x.full).put("rec", x.rec).put("score", x.score)
                 .put("logo", x.logo).put("color", x.color).put("alt", x.alt).put("abbr", x.abbr).put("rank", x.rank).put("winner", x.winner).put("fav", isFav(e.lg, x.id)));
         o.put("teams", teams);
         // what a fan wants to see of the game (whatever ESPN had)
@@ -1426,6 +1428,47 @@ final class SportsData {
         if (e == null) { h.page("spPickOpen()"); return; }
         openEv(e);
     }
+    /** OK on the scoreboard: the game's page, growing out of it (a fight card: its menu) */
+    void openPage(int r, int c, android.graphics.RectF from) {
+        if (r < 0 || r >= shownRows.size()) return;
+        List<Ev> row = shownRows.get(r);
+        if (c < 0 || c >= row.size()) return;
+        Ev e = row.get(c);
+        if (e == null) { h.page("spPickOpen()"); return; }
+        details(e, from);
+    }
+    /** what a game's menu offers, for the game's page: watch on each channel showing it (the first `watch` of
+        them), remind me / cancel the reminder; and a note when it isn't on any of your channels */
+    interface Actions { void got(List<String> labels, List<Runnable> runs, int watch, String note); }
+    void actions(Ev game, final Actions cb) {
+        Ev now = find(game.id);
+        final Ev e = now != null ? now : game;
+        index();
+        work.execute(new Runnable() { @Override public void run() {
+            final List<Hit> m = e.state.equals("post") ? new ArrayList<Hit>() : match(e);
+            main.post(new Runnable() { @Override public void run() {
+                List<String> l = new ArrayList<>(); List<Runnable> a = new ArrayList<>();
+                int watch = 0;
+                for (final Hit x : m) {
+                    if (watch >= 2) break;
+                    l.add("Watch on " + x.ch.n); a.add(new Runnable() { @Override public void run() { h.livePlayUrl(x.ch.u, gameJson(e)); } });
+                    watch++;
+                }
+                if (e.state.equals("pre") && !m.isEmpty() && e.teams.size() == 2) {
+                    final NativeLive.Ch best = m.get(0).ch;
+                    if (Reminders.has(h, best.u, e.at)) { l.add("Cancel reminder"); a.add(new Runnable() { @Override public void run() { Reminders.remove(h, Reminders.id(best.u, e.at), false); push(); } }); }
+                    else {
+                        l.add("Remind me at " + Reminders.time(h, e.at));
+                        final String title = e.teams.get(0).name + " @ " + e.teams.get(1).name;
+                        a.add(new Runnable() { @Override public void run() { Reminders.add(h, best.u, best.n, NativeLive.chNum(best), e.at, e.at + 3 * 3600000L, title); push(); } });
+                    }
+                }
+                String note = "";
+                if (m.isEmpty() && !e.state.equals("post")) note = !e.nets.isEmpty() ? "Not found in your channels · TV: " + join(e.nets, 99, ", ") : "No TV listing yet";
+                cb.got(l, a, watch, note);
+            } });
+        } });
+    }
     /** a fantasy player's game (by ESPN's id) */
     void openGame(String id) {
         for (List<Ev> l : ev.values()) for (Ev e : l) if (e.id.equals(id)) { openEv(e); return; }
@@ -1465,7 +1508,7 @@ final class SportsData {
                     for (Team t : e.teams) ts.put(new JSONObject().put("name", t.name).put("abbr", t.abbr).put("id", t.id).put("color", t.color).put("alt", t.alt)
                             .put("logo", t.logo).put("score", t.score).put("rec", t.rec).put("winner", t.winner).put("lines", new JSONArray()));
                 } catch (Exception ignored) { }
-                h.openGamePage(lg.sport, lg.league, e.id, ts);
+                h.openGamePage(lg.sport, lg.league, e.id, ts, e, null);
             } });
         }
         if (m.isEmpty() && !e.state.equals("post")) {

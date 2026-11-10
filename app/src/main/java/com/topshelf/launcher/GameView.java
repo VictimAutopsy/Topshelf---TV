@@ -26,13 +26,14 @@ import java.util.Locale;
 import java.util.Map;
 
 /**
- * A game's own page (from a game's menu on Sports): the scoreboard on the teams' colours, the score by quarter or
- * period, the chance each side had of winning as the game went, each team's leaders, the scoring plays and the
+ * A game's own page (OK on Sports' scoreboard, which it grows out of; or from a game's menu): what the game's menu
+ * offered as buttons under the scoreboard (watch on your channel, remind me, update: ◀ ▶ and OK), the scoreboard
+ * on the teams' colours, the score by quarter or period, the chance each side had of winning as the game went, each team's leaders, the scoring plays and the
  * team stats side by side — all from ESPN's game summary, fetched again every 30 s while the game is on.
- * ▲ ▼ move down the page, Back closes it.
+ * ▲ ▼ move down the page, Back closes it (back into the scoreboard, when it came from there).
  */
 final class GameView extends FrameLayout {
-    private static final int GROUND = 0xFF0A0E13, CARD = 0xFF131A23, EDGE = 0xFF222C38, GOLD = 0xFFFFC23D, LIVE_C = 0xFFFF7A59, DIM = 0xFF8E99A8;
+    private static final int GROUND = SportsLook.GROUND, CARD = SportsLook.CARD, EDGE = SportsLook.EDGE, GOLD = SportsLook.GOLD, LIVE_C = SportsLook.LIVE, DIM = SportsLook.TER;
     private final NativeHome h;
     private final float R;
     private final Typeface cond, heavy;
@@ -44,14 +45,22 @@ final class GameView extends FrameLayout {
     private float scroll, scrollT, maxScroll;
     private ValueAnimator anim;
     private int gen;
+    // the game's menu, as buttons on the page: watch on a channel (the first `watch` of them), remind me; then Update
+    private SportsData.Ev ev;
+    private final List<String> actL = new ArrayList<>();
+    private final List<Runnable> actR = new ArrayList<>();
+    private int actWatch, act;
+    private String actNote = "";
+    // what the page grew out of (the scoreboard), and how far it has grown
+    private android.graphics.Rect from;
+    private ValueAnimator grow;
 
     GameView(NativeHome host) {
         super(host.getContext());
         h = host; R = host.R;
         setBackgroundColor(GROUND);
         setClickable(true);
-        cond = Typeface.create("sans-serif-condensed", Typeface.BOLD);
-        heavy = Build.VERSION.SDK_INT >= 28 ? Typeface.create(Typeface.create("sans-serif-condensed", Typeface.NORMAL), 800, false) : cond;
+        cond = SportsLook.cond(); heavy = SportsLook.heavy();
         page = new Page(getContext());
         addView(page, new LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.MATCH_PARENT));
         setVisibility(GONE);
@@ -60,19 +69,83 @@ final class GameView extends FrameLayout {
     boolean shownNow() { return getVisibility() == VISIBLE; }
 
     /** opens on a game: its league (as ESPN's path has it) and ESPN's id; the scoreboard's teams show at once */
-    void open(String sport, String league, String id, JSONArray scoreboardTeams) {
+    void open(String sport, String league, String id, JSONArray scoreboardTeams) { open(sport, league, id, scoreboardTeams, null, null); }
+    /** …with the game itself (for its buttons) and where on the screen it grows out of (either may be null) */
+    void open(String sport, String league, String id, JSONArray scoreboardTeams, SportsData.Ev game, android.graphics.RectF fromRect) {
         this.sport = sport; this.league = league; this.id = id;
         sum = null; err = ""; scroll = scrollT = 0; gen++;
         teams.clear();
         if (scoreboardTeams != null) for (int i = 0; i < scoreboardTeams.length() && i < 2; i++) teams.add(scoreboardTeams.optJSONObject(i));
-        setVisibility(VISIBLE); setAlpha(0f); bringToFront();
-        animate().alpha(1f).setDuration(220).start();
+        ev = game; actL.clear(); actR.clear(); actWatch = 0; act = 0; actNote = "";
+        animate().cancel(); animate().setStartDelay(0);
+        if (grow != null) grow.cancel();
+        from = null;
+        if (fromRect != null && fromRect.width() > 1 && fromRect.height() > 1 && h.getWidth() > 0) {
+            from = new android.graphics.Rect(Math.round(fromRect.left), Math.round(fromRect.top), Math.round(fromRect.right), Math.round(fromRect.bottom));
+        }
+        setVisibility(VISIBLE); bringToFront();
+        if (from != null) { setAlpha(1f); grown(0f); growTo(0f, 1f, 340, null); }
+        else { setClipBounds(null); page.setTranslationY(0); page.setAlpha(1f); setAlpha(0f); animate().alpha(1f).setDuration(220).start(); }
         load();
+        loadActs();
+    }
+    /* Growing out of the scoreboard: the page is shown through a window that opens from the scoreboard's place to
+       the whole screen, its own scoreboard riding up from there to the top (nothing is redrawn as it goes). */
+    private void grown(float f) {
+        if (from == null) return;
+        int w = h.getWidth(), hh = h.getHeight();
+        setClipBounds(new android.graphics.Rect(Math.round(from.left * (1 - f)), Math.round(from.top * (1 - f)), Math.round(from.right + (w - from.right) * f), Math.round(from.bottom + (hh - from.bottom) * f)));
+        page.setTranslationY(from.top * (1 - f));
+        page.setAlpha(Math.min(1f, .25f + f * 1.5f));
+    }
+    private void growTo(float a, float b, int ms, final Runnable then) {
+        if (grow != null) grow.cancel();
+        grow = ValueAnimator.ofFloat(a, b);
+        grow.setDuration(ms); grow.setInterpolator(TileView.EASE);
+        grow.addUpdateListener(new ValueAnimator.AnimatorUpdateListener() { @Override public void onAnimationUpdate(ValueAnimator v) { grown((Float) v.getAnimatedValue()); } });
+        grow.addListener(new android.animation.AnimatorListenerAdapter() {
+            boolean off;
+            @Override public void onAnimationCancel(android.animation.Animator x) { off = true; }
+            @Override public void onAnimationEnd(android.animation.Animator x) { if (!off && then != null) then.run(); }
+        });
+        grow.start();
     }
     void close() {
         gen++;
         removeCallbacks(again);
-        animate().alpha(0f).setDuration(160).withEndAction(new Runnable() { @Override public void run() { setVisibility(GONE); logos.clear(); } }).start();
+        final Runnable gone = new Runnable() { @Override public void run() { setVisibility(GONE); setClipBounds(null); page.setTranslationY(0); page.setAlpha(1f); logos.clear(); } };
+        if (from != null && scroll < R) { growTo(1f, 0f, 240, gone); animate().alpha(0f).setStartDelay(120).setDuration(120).withEndAction(new Runnable() { @Override public void run() { animate().setStartDelay(0); } }).start(); }
+        else animate().alpha(0f).setDuration(160).withEndAction(gone).start();
+    }
+    /** gone at once (something else takes the screen: a channel starts playing) */
+    private void closeNow() {
+        gen++;
+        removeCallbacks(again);
+        animate().cancel(); if (grow != null) grow.cancel();
+        setVisibility(GONE); setClipBounds(null); page.setTranslationY(0); page.setAlpha(1f); logos.clear();
+    }
+    /** the game's buttons (asked for again after one is used: "Remind me" becomes "Cancel reminder") */
+    private void loadActs() {
+        if (ev == null || h.sportsData() == null) return;
+        final int g = gen;
+        h.sportsData().actions(ev, new SportsData.Actions() { @Override public void got(List<String> labels, List<Runnable> runs, int watch, String note) {
+            if (g != gen) return;
+            actL.clear(); actL.addAll(labels); actR.clear(); actR.addAll(runs); actWatch = watch; actNote = note;
+            if (act > actL.size()) act = actL.size();
+            page.invalidate();
+        } });
+    }
+    /** OK: the button the remote is on (the last one is always Update) */
+    private void actOk() {
+        if (scrollT > R) { scrollTo(0); return; }             // (the buttons are at the top: back up to them first)
+        if (act < actR.size()) {
+            Runnable r = actR.get(act);
+            if (act < actWatch) { closeNow(); r.run(); return; }
+            r.run();
+            loadActs();
+            return;
+        }
+        load(); loadActs(); h.toast("Updating…");
     }
     private final Runnable again = new Runnable() { @Override public void run() { if (shownNow()) load(); } };
     private void load() {
@@ -145,7 +218,9 @@ final class GameView extends FrameLayout {
         if (c == KeyEvent.KEYCODE_BACK || c == KeyEvent.KEYCODE_ESCAPE) { close(); return true; }
         if (c == KeyEvent.KEYCODE_DPAD_DOWN) scrollTo(scrollT + 9 * R);
         else if (c == KeyEvent.KEYCODE_DPAD_UP) scrollTo(scrollT - 9 * R);
-        else if (c == KeyEvent.KEYCODE_DPAD_CENTER || c == KeyEvent.KEYCODE_ENTER) { load(); h.toast("Updating…"); }
+        else if (c == KeyEvent.KEYCODE_DPAD_LEFT) { if (scrollT > R) scrollTo(0); else if (act > 0) { act--; page.invalidate(); } }
+        else if (c == KeyEvent.KEYCODE_DPAD_RIGHT) { if (scrollT > R) scrollTo(0); else if (act < actL.size()) { act++; page.invalidate(); } }
+        else if (c == KeyEvent.KEYCODE_DPAD_CENTER || c == KeyEvent.KEYCODE_ENTER || c == KeyEvent.KEYCODE_NUMPAD_ENTER || c == KeyEvent.KEYCODE_BUTTON_A) actOk();
         return true;
     }
     private void scrollTo(float to) {
@@ -204,6 +279,7 @@ final class GameView extends FrameLayout {
             float px = 4 * R, cw = w - 2 * px;
             c.save(); c.translate(0, -scroll);
             float y = header(c, w);
+            y = buttons(c, px, y, cw);
             if (sum == null) {
                 text(c, err.isEmpty() ? "Loading the game…" : "Couldn't load the game (" + err + ")", h.fMed, 1.5f, DIM, px, y + 4 * R, Paint.Align.LEFT, 0);
                 c.restore(); maxScroll = 0; return;
@@ -217,7 +293,31 @@ final class GameView extends FrameLayout {
             c.restore();
             maxScroll = Math.max(0, y + 3 * R - hh);
             // the foot
-            text(c, "▲ ▼ move   ·   OK update   ·   Back close", h.fMed, 1.1f, 0x99FFFFFF, px, hh - 1.6f * R, Paint.Align.LEFT, 0);
+            text(c, "◀ ▶ choose   ·   OK select   ·   ▲ ▼ move   ·   Back close", h.fMed, 1.1f, 0x99FFFFFF, px, hh - 1.6f * R, Paint.Align.LEFT, 0);
+        }
+
+        /** the game's buttons, under the scoreboard: Sports' own controls, the one the remote is on lit and ringed */
+        private float buttons(Canvas c, float x, float y, float cw) {
+            boolean air = GlassPanel.look.equals("air");
+            float ch = SportsLook.CTRL_H * R, top = y + 1.5f * R, pad = SportsLook.CTRL_PAD * R, bx = x;
+            RectF on = null;
+            for (int i = 0; i <= actL.size(); i++) {
+                String lab = i < actL.size() ? actL.get(i) : "Update";
+                if (air) lab = lab.toUpperCase(Locale.US);
+                float sp = air ? .05f : 0;
+                tp.setTypeface(h.fSemi); tp.setTextSize(SportsLook.T_CTRL * R); tp.setLetterSpacing(sp);
+                float bw = tp.measureText(lab) + 2 * pad; tp.setLetterSpacing(0);
+                if (bx + bw > x + cw) break;
+                RectF r = new RectF(bx, top, bx + bw, top + ch);
+                boolean sel = i == act;
+                SportsLook.ctrl(c, p, r, R, sel);
+                text(c, lab, h.fSemi, SportsLook.T_CTRL, SportsLook.ctrlText(sel), r.centerX(), r.centerY() + .46f * R, Paint.Align.CENTER, sp);
+                if (sel) on = r;
+                bx += bw + .8f * R;
+            }
+            if (!actNote.isEmpty() && bx < x + cw - 10 * R) text(c, ellip(actNote, h.fMed, SportsLook.T_LABEL, x + cw - bx - R), h.fMed, SportsLook.T_LABEL, DIM, bx + .6f * R, top + ch / 2 + .4f * R, Paint.Align.LEFT, 0);
+            if (on != null) { float rad = SportsLook.ctrlRadius(ch); SportsLook.glow(c, p, on, rad, R, GOLD, .8f, SportsLook.GLOW_CTRL); SportsLook.ring(c, p, on, rad, R, 255); }
+            return top + ch;
         }
 
         /** the scoreboard across the top, split in the teams' colours; returns where the page goes on */
@@ -244,15 +344,15 @@ final class GameView extends FrameLayout {
                 float nx = left ? lx + d + 2 * R : lx - 2 * R;
                 Paint.Align al = left ? Paint.Align.LEFT : Paint.Align.RIGHT;
                 text(c, ellip(t.optString("name").toUpperCase(Locale.US), heavy, 3.2f, cx - 14 * R - (d + 6 * R)), heavy, 3.2f, Color.WHITE, nx, ly + 4.6f * R, al, .01f);
-                if (!t.optString("rec").isEmpty()) text(c, t.optString("rec"), h.fMed, 1.4f, 0xFFDCE3EA, nx, ly + 7f * R, al, 0);
+                if (!t.optString("rec").isEmpty()) text(c, t.optString("rec"), h.fMed, 1.4f, SportsLook.SOFT, nx, ly + 7f * R, al, 0);
                 String sc = t.optString("score");
                 if ((live || post) && !sc.isEmpty()) {
                     boolean dim = post && !t.optBoolean("winner");
-                    text(c, sc, heavy, 8f, dim ? 0xFFC9D1DA : Color.WHITE, left ? cx - 7 * R : cx + 7 * R, ly + 7.6f * R, left ? Paint.Align.RIGHT : Paint.Align.LEFT, -.02f);
+                    text(c, sc, heavy, 8f, dim ? SportsLook.SUB : Color.WHITE, left ? cx - 7 * R : cx + 7 * R, ly + 7.6f * R, left ? Paint.Align.RIGHT : Paint.Align.LEFT, -.02f);
                 }
             }
             text(c, detail.toUpperCase(Locale.US), heavy, 1.8f, live ? GOLD : Color.WHITE, cx, ly + 4.4f * R, Paint.Align.CENTER, .04f);
-            if (live) { p.setColor(LIVE_C); c.drawRoundRect(new RectF(cx - 2.6f * R, 1.2f * R, cx + 2.6f * R, 3.1f * R), .4f * R, .4f * R, p); text(c, "LIVE", heavy, 1.1f, 0xFF160400, cx, 2.55f * R, Paint.Align.CENTER, .1f); }
+            if (live) { p.setColor(LIVE_C); c.drawRoundRect(new RectF(cx - 2.6f * R, 1.2f * R, cx + 2.6f * R, 3.1f * R), .4f * R, .4f * R, p); text(c, "LIVE", heavy, 1.1f, SportsLook.ON_LIVE, cx, 2.55f * R, Paint.Align.CENTER, .1f); }
             JSONObject gi = sum == null ? null : sum.optJSONObject("gameInfo"), v = gi == null ? null : gi.optJSONObject("venue");
             if (v != null) text(c, v.optString("fullName").toUpperCase(Locale.US), cond, 1.1f, 0xCCFFFFFF, cx, hh - 1.4f * R, Paint.Align.CENTER, .1f);
             return hh;
@@ -279,7 +379,7 @@ final class GameView extends FrameLayout {
                 float ry = top + rowH * (i + 1) + 2.3f * R;
                 p.setColor(teamCol(i)); c.drawRect(x + 1.2f * R, ry - 1.5f * R, x + 1.6f * R, ry + .3f * R, p);
                 text(c, t.optString("abbr").isEmpty() ? t.optString("name") : t.optString("abbr"), heavy, 1.6f, Color.WHITE, x + 2.4f * R, ry, Paint.Align.LEFT, 0);
-                for (int k = 0; k < n; k++) text(c, l != null && k < l.length() ? l.optString(k) : "", cond, 1.6f, 0xFFDCE3EA, x + nameW + colW * k + colW / 2, ry, Paint.Align.CENTER, 0);
+                for (int k = 0; k < n; k++) text(c, l != null && k < l.length() ? l.optString(k) : "", cond, 1.6f, SportsLook.SOFT, x + nameW + colW * k + colW / 2, ry, Paint.Align.CENTER, 0);
                 text(c, t.optString("score"), heavy, 1.8f, Color.WHITE, x + nameW + colW * n + colW / 2, ry, Paint.Align.CENTER, 0);
             }
             return box.bottom;
@@ -345,7 +445,7 @@ final class GameView extends FrameLayout {
                     float ry = top + 3.4f * R + k * rowH;
                     text(c, cat.optString("displayName").toUpperCase(Locale.US), cond, 1f, DIM, cx0 + 1.4f * R, ry + 1.6f * R, Paint.Align.LEFT, .08f);
                     text(c, ellip(ath == null ? "" : ath.optString("displayName"), h.fSemi, 1.4f, colW * .45f), h.fSemi, 1.4f, Color.WHITE, cx0 + 1.4f * R, ry + 3.6f * R, Paint.Align.LEFT, 0);
-                    text(c, ellip(one.optString("displayValue"), h.fMed, 1.3f, colW * .5f), h.fMed, 1.3f, 0xFFDCE3EA, cx0 + colW - 1.4f * R, ry + 3.6f * R, Paint.Align.RIGHT, 0);
+                    text(c, ellip(one.optString("displayValue"), h.fMed, 1.3f, colW * .5f), h.fMed, 1.3f, SportsLook.SOFT, cx0 + colW - 1.4f * R, ry + 3.6f * R, Paint.Align.RIGHT, 0);
                 }
                 bottom = Math.max(bottom, box.bottom);
             }
@@ -374,7 +474,7 @@ final class GameView extends FrameLayout {
                 String score = pl.optString("awayScore") + "–" + pl.optString("homeScore");
                 float sw = measure(score, heavy, 1.4f);
                 text(c, score, heavy, 1.4f, Color.WHITE, x + cw - 1.6f * R, ry, Paint.Align.RIGHT, 0);
-                text(c, ellip(pl.optString("text"), h.fMed, 1.25f, cw - 12 * R - sw), h.fMed, 1.25f, 0xFFE6EBF1, x + 9 * R, ry, Paint.Align.LEFT, 0);
+                text(c, ellip(pl.optString("text"), h.fMed, 1.25f, cw - 12 * R - sw), h.fMed, 1.25f, SportsLook.SOFT, x + 9 * R, ry, Paint.Align.LEFT, 0);
             }
             return box.bottom + 2.4f * R;
         }
@@ -403,8 +503,8 @@ final class GameView extends FrameLayout {
                 text(c, a.optString("label", a.optString("name")), h.fMed, 1.2f, DIM, mid, ry, Paint.Align.CENTER, 0);
                 double na = num(va), nb = num(vb);
                 boolean aw = na > nb, bw = nb > na;
-                text(c, va, heavy, 1.5f, aw ? Color.WHITE : 0xFFAEB8C4, x + 2 * R, ry, Paint.Align.LEFT, 0);
-                text(c, vb, heavy, 1.5f, bw ? Color.WHITE : 0xFFAEB8C4, x + cw - 2 * R, ry, Paint.Align.RIGHT, 0);
+                text(c, va, heavy, 1.5f, aw ? Color.WHITE : SportsLook.SUB, x + 2 * R, ry, Paint.Align.LEFT, 0);
+                text(c, vb, heavy, 1.5f, bw ? Color.WHITE : SportsLook.SUB, x + cw - 2 * R, ry, Paint.Align.RIGHT, 0);
                 if (na >= 0 && nb >= 0 && na + nb > 0) {
                     float bwid = cw * .16f, by = ry + .6f * R, fa = (float) (na / (na + nb));
                     p.setColor(0x26FFFFFF); c.drawRect(mid - bwid, by, mid + bwid, by + .3f * R, p);

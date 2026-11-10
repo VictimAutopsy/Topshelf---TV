@@ -39,7 +39,9 @@ import java.util.Map;
  * Sports, drawn by Android, laid out like a game-day broadcast ("Gameday"): a score strip running across
  * the top, the game that matters most as a big scoreboard split in the two teams' colours (the clock, the
  * down and distance and where the ball is, the count and the runners, the last play, the chance each side
- * wins), your teams down the right, the leagues as chips, and that league's games as scorebugs.
+ * wins), your teams down the right, the leagues as chips, and that league's games as scorebugs. OK on the
+ * scoreboard opens the game's own page out of it. The colours, the controls (tabs, leagues) and the ring and
+ * glow round what the remote is on are Sports' shared ones (SportsLook).
  *
  * Every card, the scoreboard, your-teams column and the strip are painted into one picture each (off the
  * main thread) whenever their games change, so moving around is just moving pictures.
@@ -53,7 +55,8 @@ final class NativeSports extends FrameLayout {
     /* (a phone held upright stacks them: the scoreboard full width, your teams under it, then the leagues and the games) */
     private float ROWS_Y = 43.2f, HERO_H = 27f, SIDE_W = 33.4f, RAIL_Y = 38.8f, sideY = HERO_Y;
     /* a broadcast's colours: live is a hot orange, "still to come" a gold, done a grey; cards are a dark slate */
-    private static final int LIVE_C = 0xFFFF7A59, GOLD = 0xFFFFC23D, DIMTXT = 0xFF8E99A8, CARD = 0xFF131A23, EDGE = 0xFF222C38, GROUND = 0xFF0A0E13;
+    private static final int LIVE_C = SportsLook.LIVE, GOLD = SportsLook.GOLD, DIMTXT = SportsLook.TER, CARD = SportsLook.CARD, EDGE = SportsLook.EDGE, GROUND = SportsLook.GROUND,
+            SOFT = SportsLook.SOFT, SUB = SportsLook.SUB, TER = SportsLook.TER, FAINT = SportsLook.FAINT, GREEN = SportsLook.GREEN, RED_C = SportsLook.RED;
 
     private final NativeHome h;
     private final float R;
@@ -83,12 +86,14 @@ final class NativeSports extends FrameLayout {
     private int leagueSel = 0;
     private JSONObject featured;                      // the game on the scoreboard
     private final LinearLayout tabRow;
-    private final View heroRing, sideRing;
+    /* where the remote is: one ring and glow for the whole tab, gliding from one thing to the next */
+    private final SportsLook.Focus ring;
+    private final LinearLayout tline;
+    private boolean chromeOn;
     private final TextView liveChip, updated;
     private final ImageView[] hero = new ImageView[2];
     private int heroTop = -1;
     private final FrameLayout rowsBox, rowsIn;
-    private final View glow;
     private final StandingsView standings;
     private final TextView setupTitle, setupSub;
     private final Map<String, CardView> cardViews = new HashMap<>();
@@ -119,8 +124,7 @@ final class NativeSports extends FrameLayout {
         setClipChildren(true);
         setBackgroundColor(GROUND);
         android.content.Context c = getContext();
-        cond = Typeface.create("sans-serif-condensed", Typeface.BOLD);
-        heavy = Build.VERSION.SDK_INT >= 28 ? Typeface.create(Typeface.create("sans-serif-condensed", Typeface.NORMAL), 800, false) : cond;
+        cond = SportsLook.cond(); heavy = SportsLook.heavy();
 
         bg = new ImageView(c);
         bg.setScaleType(ImageView.ScaleType.FIT_XY);
@@ -148,21 +152,21 @@ final class NativeSports extends FrameLayout {
         ribLab.setPadding(h.px(1.6f), 0, h.px(1.6f), 0);
         ribLab.setBackgroundColor(GOLD);
         ribBox.addView(ribLab, new LayoutParams(LayoutParams.WRAP_CONTENT, LayoutParams.MATCH_PARENT));
-        View ribEdge = new View(c); ribEdge.setBackgroundColor(0xFF1C2430);
+        View ribEdge = new View(c); ribEdge.setBackgroundColor(EDGE);
         ribBox.addView(ribEdge, new LayoutParams(LayoutParams.MATCH_PARENT, Math.max(1, h.px(.08f)), Gravity.BOTTOM));
-        LinearLayout tline = new LinearLayout(c);
+        tline = new LinearLayout(c);
         tline.setGravity(Gravity.CENTER_VERTICAL);
         tabRow = new LinearLayout(c);
         tabRow.setGravity(Gravity.CENTER_VERTICAL);
         tline.addView(tabRow, new LinearLayout.LayoutParams(LayoutParams.WRAP_CONTENT, LayoutParams.WRAP_CONTENT));
-        liveChip = h.text(heavy, 1.15f, 0xFF160400);
+        liveChip = h.text(heavy, 1.15f, SportsLook.ON_LIVE);
         liveChip.setLetterSpacing(.1f);
         liveChip.setPadding(h.px(.8f), h.px(.2f), h.px(.8f), h.px(.2f));
         GradientDrawable lc = new GradientDrawable(); lc.setCornerRadius(.4f * R); lc.setColor(LIVE_C); liveChip.setBackground(lc);
         liveChip.setVisibility(GONE);
         LinearLayout.LayoutParams ll = new LinearLayout.LayoutParams(LayoutParams.WRAP_CONTENT, LayoutParams.WRAP_CONTENT); ll.leftMargin = h.px(1.2f);
         tline.addView(liveChip, ll);
-        updated = h.text(h.fReg, 1.15f, 0xFF8E99A8);
+        updated = h.text(h.fReg, 1.15f, TER);
         LinearLayout.LayoutParams ul = new LinearLayout.LayoutParams(LayoutParams.WRAP_CONTENT, LayoutParams.WRAP_CONTENT); ul.leftMargin = h.px(1.4f);
         tline.addView(updated, ul);
         chrome.addView(tline, h.at(PAD, TABS_Y, LayoutParams.WRAP_CONTENT, LayoutParams.WRAP_CONTENT));
@@ -174,19 +178,11 @@ final class NativeSports extends FrameLayout {
             hero[i].setAlpha(0f);
             addView(hero[i], h.at(PAD, HERO_Y, h.px(SW - 2 * PAD), h.px(HERO_H)));
         }
-        heroRing = new View(c);
-        GradientDrawable hr = new GradientDrawable(); hr.setCornerRadius(2.2f * R); hr.setStroke(Math.max(3, h.px(.22f)), Color.WHITE);
-        heroRing.setBackground(hr); heroRing.setVisibility(GONE);
-        addView(heroRing, h.at(PAD, HERO_Y, h.px(SW - 2 * PAD), h.px(HERO_H)));
         // your teams (and your fantasy team), beside the scoreboard
         side = new ImageView(c);
         side.setScaleType(ImageView.ScaleType.FIT_XY);
         side.setVisibility(GONE);
         addView(side, h.at(SW - PAD - SIDE_W, sideY, h.px(SIDE_W), h.px(HERO_H)));
-        sideRing = new View(c);
-        GradientDrawable sr = new GradientDrawable(); sr.setCornerRadius(1.4f * R); sr.setStroke(Math.max(3, h.px(.22f)), Color.WHITE);
-        sideRing.setBackground(sr); sideRing.setVisibility(GONE);
-        addView(sideRing, h.at(SW - PAD - SIDE_W, sideY, h.px(SIDE_W), h.px(6)));
         // the leagues, as chips (the one you're in is lit)
         rail = new Rail(c);
         addView(rail, h.at(0, RAIL_Y, LayoutParams.MATCH_PARENT, h.px(4.4f)));
@@ -205,15 +201,21 @@ final class NativeSports extends FrameLayout {
         rowsIn = new FrameLayout(c);
         rowsIn.setClipChildren(false);
         rowsBox.addView(rowsIn, new LayoutParams(LayoutParams.MATCH_PARENT, h.px(400)));
-        glow = new View(c);
-        glow.setAlpha(0f);
+        ring = new SportsLook.Focus(c, R);
+        addView(ring, new LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.MATCH_PARENT));
         // Standings (its own tab): over the scoreboard, cards and leagues, under the tabs
         standings = new StandingsView(h);
         standings.setBackgroundColor(GROUND);
         standings.setVisibility(GONE);
         LayoutParams stl = new LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.MATCH_PARENT); stl.topMargin = h.px(HERO_Y - 1.2f);
         addView(standings, stl);
-        chrome.bringToFront();
+        standings.onTables = new Runnable() { @Override public void run() {
+            // (where your teams and the scoreboard's teams stand has just arrived: paint those again)
+            if (data.optBoolean("setup") || allRows.isEmpty()) return;
+            if (!sideItems.isEmpty()) paintSide();
+            main().removeCallbacks(heroLater); main().post(heroLater);
+        } };
+        order();
 
         h.imgs.make("sportsbg:" + W + "x" + H, new HomeImages.Maker() { @Override public Bitmap make() { return bakeBg(); } }, new HomeImages.Done() {
             @Override public void done(Bitmap b) {
@@ -235,7 +237,9 @@ final class NativeSports extends FrameLayout {
         setAlpha(0f);
         animate().alpha(1f).setDuration(350).start();     // (no ready-made picture: see hasOverlappingRendering)
         chrome.animate().cancel();
-        chrome.setAlpha(h.barsHiddenNow() || h.portrait ? 1f : 0f);
+        chromeOn = h.barsHiddenNow() || h.portrait;
+        chrome.setAlpha(chromeOn ? 1f : 0f);
+        placeRing(false);
         h.sportsData().setOn(true);
         removeCallbacks(fyTick); postDelayed(fyTick, 2000);
         ribStart();
@@ -259,6 +263,8 @@ final class NativeSports extends FrameLayout {
         if (h.portrait) return;            // (upright, the tab bar is at the bottom: the strip and tabs stay)
         chrome.animate().cancel();
         chrome.animate().alpha(hide ? 1f : 0f).setDuration(hide ? 400 : 180).start();
+        chromeOn = hide;
+        placeRing(true);
     }
 
 
@@ -314,7 +320,7 @@ final class NativeSports extends FrameLayout {
             LayoutParams rl = (LayoutParams) rail.getLayoutParams(); rl.topMargin = h.px(RAIL_Y); rail.setLayoutParams(rl);
             LayoutParams bl = (LayoutParams) rowsBox.getLayoutParams(); bl.topMargin = h.px(ROWS_Y); bl.height = H - h.px(ROWS_Y); rowsBox.setLayoutParams(bl);
         }
-        for (View v : new View[] { hero[0], hero[1], heroRing }) { LayoutParams lp = (LayoutParams) v.getLayoutParams(); int nw = h.px(heroW); if (lp.width != nw) { lp.width = nw; v.setLayoutParams(lp); heroKey = ""; } }
+        for (View v : new View[] { hero[0], hero[1] }) { LayoutParams lp = (LayoutParams) v.getLayoutParams(); int nw = h.px(heroW); if (lp.width != nw) { lp.width = nw; v.setLayoutParams(lp); heroKey = ""; } }
         heroWidth = heroW;
         side.setVisibility(sideOn ? VISIBLE : GONE);
         if (sideOn) paintSide();
@@ -427,20 +433,20 @@ final class NativeSports extends FrameLayout {
             if (c != null) { p.setColor(teamCol(t, 0xFF3A4A66)); c.drawCircle(x + .38f * R, y - .45f * R, .38f * R, p); }
             x += 1.1f * R;
             boolean dim = post && !t.optBoolean("winner") && !fight;
-            if (c != null) text(c, ab, cond, 1.4f, t.optBoolean("fav") ? GOLD : dim ? 0xFFAEB8C4 : Color.WHITE, x, y, Paint.Align.LEFT, 0);
+            if (c != null) text(c, ab, cond, 1.4f, t.optBoolean("fav") ? GOLD : dim ? SUB : Color.WHITE, x, y, Paint.Align.LEFT, 0);
             x += measure(ab, cond, 1.4f, 0) + .55f * R;
             String sc = t.optString("score");
             if ((live || post) && !fight && !sc.isEmpty()) {
-                if (c != null) text(c, sc, heavy, 1.45f, dim ? 0xFFAEB8C4 : Color.WHITE, x, y, Paint.Align.LEFT, 0);
+                if (c != null) text(c, sc, heavy, 1.45f, dim ? SUB : Color.WHITE, x, y, Paint.Align.LEFT, 0);
                 x += measure(sc, heavy, 1.45f, 0) + 1.1f * R;
             } else x += .5f * R;
         }
         String s = live ? (g.optString("per") + " " + g.optString("clock")).trim() : post ? "FINAL" : g.optString("when").replaceFirst("^Today ", "");
         if (live && s.isEmpty()) s = "LIVE";
         s = s.toUpperCase(java.util.Locale.US);
-        if (c != null) text(c, s, cond, 1.15f, live ? LIVE_C : post ? DIMTXT : 0xFFC6CED8, x, y, Paint.Align.LEFT, .03f);
+        if (c != null) text(c, s, cond, 1.15f, live ? LIVE_C : post ? DIMTXT : SUB, x, y, Paint.Align.LEFT, .03f);
         x += measure(s, cond, 1.15f, .03f) + 1.7f * R;
-        if (c != null) { p.setColor(0xFF1C2430); c.drawRect(x - Math.max(1, .08f * R), 0, x, hh, p); }
+        if (c != null) { p.setColor(EDGE); c.drawRect(x - Math.max(1, .08f * R), 0, x, hh, p); }
         return x;
     }
     private void ribApply(Bitmap b) {
@@ -472,7 +478,7 @@ final class NativeSports extends FrameLayout {
 
     /** the games the tab (and league) picks, as the one row on screen */
     private void applySet(boolean smooth) {
-        if (tab.equals("Standings")) { standings.show(); standings.bringToFront(); chrome.bringToFront(); } else standings.hide();
+        if (tab.equals("Standings")) { standings.show(); order(); } else standings.hide();
         String curKey = curItem() != null ? curItem().optString("k").split(":")[0] : null;
         int idx = tab.equals("Live Now") ? liveIdx : tab.equals("My Teams") ? mineIdx : tab.equals("Fantasy") ? (off == 1 ? 0 : -1) : rail.rowOf(leagueSel);
         boolean same = idx == curSet;
@@ -509,21 +515,26 @@ final class NativeSports extends FrameLayout {
     }
     private void drawTabs() {
         tabRow.removeAllViews();
+        boolean air = GlassPanel.look.equals("air");
+        int hh = h.px(SportsLook.CTRL_H);
         for (int i = 0; i < tabs.size(); i++) {
             String t = tabs.get(i);
-            boolean sel = t.equals(tab), foc = sel && zone.equals("tabs");
-            TextView v = h.text(sel ? h.fSemi : h.fMed, 1.4f, sel ? (GlassPanel.look.equals("glass") || GlassPanel.look.equals("spot") ? 0xFF0A0E13 : GlassPanel.selText()) : 0xFFC6CED8);
-            if (GlassPanel.look.equals("air")) { v.setAllCaps(true); v.setLetterSpacing(.05f); }
+            boolean sel = t.equals(tab);
+            TextView v = h.text(h.fSemi, SportsLook.T_CTRL, SportsLook.ctrlText(sel));
+            if (air) { v.setAllCaps(true); v.setLetterSpacing(.05f); }
             v.setText(t);
-            v.setPadding(h.px(1.5f), h.px(.55f), h.px(1.5f), h.px(.55f));
-            GradientDrawable g = new GradientDrawable(); g.setCornerRadius(GlassPanel.corner(h.px(2))); g.setColor(sel ? GlassPanel.selFill() : 0x00000000);
-            if (foc) g.setStroke(Math.max(2, h.px(.18f)), GOLD);
-            else if (!sel) g.setStroke(Math.max(1, h.px(.08f)), 0xFF2A3442);
+            v.setGravity(Gravity.CENTER);
+            v.setPadding(h.px(SportsLook.CTRL_PAD), 0, h.px(SportsLook.CTRL_PAD), 0);
+            GradientDrawable g = new GradientDrawable(); g.setCornerRadius(SportsLook.ctrlRadius(hh)); g.setColor(sel ? GlassPanel.selFill() : 0x14FFFFFF);
+            if (!sel) g.setStroke(Math.max(1, h.px(.08f)), SportsLook.CHIP_EDGE);
             v.setBackground(g);
-            if (foc) { v.setScaleX(1.08f); v.setScaleY(1.08f); }
-            LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(LayoutParams.WRAP_CONTENT, LayoutParams.WRAP_CONTENT); lp.rightMargin = h.px(.8f);
+            LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(LayoutParams.WRAP_CONTENT, hh); lp.rightMargin = h.px(.8f);
             tabRow.addView(v, lp);
         }
+        standings.remote(!zone.equals("tabs"));
+        // (the ring goes round the tab once it has been laid out)
+        ringTries = 0;
+        removeCallbacks(ringLater); post(ringLater);
     }
     private float heroWidth;
     private String bgFor = "";
@@ -553,6 +564,36 @@ final class NativeSports extends FrameLayout {
     }
     /** a team colour taken down to a deep tone for the backdrop */
     private static int dark(int c) { float[] hsv = new float[3]; Color.colorToHSV(c, hsv); hsv[2] = Math.min(hsv[2], .38f); hsv[1] = Math.min(1f, hsv[1] * .9f); return Color.HSVToColor(hsv); }
+    /* Where each team stands ("2nd in AFC East", "1 GB"), from Standings' own tables: looked up here (the main
+       thread) for the teams about to be painted, read by the painter. Asking also fetches a league's tables when
+       they aren't here yet; the scoreboard and your-teams cards are painted again when they arrive. */
+    private final Map<String, String[]> places = new java.util.concurrent.ConcurrentHashMap<>();
+    /** looks up both teams of a game; returns what was found, as part of a picture's key */
+    private String placesOf(JSONObject g) {
+        JSONArray ts = g == null ? null : g.optJSONArray("teams");
+        if (ts == null || ts.length() != 2 || g.optBoolean("card") || g.optBoolean("fy")) return "";
+        String lg = g.optString("lg");
+        if (lg.isEmpty()) return "";
+        standings.want(lg);
+        StringBuilder b = new StringBuilder();
+        for (int i = 0; i < 2; i++) {
+            String id = ts.optJSONObject(i).optString("id");
+            String[] pl = standings.place(lg, id);
+            if (pl == null) places.remove(lg + ":" + id); else { places.put(lg + ":" + id, pl); b.append(pl[0]).append(pl[1]); }
+            b.append('/');
+        }
+        return b.toString();
+    }
+    /** a team's line under its name: its record and where it stands, as much as fits ("★" first for a team of yours) */
+    private String subLine(JSONObject g, JSONObject t, Typeface tf, float size, float maxW) {
+        String rec = t.optString("rec");
+        boolean fav = t.optBoolean("fav");
+        String[] pl = places.get(g.optString("lg") + ":" + t.optString("id"));
+        if (pl == null) return fav ? (rec.isEmpty() ? "★ YOUR TEAM" : rec + "  ·  ★ YOUR TEAM") : rec;
+        String a = (fav ? "★ " : "") + (rec.isEmpty() ? "" : rec + "  ·  ") + pl[0];
+        String b = pl[1].isEmpty() ? a : a + "  ·  " + pl[1];
+        return measure(b, tf, size, 0) <= maxW ? b : a;
+    }
     /** your starters in each game (ESPN's id → how many) */
     private final Map<String, Integer> playersIn = new HashMap<>();
 
@@ -585,7 +626,7 @@ final class NativeSports extends FrameLayout {
                 String sub = games > 0 ? "   " + games + " game" + (games == 1 ? "" : "s") + (live > 0 && live < games ? " · " + live + " live" : "") : "";
                 String tt = titles.get(i).toUpperCase(java.util.Locale.US);
                 android.text.SpannableString ss = new android.text.SpannableString(tt + sub);
-                if (!sub.isEmpty()) { ss.setSpan(new android.text.style.AbsoluteSizeSpan(Math.round(1.3f * R)), tt.length(), ss.length(), 0); ss.setSpan(new android.text.style.ForegroundColorSpan(0xFF9AA5B3), tt.length(), ss.length(), 0); }
+                if (!sub.isEmpty()) { ss.setSpan(new android.text.style.AbsoluteSizeSpan(Math.round(1.3f * R)), tt.length(), ss.length(), 0); ss.setSpan(new android.text.style.ForegroundColorSpan(TER), tt.length(), ss.length(), 0); }
                 t.setText(ss); t.setPadding(0, 0, h.px(.5f), 0);
                 row.addView(t, h.at(PAD, .4f, LayoutParams.WRAP_CONTENT, LayoutParams.WRAP_CONTENT));
             }
@@ -632,9 +673,7 @@ final class NativeSports extends FrameLayout {
 
     private void focus(boolean smooth) {
         if (zone.equals("side") && sideSel < sideItems.size() && sideItems.get(sideSel).game != null) featured = sideItems.get(sideSel).game;
-        heroRing.setVisibility(zone.equals("hero") ? VISIBLE : GONE);
-        placeSideRing();
-        if (rows.isEmpty()) { showHero(featured); paintBg(featured); return; }
+        if (rows.isEmpty()) { showHero(featured); paintBg(featured); placeRing(smooth); return; }
         float ty = -h.px(r * ROW_H);
         if (smooth) rowsIn.animate().translationY(ty).setDuration(360).setInterpolator(TileView.EASE).start(); else rowsIn.setTranslationY(ty);
         int c = col(r);
@@ -652,20 +691,57 @@ final class NativeSports extends FrameLayout {
             if (focused != null) focused.setFocus(false, true);
             focused = v;
             if (v != null) v.setFocus(true, smooth);
-            placeGlow(smooth);
         }
+        placeRing(smooth);
         main().removeCallbacks(heroLater);
         main().postDelayed(heroLater, smooth ? 120 : 0);
         rail.invalidate();
     }
-    /** the ring round the team you're on in the your-teams column */
-    private void placeSideRing() {
-        if (!zone.equals("side") || sideItems.isEmpty() || side.getVisibility() != VISIBLE) { sideRing.setVisibility(GONE); return; }
-        float[] cr = sideCard(sideSel);
-        LayoutParams lp = (LayoutParams) sideRing.getLayoutParams();
-        lp.topMargin = h.px(sideY + cr[0]); lp.height = h.px(cr[1]);
-        sideRing.setLayoutParams(lp);
-        sideRing.setVisibility(VISIBLE);
+    /** what's above what: Standings over the scoreboard and the games, the strip and tabs over that, the ring over all */
+    private void order() {
+        if (standings != null && standings.shownNow()) standings.bringToFront();
+        chrome.bringToFront();
+        ring.bringToFront();
+    }
+    private int ringTries;
+    private final Runnable ringLater = new Runnable() { @Override public void run() { placeRing(true); } };
+    /** a game's glow: the home team's colour (orange while it's live) */
+    private static int gameGlow(JSONObject g) {
+        if (g == null) return GOLD;
+        if ("in".equals(g.optString("state"))) return LIVE_C;
+        JSONArray ts = g.optJSONArray("teams");
+        if (ts != null && ts.length() == 2 && !ts.optJSONObject(1).optString("color").isEmpty()) return SportsLook.glowColor(parse(ts.optJSONObject(1).optString("color"), GOLD));
+        return GOLD;
+    }
+    /** the ring and glow round what the remote is on: a tab, the scoreboard, one of your teams, a league, a game */
+    private void placeRing(boolean smooth) {
+        RectF to = null; float rad = 0; int col = GOLD; boolean ctl = false;
+        if (zone.equals("tabs")) {
+            int i = tabs.indexOf(tab);
+            View v = chromeOn && i >= 0 && i < tabRow.getChildCount() ? tabRow.getChildAt(i) : null;
+            if (v != null && v.getWidth() > 0 && !v.isLayoutRequested()) {
+                float x = tline.getLeft() + tabRow.getLeft() + v.getLeft(), y = tline.getTop() + tabRow.getTop() + v.getTop();
+                to = new RectF(x, y, x + v.getWidth(), y + v.getHeight()); rad = SportsLook.ctrlRadius(v.getHeight()); ctl = true;
+            } else if (v != null && ringTries++ < 4) { removeCallbacks(ringLater); postDelayed(ringLater, 30); return; }
+        } else if (tab.equals("Standings")) {
+            // (Standings shows its own)
+        } else if (zone.equals("hero") && featured != null && heroWidth > 0) {
+            to = new RectF(h.px(PAD), h.px(HERO_Y), h.px(PAD) + h.px(heroWidth), h.px(HERO_Y) + h.px(HERO_H)); rad = 2.2f * R; col = gameGlow(featured);
+        } else if (zone.equals("side") && sideSel < sideItems.size() && side.getVisibility() == VISIBLE) {
+            float[] cr = sideCard(sideSel);
+            Side sd = sideItems.get(sideSel);
+            float x = h.px(SW - PAD - SIDE_W), y = h.px(sideY + cr[0]);
+            to = new RectF(x, y, x + h.px(SIDE_W), y + h.px(cr[1])); rad = 1.4f * R;
+            col = sd.game != null && "in".equals(sd.game.optString("state")) ? LIVE_C : sd.kind.equals("team") ? SportsLook.glowColor(teamCol(sd.team, GOLD)) : sd.kind.equals("fy") ? 0xFF8E7BFF : GOLD;
+        } else if (zone.equals("rail") && rail.getVisibility() == VISIBLE) {
+            RectF cr = rail.chipAt(leagueSel);
+            if (cr != null) { to = new RectF(cr); to.offset(0, h.px(RAIL_Y)); rad = SportsLook.ctrlRadius(cr.height()); ctl = true; }
+        } else if (zone.equals("grid") && focused != null && focused.getParent() != null) {
+            float x = h.px(PAD + col(r) * (CW + GAP)) - h.px(scroll(r)), y = h.px(ROWS_Y) + h.px(3.4f) + h.px(.6f);
+            float w = h.px(CW), hh = h.px(CH), gx = w * .03f, gy = hh * .03f;       // (the card you're on is drawn 6% larger)
+            to = new RectF(x - gx, y - gy, x + w + gx, y + hh + gy); rad = 1.6f * R * 1.06f; col = gameGlow(focused.item);
+        }
+        if (to == null) ring.off(smooth); else ring.to(to, rad, col, ctl, smooth);
     }
     private final Runnable heroLater = new Runnable() { @Override public void run() {
         JSONObject cur = curItem();
@@ -675,40 +751,6 @@ final class NativeSports extends FrameLayout {
         paintBg(show);
     } };
     private android.os.Handler main() { return h.main; }
-
-    private void placeGlow(boolean smooth) {
-        if (glow.getParent() != null) ((FrameLayout) glow.getParent()).removeView(glow);
-        if (focused == null || focused.getParent() == null) return;
-        JSONObject it = focused.item;
-        int col = 0xFF34C759;
-        JSONArray ts = it.optJSONArray("teams");
-        if (ts != null && ts.length() == 2 && !ts.optJSONObject(1).optString("color").isEmpty()) col = parse(ts.optJSONObject(1).optString("color"), col);
-        if (it.optString("state").equals("in")) col = LIVE_C;
-        glow.setBackground(new android.graphics.drawable.BitmapDrawable(getResources(), glowBmp()));
-        glow.getBackground().setColorFilter(new android.graphics.PorterDuffColorFilter(col, android.graphics.PorterDuff.Mode.SRC_IN));
-        FrameLayout strip = (FrameLayout) focused.getParent();
-        LayoutParams fl = (LayoutParams) focused.getLayoutParams();
-        int m = h.px(3.4f);
-        LayoutParams gl = new LayoutParams(h.px(CW) + 2 * m, h.px(CH) + 2 * m);
-        gl.leftMargin = fl.leftMargin - m; gl.topMargin = fl.topMargin - m;
-        strip.addView(glow, strip.indexOfChild(focused), gl);
-        glow.setScaleX(1.06f); glow.setScaleY(1.06f);
-        glow.animate().cancel();
-        if (smooth) { glow.setAlpha(0f); glow.animate().alpha(.75f).setDuration(220).start(); } else glow.setAlpha(.75f);
-    }
-    private Bitmap glowCache;
-    private Bitmap glowBmp() {
-        if (glowCache != null) return glowCache;
-        int m = h.px(3.4f), w = h.px(CW), hh = h.px(CH);
-        Bitmap b = Bitmap.createBitmap(w + 2 * m, hh + 2 * m, Bitmap.Config.ARGB_8888);
-        Canvas c = new Canvas(b);
-        Paint p = new Paint(Paint.ANTI_ALIAS_FLAG);
-        p.setColor(Color.WHITE);
-        p.setMaskFilter(new BlurMaskFilter(1.6f * R, BlurMaskFilter.Blur.OUTER));
-        c.drawRoundRect(new RectF(m, m, m + w, m + hh), 1.6f * R, 1.6f * R, p);
-        glowCache = b;
-        return b;
-    }
 
     // ================================================================== keys
 
@@ -805,7 +847,7 @@ final class NativeSports extends FrameLayout {
     void ok() {
         if (tab.equals("Standings")) { if (zone.equals("tabs")) { zone = "grid"; drawTabs(); standings.focusIn(); } else standings.ok(); return; }
         if (zone.equals("tabs") || zone.equals("rail")) { zone = "grid"; drawTabs(); focus(true); rail.invalidate(); return; }
-        if (zone.equals("hero")) { openGame(featured); return; }
+        if (zone.equals("hero")) { openPage(featured); return; }
         if (zone.equals("side")) { sideOk(); return; }
         if (focused != null) focused.animate().scaleX(1.02f).scaleY(1.02f).setDuration(90).withEndAction(new Runnable() { @Override public void run() {
             if (focused != null) focused.animate().scaleX(1.06f).scaleY(1.06f).setDuration(180).setInterpolator(TileView.EASE).start();
@@ -826,7 +868,21 @@ final class NativeSports extends FrameLayout {
             tab = "Fantasy"; zone = "grid"; applySet(true);
         } else h.page("spPickOpen()");
     }
-    /** the scoreboard's game: its menu (watch on your channel, remind me…) */
+    /** OK on the scoreboard: the game's own page grows out of it, with what its menu offered (watch on your channel,
+        remind me…) as buttons on the page */
+    private void openPage(JSONObject g) {
+        if (g == null) return;
+        String id = g.optString("k").split(":")[0];
+        for (int k = off; k < allRows.size(); k++) { JSONArray a = allRows.get(k); for (int i = 0; i < a.length(); i++) if (a.optJSONObject(i).optString("k").split(":")[0].equals(id)) {
+            int[] me = new int[2], host = new int[2];
+            getLocationInWindow(me); h.getLocationInWindow(host);
+            float x = me[0] - host[0] + h.px(PAD), y = me[1] - host[1] + h.px(HERO_Y);
+            h.sportsData().openPage(k - off, i, new RectF(x, y, x + h.px(heroWidth), y + h.px(HERO_H)));
+            return;
+        } }
+        if (g.optBoolean("fy")) fyOk(g);
+    }
+    /** a game's menu (watch on your channel, remind me…) */
     private void openGame(JSONObject g) {
         if (g == null) return;
         String id = g.optString("k").split(":")[0];
@@ -894,8 +950,6 @@ final class NativeSports extends FrameLayout {
         void setFocus(boolean f, boolean smooth) {
             float s = f ? 1.06f : 1f;
             if (smooth) animate().scaleX(s).scaleY(s).setDuration(220).setInterpolator(TileView.EASE).start(); else { setScaleX(s); setScaleY(s); }
-            if (f) { GradientDrawable rg = new GradientDrawable(); rg.setCornerRadius(1.6f * R); rg.setStroke(Math.max(2, h.px(.16f)), Color.WHITE); setForeground(rg); }
-            else setForeground(null);
             setZ(f ? 3 : 0);
             setElevation(f ? 1.4f * R : 0);
             setOutlineProvider(new android.view.ViewOutlineProvider() { @Override public void getOutline(View v, android.graphics.Outline o) { o.setRoundRect(0, 0, v.getWidth(), v.getHeight(), 1.6f * R); } });
@@ -1035,7 +1089,7 @@ final class NativeSports extends FrameLayout {
             p.setPathEffect(new android.graphics.DashPathEffect(new float[] { .6f * R, .4f * R }, 0));
             c.drawRoundRect(new RectF(.4f * R, .4f * R, w - .4f * R, hh - .4f * R), 1.3f * R, 1.3f * R, p);
             p.setPathEffect(null); p.setStyle(Paint.Style.FILL);
-            text(c, "+", h.fReg, 3.4f, 0xFFA8FF60, w / 2f, hh / 2f - .2f * R, Paint.Align.CENTER, 0);
+            text(c, "+", h.fReg, 3.4f, GREEN, w / 2f, hh / 2f - .2f * R, Paint.Align.CENTER, 0);
             text(c, it.optString("label"), h.fSemi, 1.2f, Color.WHITE, w / 2f, hh / 2f + 2.2f * R, Paint.Align.CENTER, 0);
             out.setHasAlpha(false);
             return out;
@@ -1084,11 +1138,11 @@ final class NativeSports extends FrameLayout {
             String nm = (t.optInt("rank") > 0 ? "#" + t.optInt("rank") + " " : "") + t.optString("name");
             float nmW = w - px - nx - rw - (t.optBoolean("fav") ? 1.5f * R : 0) - (poss == i ? 1.4f * R : 0);
             String shown = ellip(nm, cond, 1.75f, nmW);
-            text(c, shown, cond, 1.75f, dim ? 0xFFAEB8C4 : Color.WHITE, nx, cy + .62f * R, Paint.Align.LEFT, 0);
+            text(c, shown, cond, 1.75f, dim ? SUB : Color.WHITE, nx, cy + .62f * R, Paint.Align.LEFT, 0);
             float ex = nx + measure(shown, cond, 1.75f, 0) + .5f * R;
             if (poss == i) { football(c, p, ex + .55f * R, cy, .55f * R); ex += 1.4f * R; }
             if (t.optBoolean("fav")) text(c, "★", h.fSemi, 1.1f, GOLD, ex, cy + .5f * R, Paint.Align.LEFT, 0);
-            if (!right.isEmpty()) text(c, right, rf, rs, showScore ? (dim ? 0xFFAEB8C4 : Color.WHITE) : right.equals("W") ? GOLD : DIMTXT, w - px, cy + (showScore ? .85f : .45f) * R, Paint.Align.RIGHT, 0);
+            if (!right.isEmpty()) text(c, right, rf, rs, showScore ? (dim ? SUB : Color.WHITE) : right.equals("W") ? GOLD : DIMTXT, w - px, cy + (showScore ? .85f : .45f) * R, Paint.Align.RIGHT, 0);
         }
         // foot: the down and distance / the count while it's on, else where to watch (green when it's one of your channels); your fantasy players in it
         String foot;
@@ -1109,7 +1163,7 @@ final class NativeSports extends FrameLayout {
             boolean on = tvLine && it.optBoolean("tvOn");
             float fx = px;
             if (tvLine) {
-                p.setStyle(Paint.Style.STROKE); p.setStrokeWidth(.14f * R); p.setColor(on ? 0xFFA8FF60 : DIMTXT);
+                p.setStyle(Paint.Style.STROKE); p.setStrokeWidth(.14f * R); p.setColor(on ? GREEN : DIMTXT);
                 c.drawRoundRect(new RectF(px, by - 1.05f * R, px + 1.3f * R, by - .2f * R), .25f * R, .25f * R, p);
                 c.drawLine(px + .35f * R, by + .1f * R, px + .95f * R, by + .1f * R, p);
                 p.setStyle(Paint.Style.FILL);
@@ -1117,7 +1171,7 @@ final class NativeSports extends FrameLayout {
             }
             boolean sit = live && !tvLine;
             Typeface ff = sit ? cond : on ? h.fSemi : h.fReg;
-            int fc = sit ? (it.optBoolean("red") ? LIVE_C : 0xFFE6EBF1) : on ? 0xFFA8FF60 : DIMTXT;
+            int fc = sit ? (it.optBoolean("red") ? LIVE_C : SOFT) : on ? GREEN : DIMTXT;
             text(c, ellip(sit ? foot.toUpperCase(java.util.Locale.US) : foot, ff, sit ? 1.2f : 1.1f, w - fx - px - starW), ff, sit ? 1.2f : 1.1f, fc, fx, by, Paint.Align.LEFT, sit ? .03f : 0);
         }
         out.setHasAlpha(false);
@@ -1175,8 +1229,8 @@ final class NativeSports extends FrameLayout {
         if (live) {
             float cw0 = measure("LIVE", heavy, 1.15f, .1f) + 2.6f * R;
             p.setColor(LIVE_C); c.drawRoundRect(new RectF(px, 1.45f * R, px + cw0, 3.75f * R), .45f * R, .45f * R, p);
-            p.setColor(0xFF160400); c.drawCircle(px + 1f * R, 2.6f * R, .32f * R, p);
-            text(c, "LIVE", heavy, 1.15f, 0xFF160400, px + 1.7f * R, 3.05f * R, Paint.Align.LEFT, .1f);
+            p.setColor(SportsLook.ON_LIVE); c.drawCircle(px + 1f * R, 2.6f * R, .32f * R, p);
+            text(c, "LIVE", heavy, 1.15f, SportsLook.ON_LIVE, px + 1.7f * R, 3.05f * R, Paint.Align.LEFT, .1f);
             tx += cw0 + 1.1f * R;
         }
         String tv = it.optString("tv");
@@ -1200,7 +1254,7 @@ final class NativeSports extends FrameLayout {
         if (it.optInt("week") > 0) top.append(" · Week ").append(it.optInt("week"));
         if (!it.optString("note").isEmpty()) top.append(" · ").append(it.optString("note"));
         if (!it.optString("venue").isEmpty()) top.append(" · ").append(it.optString("venue"));
-        text(c, ellip(top.toString().toUpperCase(java.util.Locale.US), cond, 1.3f, w - tx - px - ww), cond, 1.3f, 0xFFE6EBF1, tx, 3.05f * R, Paint.Align.LEFT, .08f);
+        text(c, ellip(top.toString().toUpperCase(java.util.Locale.US), cond, 1.3f, w - tx - px - ww), cond, 1.3f, SOFT, tx, 3.05f * R, Paint.Align.LEFT, .08f);
 
         // the teams: logo, name (ranked, a star for yours), record
         float ld = 7f * R, ly = 5.4f * R;
@@ -1233,18 +1287,17 @@ final class NativeSports extends FrameLayout {
             float ns = measure(nm, heavy, 2.7f, .01f) > nmax ? 2.2f : 2.7f;
             float nx = left ? px : w - px;
             Paint.Align al = left ? Paint.Align.LEFT : Paint.Align.RIGHT;
-            text(c, ellip(nm, heavy, ns, nmax), heavy, ns, dim ? 0xFFC9D1DA : Color.WHITE, nx, ly + ld + 2.75f * R, al, .01f);
-            String sub = t.optString("rec");
-            if (t.optBoolean("fav")) sub = sub.isEmpty() ? "★ YOUR TEAM" : sub + "  ·  ★ YOUR TEAM";
-            if (!sub.isEmpty()) text(c, ellip(sub, h.fMed, 1.3f, nmax), h.fMed, 1.3f, t.optBoolean("fav") ? 0xFFFFD873 : 0xFFDCE3EA, nx, ly + ld + 4.75f * R, al, 0);
+            text(c, ellip(nm, heavy, ns, nmax), heavy, ns, dim ? SUB : Color.WHITE, nx, ly + ld + 2.75f * R, al, .01f);
+            String sub = subLine(it, t, h.fMed, 1.3f, nmax);
+            if (!sub.isEmpty()) text(c, ellip(sub, h.fMed, 1.3f, nmax), h.fMed, 1.3f, t.optBoolean("fav") ? GOLD : SOFT, nx, ly + ld + 4.75f * R, al, 0);
         }
         // the middle: the scores and the clock, the start time, or VS
         float sy = 14.4f * R;
         if (scores) {
             boolean w0 = post && ts.optJSONObject(0).optBoolean("winner"), w1 = post && ts.optJSONObject(1).optBoolean("winner");
             boolean d0 = (post && !w0) || (live && !lead(ts, 0)), d1 = (post && !w1) || (live && !lead(ts, 1));
-            text(c, s0, heavy, ss, d0 ? 0xFFC9D1DA : Color.WHITE, cx - gapC, sy, Paint.Align.RIGHT, -.02f);
-            text(c, s1, heavy, ss, d1 ? 0xFFC9D1DA : Color.WHITE, cx + gapC, sy, Paint.Align.LEFT, -.02f);
+            text(c, s0, heavy, ss, d0 ? SUB : Color.WHITE, cx - gapC, sy, Paint.Align.RIGHT, -.02f);
+            text(c, s1, heavy, ss, d1 ? SUB : Color.WHITE, cx + gapC, sy, Paint.Align.LEFT, -.02f);
             float sh = ss * R * .36f;
             if (poss == 0) football(c, p, cx - gapC - scoreW - 1.6f * R, sy - sh, .75f * R);
             if (poss == 1) football(c, p, cx + gapC + scoreW + 1.6f * R, sy - sh, .75f * R);
@@ -1266,7 +1319,7 @@ final class NativeSports extends FrameLayout {
             String when = it.optString("when");
             int spc = when.indexOf(' ');
             String day = spc > 0 && !Character.isDigit(when.charAt(0)) ? when.substring(0, spc) : "", time = spc > 0 && !day.isEmpty() ? when.substring(spc + 1) : when;
-            if (!day.isEmpty()) text(c, day.toUpperCase(java.util.Locale.US), cond, 1.5f, 0xFFDCE3EA, cx, sy - 6.4f * R, Paint.Align.CENTER, .12f);
+            if (!day.isEmpty()) text(c, day.toUpperCase(java.util.Locale.US), cond, 1.5f, SOFT, cx, sy - 6.4f * R, Paint.Align.CENTER, .12f);
             float tz = measure(time, heavy, 3.6f, 0) > 2 * 9 * R ? 2.4f : 3.6f;
             text(c, time, heavy, tz, Color.WHITE, cx, sy - 2.8f * R, Paint.Align.CENTER, 0);
         }
@@ -1289,7 +1342,7 @@ final class NativeSports extends FrameLayout {
             String spot = it.optString("spot");
             String who = poss == 0 ? a0 : poss == 1 ? a1 : "";
             String sl = (red ? "RED ZONE · " : "") + (who.isEmpty() ? "" : who + " ball") + (spot.isEmpty() ? "" : (who.isEmpty() ? "Ball on " : " on ") + spot);
-            text(c, ellip(sl, h.fMed, 1.2f, c1w), h.fMed, 1.2f, red ? 0xFFFFB4A1 : 0xFFAEB8C4, px, bandY + 5.6f * R, Paint.Align.LEFT, 0);
+            text(c, ellip(sl, h.fMed, 1.2f, c1w), h.fMed, 1.2f, red ? 0xFFFFB4A1 : SUB, px, bandY + 5.6f * R, Paint.Align.LEFT, 0);
             drawField(c, p, it, cs, x2, bandY + 1.5f * R, x2e - x2, 2.6f * R);
             if (hw >= 0) winLine(c, x2, x2e, bandY + 5.9f * R, a0, a1, hw, false, cs, p);
         } else if (live && it.has("outs")) {
@@ -1302,28 +1355,28 @@ final class NativeSports extends FrameLayout {
                 Path dia = new Path(); float q = .85f * R;
                 dia.moveTo(bx, byy - q); dia.lineTo(bx + q, byy); dia.lineTo(bx, byy + q); dia.lineTo(bx - q, byy); dia.close();
                 if (onb) { p.setColor(GOLD); c.drawPath(dia, p); }
-                else { p.setStyle(Paint.Style.STROKE); p.setStrokeWidth(Math.max(1, .14f * R)); p.setColor(0xFF5B6675); c.drawPath(dia, p); p.setStyle(Paint.Style.FILL); }
+                else { p.setStyle(Paint.Style.STROKE); p.setStrokeWidth(Math.max(1, .14f * R)); p.setColor(FAINT); c.drawPath(dia, p); p.setStyle(Paint.Style.FILL); }
             }
             int outs = it.optInt("outs");
             text(c, it.optInt("balls") + "–" + it.optInt("strikes"), heavy, 2.5f, Color.WHITE, px + 5.6f * R, bandY + 3.4f * R, Paint.Align.LEFT, 0);
-            text(c, outs + (outs == 1 ? " OUT" : " OUTS"), cond, 1.35f, 0xFFAEB8C4, px + 5.6f * R, bandY + 5.5f * R, Paint.Align.LEFT, .06f);
+            text(c, outs + (outs == 1 ? " OUT" : " OUTS"), cond, 1.35f, SUB, px + 5.6f * R, bandY + 5.5f * R, Paint.Align.LEFT, .06f);
             String ab = it.optString("batter"), pi = it.optString("pitcher");
             if (!ab.isEmpty()) labelled(c, "AT BAT", ab, x2, bandY + 3.1f * R, x2e - x2);
             if (!pi.isEmpty()) labelled(c, "PITCHING", pi, x2, bandY + 5.6f * R, x2e - x2);
         } else if (live) {
             String clk = (it.optString("per") + " " + it.optString("clock")).trim();
             text(c, ellip(clk.isEmpty() ? "LIVE" : clk, heavy, 2.7f, c1w), heavy, 2.7f, Color.WHITE, px, bandY + 3.5f * R, Paint.Align.LEFT, 0);
-            text(c, ellip(it.optString("lgName"), h.fMed, 1.2f, c1w), h.fMed, 1.2f, 0xFFAEB8C4, px, bandY + 5.6f * R, Paint.Align.LEFT, 0);
+            text(c, ellip(it.optString("lgName"), h.fMed, 1.2f, c1w), h.fMed, 1.2f, SUB, px, bandY + 5.6f * R, Paint.Align.LEFT, 0);
             if (hw >= 0) winLine(c, x2, x2e, bandY + 4.4f * R, a0, a1, hw, true, cs, p);
             else if (!fyNote.isEmpty()) { text(c, ellip(fyNote, h.fSemi, 1.25f, x2e - x2), h.fSemi, 1.25f, GOLD, x2, bandY + 4.3f * R, Paint.Align.LEFT, 0); fyNote = ""; }
-            else if (fight && !it.optString("extra").isEmpty()) text(c, ellip(it.optString("extra"), h.fMed, 1.25f, x2e - x2), h.fMed, 1.25f, 0xFFDCE3EA, x2, bandY + 4.3f * R, Paint.Align.LEFT, 0);
+            else if (fight && !it.optString("extra").isEmpty()) text(c, ellip(it.optString("extra"), h.fMed, 1.25f, x2e - x2), h.fMed, 1.25f, SOFT, x2, bandY + 4.3f * R, Paint.Align.LEFT, 0);
         } else if (post) {
             text(c, it.optString("per").isEmpty() ? "FINAL" : it.optString("per"), heavy, 2.7f, Color.WHITE, px, bandY + 3.5f * R, Paint.Align.LEFT, 0);
             JSONObject wt = ts.optJSONObject(0).optBoolean("winner") ? ts.optJSONObject(0) : ts.optJSONObject(1).optBoolean("winner") ? ts.optJSONObject(1) : null;
-            if (wt != null) text(c, ellip(wt.optString("name") + " win", h.fMed, 1.2f, c1w), h.fMed, 1.2f, 0xFFAEB8C4, px, bandY + 5.6f * R, Paint.Align.LEFT, 0);
+            if (wt != null) text(c, ellip(wt.optString("name") + " win", h.fMed, 1.2f, c1w), h.fMed, 1.2f, SUB, px, bandY + 5.6f * R, Paint.Align.LEFT, 0);
             String hl = it.optString("headline");
-            if (!hl.isEmpty()) { label(c, "RECAP", x2, bandY + 2.3f * R); wrap(c, hl, h.fMed, 1.25f, 0xFFE6EBF1, x2, bandY + 2.9f * R, x2e - x2, 2); }
-            else if (fight && !it.optString("extra").isEmpty()) wrap(c, it.optString("extra"), h.fMed, 1.25f, 0xFFE6EBF1, x2, bandY + 2.9f * R, x2e - x2, 2);
+            if (!hl.isEmpty()) { label(c, "RECAP", x2, bandY + 2.3f * R); wrap(c, hl, h.fMed, 1.25f, SOFT, x2, bandY + 2.9f * R, x2e - x2, 2); }
+            else if (fight && !it.optString("extra").isEmpty()) wrap(c, it.optString("extra"), h.fMed, 1.25f, SOFT, x2, bandY + 2.9f * R, x2e - x2, 2);
         } else {
             // before the game: the start, the line, the venue
             String word = sport.equals("baseball") ? "FIRST PITCH" : sport.equals("hockey") ? "PUCK DROP" : sport.equals("basketball") ? "TIP-OFF" : fight ? "MAIN CARD" : "KICKOFF";
@@ -1337,12 +1390,12 @@ final class NativeSports extends FrameLayout {
         }
         // the right of the band: the last play, else where to watch / your fantasy players
         String last = it.optString("last");
-        if (live && !last.isEmpty()) { label(c, "LAST PLAY", c3x, bandY + 2.3f * R); wrap(c, last, h.fMed, 1.2f, 0xFFD5DCE4, c3x, bandY + 2.8f * R, c3w, 3); }
-        else if (!fyNote.isEmpty()) { label(c, "FANTASY", c3x, bandY + 2.3f * R); wrap(c, fyNote, h.fSemi, 1.2f, 0xFFFFD873, c3x, bandY + 2.8f * R, c3w, 2); }
+        if (live && !last.isEmpty()) { label(c, "LAST PLAY", c3x, bandY + 2.3f * R); wrap(c, last, h.fMed, 1.2f, SOFT, c3x, bandY + 2.8f * R, c3w, 3); }
+        else if (!fyNote.isEmpty()) { label(c, "FANTASY", c3x, bandY + 2.3f * R); wrap(c, fyNote, h.fSemi, 1.2f, GOLD, c3x, bandY + 2.8f * R, c3w, 2); }
         else if (!post) {
             label(c, "WATCH", c3x, bandY + 2.3f * R);
             String wt = tv.isEmpty() ? "No TV listing yet" : on ? tv + " · on your channels" : tv;
-            wrap(c, wt, on ? h.fSemi : h.fMed, 1.25f, on ? 0xFFA8FF60 : 0xFFD5DCE4, c3x, bandY + 2.8f * R, c3w, 2);
+            wrap(c, wt, on ? h.fSemi : h.fMed, 1.25f, on ? GREEN : SOFT, c3x, bandY + 2.8f * R, c3w, 2);
         }
         return out;
     }
@@ -1371,8 +1424,8 @@ final class NativeSports extends FrameLayout {
         if (live) {
             float cw0 = measure("LIVE", heavy, 1.05f, .1f) + 2.4f * R;
             p.setColor(LIVE_C); c.drawRoundRect(new RectF(px, 1.2f * R, px + cw0, 3.3f * R), .45f * R, .45f * R, p);
-            p.setColor(0xFF160400); c.drawCircle(px + .95f * R, 2.25f * R, .3f * R, p);
-            text(c, "LIVE", heavy, 1.05f, 0xFF160400, px + 1.6f * R, 2.65f * R, Paint.Align.LEFT, .1f);
+            p.setColor(SportsLook.ON_LIVE); c.drawCircle(px + .95f * R, 2.25f * R, .3f * R, p);
+            text(c, "LIVE", heavy, 1.05f, SportsLook.ON_LIVE, px + 1.6f * R, 2.65f * R, Paint.Align.LEFT, .1f);
             tx += cw0 + 1f * R;
         }
         String clock = live ? (it.optString("per") + "  " + it.optString("clock")).trim() : post ? (it.optString("per").isEmpty() ? "FINAL" : it.optString("per")) : it.optString("when").toUpperCase(java.util.Locale.US);
@@ -1382,7 +1435,7 @@ final class NativeSports extends FrameLayout {
         StringBuilder top = new StringBuilder(it.optString("lgName"));
         if (it.optInt("week") > 0) top.append(" · Week ").append(it.optInt("week"));
         if (!it.optString("note").isEmpty()) top.append(" · ").append(it.optString("note"));
-        text(c, ellip(top.toString().toUpperCase(java.util.Locale.US), cond, 1.15f, w - tx - px - clw - 1.5f * R), cond, 1.15f, 0xFFE6EBF1, tx, 2.75f * R, Paint.Align.LEFT, .08f);
+        text(c, ellip(top.toString().toUpperCase(java.util.Locale.US), cond, 1.15f, w - tx - px - clw - 1.5f * R), cond, 1.15f, SOFT, tx, 2.75f * R, Paint.Align.LEFT, .08f);
         // the teams, one above the other
         int poss = it.optInt("poss", -1);
         String s0 = ts.optJSONObject(0).optString("score"), s1 = ts.optJSONObject(1).optString("score");
@@ -1399,15 +1452,15 @@ final class NativeSports extends FrameLayout {
             } else text(c, abbr(t).toUpperCase(java.util.Locale.US), heavy, 1.5f, cs[i], px + d / 2, cy + .55f * R, Paint.Align.CENTER, 0);
             String sc = scores ? t.optString("score") : "";
             float scW = sc.isEmpty() ? 0 : measure(sc, heavy, 4.6f, -.02f);
-            if (!sc.isEmpty()) text(c, sc, heavy, 4.6f, dim ? 0xFFC9D1DA : Color.WHITE, w - px, cy + 1.65f * R, Paint.Align.RIGHT, -.02f);
+            if (!sc.isEmpty()) text(c, sc, heavy, 4.6f, dim ? SUB : Color.WHITE, w - px, cy + 1.65f * R, Paint.Align.RIGHT, -.02f);
             if (poss == i) football(c, p, w - px - scW - 1.6f * R, cy, .7f * R);
             if (post && t.optBoolean("winner")) { Path tri = new Path(); float ax = w - px - scW - 1.2f * R; tri.moveTo(ax, cy - .7f * R); tri.lineTo(ax, cy + .7f * R); tri.lineTo(ax - .9f * R, cy); tri.close(); p.setColor(GOLD); c.drawPath(tri, p); }
             float nx = px + d + 1.3f * R, nmax = w - nx - px - scW - 3f * R;
             String nm = ((t.optInt("rank") > 0 ? "#" + t.optInt("rank") + " " : "") + t.optString(fight ? "full" : "name")).toUpperCase(java.util.Locale.US);
             float ns = measure(nm, heavy, 2.3f, .01f) > nmax ? 1.8f : 2.3f;
-            text(c, ellip(nm, heavy, ns, nmax), heavy, ns, dim ? 0xFFC9D1DA : Color.WHITE, nx, cy + .15f * R, Paint.Align.LEFT, .01f);
+            text(c, ellip(nm, heavy, ns, nmax), heavy, ns, dim ? SUB : Color.WHITE, nx, cy + .15f * R, Paint.Align.LEFT, .01f);
             String sub = t.optString("rec") + (t.optBoolean("fav") ? (t.optString("rec").isEmpty() ? "" : "  ·  ") + "★ YOUR TEAM" : "");
-            if (!sub.isEmpty()) text(c, ellip(sub, h.fMed, 1.15f, nmax), h.fMed, 1.15f, t.optBoolean("fav") ? 0xFFFFD873 : 0xFFDCE3EA, nx, cy + 2f * R, Paint.Align.LEFT, 0);
+            if (!sub.isEmpty()) text(c, ellip(sub, h.fMed, 1.15f, nmax), h.fMed, 1.15f, t.optBoolean("fav") ? GOLD : SOFT, nx, cy + 2f * R, Paint.Align.LEFT, 0);
         }
         // the band: what's happening, stacked
         p.setColor(0xE6030508); c.drawRect(0, bandY, w, hh, p);
@@ -1424,7 +1477,7 @@ final class NativeSports extends FrameLayout {
             String who = poss == 0 ? a0 : poss == 1 ? a1 : "", spot = it.optString("spot");
             String sl = (red ? "RED ZONE · " : "") + (who.isEmpty() ? "" : who + " ball") + (spot.isEmpty() ? "" : (who.isEmpty() ? "Ball on " : " on ") + spot);
             float dw0 = measure(dn.isEmpty() ? "LIVE" : dn, heavy, 2.1f, 0) + 1.2f * R;
-            text(c, ellip(sl, h.fMed, 1.1f, bw - dw0), h.fMed, 1.1f, red ? 0xFFFFB4A1 : 0xFFAEB8C4, px + dw0, y1 - .1f * R, Paint.Align.LEFT, 0);
+            text(c, ellip(sl, h.fMed, 1.1f, bw - dw0), h.fMed, 1.1f, red ? 0xFFFFB4A1 : SUB, px + dw0, y1 - .1f * R, Paint.Align.LEFT, 0);
             drawField(c, p, it, cs, px, y2 - .2f * R, bw, 1.9f * R);
             if (hw >= 0) winLine(c, px, w - px, y2 + 3.6f * R, a0, a1, hw, false, cs, p);
             usedSecond = true;
@@ -1437,7 +1490,7 @@ final class NativeSports extends FrameLayout {
                 Path dia = new Path(); float q = .7f * R;
                 dia.moveTo(bx, byy - q); dia.lineTo(bx + q, byy); dia.lineTo(bx, byy + q); dia.lineTo(bx - q, byy); dia.close();
                 if (onb) { p.setColor(GOLD); c.drawPath(dia, p); }
-                else { p.setStyle(Paint.Style.STROKE); p.setStrokeWidth(Math.max(1, .12f * R)); p.setColor(0xFF5B6675); c.drawPath(dia, p); p.setStyle(Paint.Style.FILL); }
+                else { p.setStyle(Paint.Style.STROKE); p.setStrokeWidth(Math.max(1, .12f * R)); p.setColor(FAINT); c.drawPath(dia, p); p.setStyle(Paint.Style.FILL); }
             }
             int outs = it.optInt("outs");
             text(c, it.optInt("balls") + "–" + it.optInt("strikes") + "  ·  " + outs + (outs == 1 ? " OUT" : " OUTS"), heavy, 1.8f, Color.WHITE, px + 4.4f * R, y1, Paint.Align.LEFT, 0);
@@ -1446,12 +1499,12 @@ final class NativeSports extends FrameLayout {
             usedSecond = true;
         } else if (live) {
             if (hw >= 0) { winLine(c, px, w - px, y1, a0, a1, hw, true, cs, p); usedSecond = true; }
-            else if (fight && !it.optString("extra").isEmpty()) text(c, ellip(it.optString("extra"), h.fMed, 1.2f, bw), h.fMed, 1.2f, 0xFFDCE3EA, px, y1, Paint.Align.LEFT, 0);
+            else if (fight && !it.optString("extra").isEmpty()) text(c, ellip(it.optString("extra"), h.fMed, 1.2f, bw), h.fMed, 1.2f, SOFT, px, y1, Paint.Align.LEFT, 0);
         } else if (post) {
             JSONObject wt = ts.optJSONObject(0).optBoolean("winner") ? ts.optJSONObject(0) : ts.optJSONObject(1).optBoolean("winner") ? ts.optJSONObject(1) : null;
             text(c, wt == null ? "FINAL" : (wt.optString("name") + " win").toUpperCase(java.util.Locale.US), heavy, 1.9f, Color.WHITE, px, y1, Paint.Align.LEFT, 0);
             String hl = it.optString("headline");
-            if (!hl.isEmpty()) { wrap(c, hl, h.fMed, 1.2f, 0xFFE6EBF1, px, y2 - .2f * R, bw, 2); usedSecond = true; }
+            if (!hl.isEmpty()) { wrap(c, hl, h.fMed, 1.2f, SOFT, px, y2 - .2f * R, bw, 2); usedSecond = true; }
         } else {
             String word = sport.equals("baseball") ? "FIRST PITCH" : sport.equals("hockey") ? "PUCK DROP" : sport.equals("basketball") ? "TIP-OFF" : fight ? "MAIN CARD" : "KICKOFF";
             long left = it.optLong("at") - System.currentTimeMillis();
@@ -1465,11 +1518,11 @@ final class NativeSports extends FrameLayout {
         // last: the last play, else your fantasy players / where to watch
         String last = it.optString("last");
         float ly = usedSecond ? y3 : y2 + .3f * R;
-        if (live && !last.isEmpty()) { label(c, "LAST PLAY", px, ly); wrap(c, last, h.fMed, 1.1f, 0xFFD5DCE4, px + measure("LAST PLAY", cond, 1.05f, .1f) + 1f * R, ly - 1f * R, bw - measure("LAST PLAY", cond, 1.05f, .1f) - 1f * R, 2); }
-        else if (mine != null && mine > 0) text(c, ellip("★ " + mine + " of your fantasy players in this game", h.fSemi, 1.15f, bw), h.fSemi, 1.15f, 0xFFFFD873, px, ly, Paint.Align.LEFT, 0);
+        if (live && !last.isEmpty()) { label(c, "LAST PLAY", px, ly); wrap(c, last, h.fMed, 1.1f, SOFT, px + measure("LAST PLAY", cond, 1.05f, .1f) + 1f * R, ly - 1f * R, bw - measure("LAST PLAY", cond, 1.05f, .1f) - 1f * R, 2); }
+        else if (mine != null && mine > 0) text(c, ellip("★ " + mine + " of your fantasy players in this game", h.fSemi, 1.15f, bw), h.fSemi, 1.15f, GOLD, px, ly, Paint.Align.LEFT, 0);
         else if (!post) {
             String wt = tv.isEmpty() ? "No TV listing yet" : (on ? "▶  OK · Watch on " : "On ") + tv;
-            text(c, ellip(wt, on ? h.fSemi : h.fMed, 1.2f, bw), on ? h.fSemi : h.fMed, 1.2f, on ? 0xFFA8FF60 : 0xFFD5DCE4, px, ly, Paint.Align.LEFT, 0);
+            text(c, ellip(wt, on ? h.fSemi : h.fMed, 1.2f, bw), on ? h.fSemi : h.fMed, 1.2f, on ? GREEN : SOFT, px, ly, Paint.Align.LEFT, 0);
         }
         return out;
     }
@@ -1477,7 +1530,7 @@ final class NativeSports extends FrameLayout {
     private void labelled(Canvas c, String lab, String val, float x, float y, float maxW) {
         float lw = measure(lab, cond, 1.05f, .1f) + 1f * R;
         text(c, lab, cond, 1.05f, GOLD, x, y, Paint.Align.LEFT, .1f);
-        text(c, ellip(val, h.fMed, 1.3f, maxW - lw), h.fMed, 1.3f, 0xFFE6EBF1, x + lw, y, Paint.Align.LEFT, 0);
+        text(c, ellip(val, h.fMed, 1.3f, maxW - lw), h.fMed, 1.3f, SOFT, x + lw, y, Paint.Align.LEFT, 0);
     }
     /** text wrapped onto a few lines below y (the top of the first line) */
     private void wrap(Canvas c, String s, Typeface tf, float sizeRem, int color, float x, float y, float width, int maxLines) {
@@ -1490,8 +1543,8 @@ final class NativeSports extends FrameLayout {
     /** "CAR 36%   WIN CHANCE   GB 64%" (with a bar split in the teams' colours when there's no field above it) */
     private void winLine(Canvas c, float x, float xe, float y, String a0, String a1, float home, boolean bar, int[] cs, Paint p) {
         int hp = Math.round(home * 100), ap = 100 - hp;
-        text(c, a0 + " " + ap + "%", cond, 1.3f, ap > hp ? Color.WHITE : 0xFFAEB8C4, x, y, Paint.Align.LEFT, 0);
-        text(c, a1 + " " + hp + "%", cond, 1.3f, hp > ap ? Color.WHITE : 0xFFAEB8C4, xe, y, Paint.Align.RIGHT, 0);
+        text(c, a0 + " " + ap + "%", cond, 1.3f, ap > hp ? Color.WHITE : SUB, x, y, Paint.Align.LEFT, 0);
+        text(c, a1 + " " + hp + "%", cond, 1.3f, hp > ap ? Color.WHITE : SUB, xe, y, Paint.Align.RIGHT, 0);
         text(c, "WIN CHANCE", cond, 1.0f, DIMTXT, (x + xe) / 2, y - .05f * R, Paint.Align.CENTER, .1f);
         if (bar) {
             float by = y + 1.1f * R, bh = .6f * R, split = x + (xe - x) * ap / 100f;
@@ -1534,7 +1587,7 @@ final class NativeSports extends FrameLayout {
     private void paintSide() {
         final List<Side> items = new ArrayList<>(sideItems);
         StringBuilder kb = new StringBuilder();
-        for (Side s : items) kb.append(s.kind).append(s.team == null ? "" : s.team.optString("full") + s.team.optString("pts") + s.team.optString("proj") + s.team.optInt("left")).append(s.game == null ? "" : s.game.optString("k")).append('|');
+        for (Side s : items) kb.append(s.kind).append(s.team == null ? "" : s.team.optString("full") + s.team.optString("pts") + s.team.optString("proj") + s.team.optInt("left")).append(s.game == null ? "" : s.game.optString("k") + placesOf(s.game)).append('|');
         final String key = kb.toString();
         if (key.equals(sideKey)) return;
         sideKey = key;
@@ -1573,7 +1626,7 @@ final class NativeSports extends FrameLayout {
                 stc = LIVE_C;
             } else if (state.equals("post")) {
                 st = (t.optBoolean("winner") ? "W " : o.optBoolean("winner") ? "L " : "") + my + "–" + their + " " + vs + " · Final";
-                stc = 0xFFAEB8C4;
+                stc = SUB;
             } else {
                 st = g.optString("when") + " " + vs + (g.optString("tv").isEmpty() ? "" : " · " + g.optString("tv"));
                 stc = GOLD;
@@ -1581,7 +1634,7 @@ final class NativeSports extends FrameLayout {
         } else if (s.kind.equals("fy")) {
             col = 0xFF5B4BD6; mark = "FANTASY";
             JSONObject t = s.team;
-            if (t == null) { name = "My fantasy team"; rec = ""; st = "OK to pick your players"; stc = 0xFFAEB8C4; }
+            if (t == null) { name = "My fantasy team"; rec = ""; st = "OK to pick your players"; stc = SUB; }
             else {
                 name = t.optString("name").isEmpty() ? "My fantasy team" : t.optString("name");
                 rec = t.optInt("week") > 0 ? "Week " + t.optInt("week") : "";
@@ -1589,7 +1642,7 @@ final class NativeSports extends FrameLayout {
                 st = t.optString("pts") + " pts" + (t.optString("proj").isEmpty() ? "" : " · Proj " + t.optString("proj")) + (pl > 0 ? " · " + pl + " playing" : left > 0 ? " · " + left + " to play" : "");
                 stc = pl > 0 ? LIVE_C : GOLD;
             }
-        } else { col = 0xFF2E7D4F; mark = "TEAMS"; name = "Follow your teams"; rec = ""; st = "OK to pick your sports and teams"; stc = 0xFFAEB8C4; }
+        } else { col = 0xFF2E7D4F; mark = "TEAMS"; name = "Follow your teams"; rec = ""; st = "OK to pick your sports and teams"; stc = SUB; }
         // the big faint mark
         int mc = lum(col) < .1f ? Color.rgb((Color.red(col) + 90) / 2 + 20, (Color.green(col) + 90) / 2 + 20, (Color.blue(col) + 90) / 2 + 20) : col;
         text(c, mark, heavy, ch / R * 1.45f, alpha(mc, .17f), w + .5f * R, top + ch * 1.08f, Paint.Align.RIGHT, -.02f);
@@ -1598,9 +1651,16 @@ final class NativeSports extends FrameLayout {
         if (s.kind.equals("team")) disc(c, p, s.team, col, dcx, dcy, d);
         else { p.setColor(col); c.drawCircle(dcx, dcy, d / 2, p); text(c, s.kind.equals("fy") ? "★" : "+", h.fSemi, d / R * .5f, Color.WHITE, dcx, dcy + d * .18f, Paint.Align.CENTER, 0); }
         float nx = dcx + d / 2 + 1.1f * R, maxW = w - nx - 1f * R;
+        // (after the record, where the team stands, as much of it as there's room for beside the name)
+        String[] pl = s.kind.equals("team") ? places.get(s.game.optString("lg") + ":" + s.team.optString("id")) : null;
+        if (pl != null) {
+            float room = maxW - measure(name, cond, 1.75f, 0) - .8f * R;
+            String a = (rec.isEmpty() ? "" : rec + "  ·  ") + pl[0], b = pl[1].isEmpty() ? a : a + "  ·  " + pl[1];
+            if (measure(b, h.fReg, 1.15f, 0) <= room) rec = b; else if (measure(a, h.fReg, 1.15f, 0) <= room) rec = a;
+        }
         String nm = ellip(name, cond, 1.75f, maxW - (rec.isEmpty() ? 0 : measure(rec, h.fReg, 1.15f, 0) + .8f * R));
         text(c, nm, cond, 1.75f, Color.WHITE, nx, top + ch * .46f, Paint.Align.LEFT, 0);
-        if (!rec.isEmpty()) text(c, rec, h.fReg, 1.15f, 0xFF9AA5B3, nx + measure(nm, cond, 1.75f, 0) + .7f * R, top + ch * .46f, Paint.Align.LEFT, 0);
+        if (!rec.isEmpty()) text(c, rec, h.fReg, 1.15f, TER, nx + measure(nm, cond, 1.75f, 0) + .7f * R, top + ch * .46f, Paint.Align.LEFT, 0);
         text(c, ellip(st, h.fSemi, 1.15f, maxW), h.fSemi, 1.15f, stc, nx, top + ch * .78f, Paint.Align.LEFT, 0);
         c.restore();
         p.setStyle(Paint.Style.STROKE); p.setStrokeWidth(Math.max(1, (live ? .14f : .08f) * R)); p.setColor(live ? LIVE_C : EDGE);
@@ -1646,48 +1706,58 @@ final class NativeSports extends FrameLayout {
             setVisibility(rowsOf.isEmpty() ? GONE : VISIBLE);
             invalidate();
         }
-        @Override protected void onDraw(Canvas c) {
-            float hh = 3.6f * R, top = .4f * R, x = PAD * R, d = 2.5f * R;
-            int cur = tab.equals("Today") ? leagueSel : -1;
-            boolean foc = zone.equals("rail");
-            // (slid along so the league you're on is on screen)
-            float[] ws = new float[rowsOf.size()], nws = new float[rowsOf.size()];
+        private float[] ws = new float[0], nws = new float[0];
+        private String label(int i) { String n = names.get(i); return GlassPanel.look.equals("air") ? n.toUpperCase(java.util.Locale.US) : n; }
+        private float sp() { return GlassPanel.look.equals("air") ? .05f : 0; }
+        /** where each league is (slid along so the one you're on is on screen) */
+        private void lay() {
+            float hh = SportsLook.CTRL_H * R, top = (4.4f - SportsLook.CTRL_H) / 2 * R, x = PAD * R, d = (SportsLook.CTRL_H - 1f) * R;
+            int n = rowsOf.size();
+            if (ws.length != n) { ws = new float[n]; nws = new float[n]; }
             float selR = 0;
-            for (int i = 0; i < rowsOf.size(); i++) {
-                int[] n = counts.get(i);
-                nws[i] = NativeSports.this.measure(names.get(i), cond, 1.35f, .02f);
-                ws[i] = .5f * R + d + .9f * R + nws[i] + .9f * R + NativeSports.this.measure(n[1] > 0 ? n[1] + " LIVE" : String.valueOf(n[0]), cond, 1.15f, .04f) + 1.3f * R;
-                if (i <= leagueSel) selR += ws[i] + (i > 0 ? 1f * R : 0);
+            for (int i = 0; i < n; i++) {
+                int[] cn = counts.get(i);
+                nws[i] = NativeSports.this.measure(label(i), h.fSemi, SportsLook.T_CTRL, sp());
+                ws[i] = .5f * R + d + .8f * R + nws[i] + .8f * R + NativeSports.this.measure(cn[1] > 0 ? cn[1] + " LIVE" : String.valueOf(cn[0]), cond, SportsLook.T_LABEL, .04f) + SportsLook.CTRL_PAD * R;
+                if (i <= leagueSel) selR += ws[i] + (i > 0 ? .8f * R : 0);
             }
             x -= Math.max(0, x + selR - (getWidth() - PAD * R));
             chips.clear();
-            for (int i = 0; i < rowsOf.size(); i++) {
-                if (x > getWidth()) break;
-                boolean sel = i == cur, f = foc && i == leagueSel;
-                String nm = names.get(i);
+            for (int i = 0; i < n; i++) { chips.add(new RectF(x, top, x + ws[i], top + hh)); x += ws[i] + .8f * R; }
+        }
+        /** a league's chip, in this view's own coordinates (null before there's room to lay them out) */
+        RectF chipAt(int i) {
+            if (getWidth() <= 0) return null;
+            lay();
+            return i >= 0 && i < chips.size() ? chips.get(i) : null;
+        }
+        @Override protected void onDraw(Canvas c) {
+            lay();
+            float d = (SportsLook.CTRL_H - 1f) * R;
+            int cur = tab.equals("Today") ? leagueSel : -1;
+            boolean foc = zone.equals("rail");
+            for (int i = 0; i < chips.size(); i++) {
+                RectF chip = chips.get(i);
+                if (chip.left > getWidth()) break;
+                if (chip.right < 0) continue;
+                boolean lit = i == cur || (foc && i == leagueSel);
                 int[] n = counts.get(i);
                 String cnt = n[1] > 0 ? n[1] + " LIVE" : String.valueOf(n[0]);
-                float nw = nws[i], w = ws[i];
-                RectF chip = new RectF(x, top, x + w, top + hh);
-                chips.add(new RectF(chip));
-                float cr = GlassPanel.corner(hh / 2);
-                if (f) { rp.setColor((GlassPanel.selFill() & 0x00FFFFFF) | 0x59000000); c.drawRoundRect(new RectF(chip.left - .35f * R, chip.top - .35f * R, chip.right + .35f * R, chip.bottom + .35f * R), cr + .35f * R, cr + .35f * R, rp); }
-                rp.setColor(sel || f ? GlassPanel.selFill() : 0x17FFFFFF); c.drawRoundRect(chip, cr, cr, rp);
-                if (!sel && !f) { rp.setStyle(Paint.Style.STROKE); rp.setStrokeWidth(Math.max(1, .08f * R)); rp.setColor(0xFF2A3442); c.drawRoundRect(chip, cr, cr, rp); rp.setStyle(Paint.Style.FILL); }
-                float dcx = x + .5f * R + d / 2, dcy = top + hh / 2;
+                SportsLook.ctrl(c, rp, chip, R, lit);
+                float dcx = chip.left + .5f * R + d / 2, dcy = chip.centerY();
                 Bitmap b = got.get(icons.get(i));
-                rp.setColor(sel || f ? 0xFFEEF1F5 : Color.WHITE); c.drawCircle(dcx, dcy, d / 2, rp);
+                rp.setColor(lit ? 0xFFEEF1F5 : Color.WHITE); c.drawCircle(dcx, dcy, d / 2, rp);
                 if (b != null) {
                     float s0 = Math.min(d * .66f / b.getWidth(), d * .66f / b.getHeight());
                     float dw = b.getWidth() * s0, dh = b.getHeight() * s0;
                     c.drawBitmap(b, null, new RectF(dcx - dw / 2, dcy - dh / 2, dcx + dw / 2, dcy + dh / 2), rp);
-                } else if (!emoji.get(i).isEmpty()) text(c, emoji.get(i), h.fReg, 1.3f, Color.BLACK, dcx, dcy + .45f * R, Paint.Align.CENTER, 0);
-                float tx = x + .5f * R + d + .9f * R;
-                boolean plain = GlassPanel.look.equals("glass") || GlassPanel.look.equals("spot"), lit = sel || f;
-                int st = GlassPanel.selText();
-                text(c, nm, cond, 1.35f, lit ? (plain ? GROUND : st) : 0xFFDCE3EA, tx, dcy + .48f * R, Paint.Align.LEFT, .02f);
-                text(c, cnt, cond, 1.15f, lit && !plain ? (st & 0x00FFFFFF) | 0xC7000000 : n[1] > 0 ? (lit ? 0xFFD9452B : LIVE_C) : lit ? 0xFF5B6675 : DIMTXT, tx + nw + .9f * R, dcy + .42f * R, Paint.Align.LEFT, .04f);
-                x += w + 1f * R;
+                } else if (!emoji.get(i).isEmpty()) text(c, emoji.get(i), h.fReg, 1.2f, Color.BLACK, dcx, dcy + .42f * R, Paint.Align.CENTER, 0);
+                float tx = chip.left + .5f * R + d + .8f * R;
+                int st = SportsLook.ctrlText(lit);
+                text(c, label(i), h.fSemi, SportsLook.T_CTRL, st, tx, dcy + .46f * R, Paint.Align.LEFT, sp());
+                // (how many games; while some are on, how many of those: orange, or the chosen words' own colour on a chosen chip)
+                int cc = lit ? (st & 0x00FFFFFF) | 0xB3000000 : n[1] > 0 ? LIVE_C : DIMTXT;
+                text(c, cnt, cond, SportsLook.T_LABEL, cc, tx + nws[i] + .8f * R, dcy + .42f * R, Paint.Align.LEFT, .04f);
             }
         }
     }
@@ -1713,11 +1783,11 @@ final class NativeSports extends FrameLayout {
             p.setAlpha(it.optBoolean("bench") ? 120 : 235); c.drawBitmap(ph, null, new RectF(x, y, x + bw, y + bh), p); p.setAlpha(255);
             p.setShader(new LinearGradient(x - .5f * R, 0, x + bw * .55f, 0, 0xFF101826, 0x00101826, Shader.TileMode.CLAMP)); c.drawRect(x - R, 0, x + bw, hh, p); p.setShader(null);
         }
-        p.setColor(live ? 0xFFFF453A : alpha(tc, .9f)); c.drawRect(0, 0, w, live ? .22f * R : .14f * R, p);
+        p.setColor(live ? LIVE_C : alpha(tc, .9f)); c.drawRect(0, 0, w, live ? .22f * R : .14f * R, p);
         float px = 1.3f * R;
         // position chip · team, and the game's state
         String pos = it.optString("pos");
-        int pc = pos.equals("QB") ? 0xFFFF5A5F : pos.equals("RB") ? 0xFF30D158 : pos.equals("WR") ? 0xFF0A84FF : pos.equals("TE") ? 0xFFFF9F0A : pos.equals("K") ? 0xFFBF5AF2 : 0xFF8E8E93;
+        int pc = pos.equals("QB") ? RED_C : pos.equals("RB") ? 0xFF30D158 : pos.equals("WR") ? 0xFF0A84FF : pos.equals("TE") ? GOLD : pos.equals("K") ? 0xFFBF5AF2 : 0xFF8E8E93;
         float cw = measure(pos, h.fSemi, .85f, .04f) + 1.1f * R;
         p.setColor(alpha(pc, .3f)); c.drawRoundRect(new RectF(px, 1.1f * R, px + cw, 2.6f * R), .4f * R, .4f * R, p);
         text(c, pos, h.fSemi, .85f, pc, px + cw / 2, 2.15f * R, Paint.Align.CENTER, .04f);
@@ -1729,7 +1799,7 @@ final class NativeSports extends FrameLayout {
             if (!pts.isEmpty()) {
                 p.setColor(0xB3000000); float tw = measure(pts, Typeface.create(h.fSemi, Typeface.BOLD), 1.9f, 0) + 1.2f * R;
                 c.drawRoundRect(new RectF(rx - tw, .9f * R, rx, 3.4f * R), .6f * R, .6f * R, p);
-                text(c, pts, Typeface.create(h.fSemi, Typeface.BOLD), 1.9f, live ? 0xFFFFE066 : Color.WHITE, rx - .6f * R, 2.85f * R, Paint.Align.RIGHT, 0);
+                text(c, pts, Typeface.create(h.fSemi, Typeface.BOLD), 1.9f, live ? GOLD : Color.WHITE, rx - .6f * R, 2.85f * R, Paint.Align.RIGHT, 0);
                 if (!pj.isEmpty()) text(c, "proj " + pj, h.fMed, .85f, 0xCCFFFFFF, rx - .2f * R, 4.5f * R, Paint.Align.RIGHT, 0);
             } else {
                 p.setColor(0x99000000); float tw = measure("proj " + pj, h.fSemi, 1f, 0) + 1.2f * R;
@@ -1745,9 +1815,9 @@ final class NativeSports extends FrameLayout {
         String when = it.optString("when");
         if (!it.optString("opp").isEmpty()) {
             text(c, ellip(game, h.fMed, 1.05f, nameMax), h.fMed, 1.05f, 0xD9FFFFFF, px, 6.9f * R, Paint.Align.LEFT, 0);
-            if (live) { float tw = measure(when.replaceFirst("^LIVE · ", ""), h.fSemi, .95f, 0); p.setColor(0xFFFF453A); c.drawCircle(px + .27f * R, 8.5f * R, .27f * R, p);
-                text(c, ellip(when.replaceFirst("^LIVE · ", ""), h.fSemi, .95f, nameMax - R), h.fSemi, .95f, 0xFFFF6B60, px + .8f * R, 8.85f * R, Paint.Align.LEFT, 0); }
-            else text(c, ellip(when + (it.optString("tv").isEmpty() || post ? "" : " · " + it.optString("tv")), h.fSemi, .95f, nameMax), h.fSemi, .95f, post ? 0x99FFFFFF : 0xFFA8FF60, px, 8.85f * R, Paint.Align.LEFT, 0);
+            if (live) { float tw = measure(when.replaceFirst("^LIVE · ", ""), h.fSemi, .95f, 0); p.setColor(LIVE_C); c.drawCircle(px + .27f * R, 8.5f * R, .27f * R, p);
+                text(c, ellip(when.replaceFirst("^LIVE · ", ""), h.fSemi, .95f, nameMax - R), h.fSemi, .95f, LIVE_C, px + .8f * R, 8.85f * R, Paint.Align.LEFT, 0); }
+            else text(c, ellip(when + (it.optString("tv").isEmpty() || post ? "" : " · " + it.optString("tv")), h.fSemi, .95f, nameMax), h.fSemi, .95f, post ? 0x99FFFFFF : GREEN, px, 8.85f * R, Paint.Align.LEFT, 0);
         } else text(c, "No game this week", h.fMed, 1.05f, 0x99FFFFFF, px, 6.9f * R, Paint.Align.LEFT, 0);
         // the line so far, an injury, or the last alert
         String st = it.optString("status");
@@ -1757,7 +1827,7 @@ final class NativeSports extends FrameLayout {
             String lab = it.optString("statusFull") + (it.optString("note").isEmpty() ? "" : " · " + it.optString("note"));
             float bw = Math.min(w - 2 * px, measure(lab, h.fSemi, .9f, 0) + 1.4f * R);
             p.setColor(bad ? 0x40FF453A : 0x40FFD60A); c.drawRoundRect(new RectF(px, by - 1.35f * R, px + bw, by + .45f * R), .5f * R, .5f * R, p);
-            text(c, ellip(lab, h.fSemi, .9f, bw - 1.4f * R), h.fSemi, .9f, bad ? 0xFFFF8A80 : 0xFFFFE066, px + .7f * R, by - .15f * R, Paint.Align.LEFT, 0);
+            text(c, ellip(lab, h.fSemi, .9f, bw - 1.4f * R), h.fSemi, .9f, bad ? RED_C : GOLD, px + .7f * R, by - .15f * R, Paint.Align.LEFT, 0);
         } else if (!it.optString("line").isEmpty()) {
             text(c, ellip(it.optString("line"), h.fSemi, 1f, w - 2 * px), h.fSemi, 1f, Color.WHITE, px, by, Paint.Align.LEFT, 0);
         } else if (!it.optString("last").isEmpty()) {
@@ -1770,7 +1840,7 @@ final class NativeSports extends FrameLayout {
         p.setShader(new LinearGradient(0, 0, w, hh, 0xFF2A1F4D, 0xFF0E0B1E, Shader.TileMode.CLAMP)); c.drawRect(0, 0, w, hh, p); p.setShader(null);
         p.setColor(0x14FFFFFF); for (float x = -hh; x < w; x += .7f * R) c.drawLine(x, hh, x + hh, 0, p);
         boolean live = it.optInt("playing") > 0;
-        p.setColor(live ? 0xFFFF453A : 0xFF8E7BFF); c.drawRect(0, 0, w, live ? .22f * R : .14f * R, p);
+        p.setColor(live ? LIVE_C : 0xFF8E7BFF); c.drawRect(0, 0, w, live ? .22f * R : .14f * R, p);
         float px = 1.3f * R;
         text(c, ellip(it.optString("name").toUpperCase(java.util.Locale.US), h.fSemi, .95f, w - 2 * px - 6 * R), h.fSemi, .95f, 0xB3FFFFFF, px, 2.1f * R, Paint.Align.LEFT, .06f);
         if (it.optInt("week") > 0) text(c, "WEEK " + it.optInt("week"), h.fSemi, .95f, 0x8CFFFFFF, w - px, 2.1f * R, Paint.Align.RIGHT, .06f);
@@ -1780,7 +1850,7 @@ final class NativeSports extends FrameLayout {
         if (!it.optString("proj").isEmpty()) text(c, "Projected " + it.optString("proj"), h.fSemi, 1.15f, 0xFFB9A8FF, px, 9.4f * R, Paint.Align.LEFT, 0);
         int left = it.optInt("left"), pl = it.optInt("playing");
         String st = (pl > 0 ? pl + " playing now" : "") + (pl > 0 && left > 0 ? " · " : "") + (left > 0 ? left + " yet to play" : "") + (pl == 0 && left == 0 ? "All done this week" : "");
-        if (pl > 0) { p.setColor(0xFFFF453A); c.drawCircle(px + .27f * R, hh - 1.45f * R, .27f * R, p); }
+        if (pl > 0) { p.setColor(LIVE_C); c.drawCircle(px + .27f * R, hh - 1.45f * R, .27f * R, p); }
         text(c, st + "  ·  " + it.optString("scoring"), h.fMed, .95f, 0xCCFFFFFF, px + (pl > 0 ? .8f * R : 0), hh - 1.1f * R, Paint.Align.LEFT, 0);
     }
 
@@ -1800,7 +1870,7 @@ final class NativeSports extends FrameLayout {
     private String heroKey = "";
     private void showHero(final JSONObject it) {
         Integer mine = it == null ? null : playersIn.get(it.optString("k").split(":")[0]);
-        final String key = it == null ? "" : "hero:" + it.optString("k") + ":" + Math.round(heroWidth) + ":" + (mine == null ? 0 : mine);
+        final String key = it == null ? "" : "hero:" + it.optString("k") + ":" + Math.round(heroWidth) + ":" + (mine == null ? 0 : mine) + ":" + placesOf(it);
         if (key.equals(heroKey)) return;
         heroKey = key;
         if (it == null || it.optBoolean("edit") && rows.size() <= 1) { for (ImageView v : hero) v.animate().alpha(0f).setDuration(250).start(); return; }
@@ -1826,7 +1896,7 @@ final class NativeSports extends FrameLayout {
         final int under = heroTop;
         heroTop = next;
         // (Standings covers the scoreboard: a new scoreboard brought forward went over the tables)
-        if (standings != null && standings.shownNow()) { standings.bringToFront(); chrome.bringToFront(); }
+        order();
         nv.animate().alpha(1f).translationY(0).setDuration(300).setInterpolator(TileView.EASE).withEndAction(new Runnable() { @Override public void run() {
             if (heroTop == 1 - under || under < 0) { } if (under >= 0 && heroTop != under) hero[under].setAlpha(0f);
         } }).start();
@@ -1871,7 +1941,7 @@ final class NativeSports extends FrameLayout {
             p.setShader(new LinearGradient(0, 0, w, 0, 0xE6102018, 0xB30A1410, Shader.TileMode.CLAMP)); c.drawRect(0, 0, w, hh, p); p.setShader(null);
             text(c, "YOUR TEAMS, EVERYWHERE", Typeface.create(h.fSemi, Typeface.BOLD_ITALIC), 2.6f, Color.WHITE, 3 * R, 6.5f * R, Paint.Align.LEFT, .03f);
             text(c, "Pick the sports and teams you follow: their games, live scores and the channel each one is on.", h.fReg, 1.3f, 0xBFFFFFFF, 3 * R, 9.5f * R, Paint.Align.LEFT, 0);
-            text(c, "OK · Edit sports & teams", h.fSemi, 1.1f, 0xFFA8FF60, 3 * R, 12.6f * R, Paint.Align.LEFT, .04f);
+            text(c, "OK · Edit sports & teams", h.fSemi, 1.1f, GREEN, 3 * R, 12.6f * R, Paint.Align.LEFT, .04f);
             return out;
         }
         JSONArray ts = it.optJSONArray("teams");
@@ -1905,7 +1975,7 @@ final class NativeSports extends FrameLayout {
         for (int k = 1; k <= 12; k++) {
             float t = (float) Math.pow(k / 12.0, 1.8);
             float y = horizon + (H - horizon) * t;
-            g.setColor(alpha(0xFF60FF9A, .02f + .14f * t));
+            g.setColor(alpha(GREEN, .02f + .14f * t));
             c.drawLine(0, y, W, y, g);
         }
         // the horizon line, lit

@@ -2268,9 +2268,11 @@ final class NativeHome extends FrameLayout {
     /** a movie or show from Movies & TV Shows: its details and the streams the addons find */
     /** a game's own page (box score, leaders, scoring, win chance) */
     private GameView gamePage;
-    void openGamePage(String sport, String league, String id, JSONArray teams) {
+    void openGamePage(String sport, String league, String id, JSONArray teams) { openGamePage(sport, league, id, teams, null, null); }
+    /** …with the game (its page gets the menu's buttons) and what on the screen it grows out of (either may be null) */
+    void openGamePage(String sport, String league, String id, JSONArray teams, SportsData.Ev game, android.graphics.RectF from) {
         if (gamePage == null) { gamePage = new GameView(this); addView(gamePage, new LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.MATCH_PARENT)); }
-        gamePage.open(sport, league, id, teams);
+        gamePage.open(sport, league, id, teams, game, from);
     }
     private boolean gameOpenNow() { return gamePage != null && gamePage.shownNow(); }
     /** a title on Movies (else Home's Movies & TV rows), for the self-check */

@@ -33,7 +33,7 @@ final class SportsAlert extends FrameLayout {
     SportsAlert(NativeHome home) {
         super(home.getContext());
         h = home;
-        cond = Typeface.create("sans-serif-condensed", Typeface.BOLD);
+        cond = SportsLook.cond();
         setClipChildren(false);
         card = new LinearLayout(getContext());
         card.setOrientation(LinearLayout.HORIZONTAL);
@@ -60,7 +60,7 @@ final class SportsAlert extends FrameLayout {
         mid.setOrientation(LinearLayout.VERTICAL);
         mid.setGravity(Gravity.CENTER_HORIZONTAL);
         mid.setPadding(h.px(2), h.px(1.2f), h.px(2), h.px(1.3f));
-        kicker = h.text(h.fSemi, 1.05f, 0xFFFFC23D); kicker.setLetterSpacing(.14f); kicker.setGravity(Gravity.CENTER);
+        kicker = h.text(h.fSemi, 1.05f, SportsLook.GOLD); kicker.setLetterSpacing(.14f); kicker.setGravity(Gravity.CENTER);
         headline = h.text(cond, 2.6f, Color.WHITE); headline.setGravity(Gravity.CENTER); headline.setSingleLine(true); headline.setEllipsize(android.text.TextUtils.TruncateAt.END);
         headline.setFontFeatureSettings("tnum");
         line = h.text(h.fMed, 1.3f, 0xE6FFFFFF); line.setGravity(Gravity.CENTER); line.setMaxLines(2); line.setEllipsize(android.text.TextUtils.TruncateAt.END);

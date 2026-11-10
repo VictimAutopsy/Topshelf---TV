@@ -52,8 +52,8 @@ import java.util.Set;
  */
 final class StandingsView extends View {
     // the palette: three greys for text, two surfaces, and colour only where it means something
-    private static final int INK = 0xFFF2F5F8, SUB = 0xFFA3AEBC, TER = 0xFF6B7787, PANEL = 0xFF111821, EDGE = 0xFF1F2935,
-            TRACK = 0xFF161E28, IN = 0xFF3DDC84, AMBER = 0xFFFFC23D, RED = 0xFFFF6B6B, BG = 0xFF0A0E13;
+    private static final int INK = SportsLook.INK, SUB = SportsLook.SUB, TER = SportsLook.FAINT, PANEL = SportsLook.CARD, EDGE = SportsLook.EDGE,
+            TRACK = SportsLook.TRACK, IN = SportsLook.GREEN, AMBER = SportsLook.GOLD, RED = SportsLook.RED, BG = SportsLook.GROUND;
     /** {id, ESPN sport, ESPN league, name, tab} */
     private static final String[][] LEAGUES = {
         { "nfl", "football", "nfl", "NFL", "NFL" }, { "nba", "basketball", "nba", "NBA", "NBA" }, { "mlb", "baseball", "mlb", "MLB", "MLB" },
@@ -164,6 +164,9 @@ final class StandingsView extends View {
     void hide() { setVisibility(GONE); focus = 0; closeTeam(); }
     boolean shownNow() { return getVisibility() == VISIBLE; }
     void focusIn() { focus = 0; invalidate(); }
+    /* whether the remote is in here at all (it's on Sports' own tabs above otherwise: no ring round a league then) */
+    private boolean remote = true;
+    void remote(boolean in) { if (remote != in) { remote = in; invalidate(); } }
 
     // ------------------------------------------------------------------ views and the board
 
@@ -506,7 +509,42 @@ final class StandingsView extends View {
 
     private void load() {
         if (chips.isEmpty()) return;
-        final String[] lg = chips.get(sel);
+        load(chips.get(sel));
+    }
+    /** a league's tables are wanted by someone else (Sports' scoreboard and your-teams cards say where a team
+        stands): fetched when they aren't here or have gone stale; {@link #onTables} runs when they arrive */
+    void want(String lgId) { if (errors.containsKey(lgId)) return; for (String[] l : LEAGUES) if (l[0].equals(lgId)) { load(l); return; } }
+    Runnable onTables;
+    /**
+     * Where a team stands, in a few words, from the tables already here: {"2nd in AFC East", "1 GB"} (the second
+     * is "" when there's nothing to say: top and level, or college, where games back mean little); null when the
+     * league's tables aren't here (see {@link #want}) or the team isn't in them.
+     */
+    @SuppressWarnings("unchecked")
+    String[] place(String lgId, String teamId) {
+        Object[] c = cache.get(lgId);
+        if (c == null || teamId == null || teamId.isEmpty()) return null;
+        String[] lg = null;
+        for (String[] l : LEAGUES) if (l[0].equals(lgId)) lg = l;
+        if (lg == null) return null;
+        Group g = null; Row r = null;
+        for (Group x : (List<Group>) c[1]) for (Row y : x.rows) if (y.id.equals(teamId)) { g = x; r = y; }
+        if (r == null) return null;
+        List<Row> rs = new ArrayList<>(g.rows);
+        sortRows(rs, false);
+        int at = rs.indexOf(r);
+        boolean soccer = lg[1].equals("soccer"), pts = pointsSport(lg[1]), college = lgId.equals("cfb") || lgId.equals("cbb");
+        String in = soccer ? lg[3] : g.name.replace("Eastern Conference", "East").replace("Western Conference", "West")
+                .replace("American League", "AL").replace("National League", "NL").replace(" Division", "").replace(" Conference", "").trim();
+        String where = ordinal(at + 1) + (in.isEmpty() ? "" : " in " + in);
+        String gapS = "";
+        if (!college && rs.size() > 1) {
+            if (at == 0) { double d = gap(r, rs.get(1), pts); if (d > 0) gapS = "leads by " + half(d) + (pts ? (d == 1 ? " pt" : " pts") : ""); }
+            else { double d = gap(rs.get(0), r, pts); if (d > 0) gapS = half(d) + (pts ? (d == 1 ? " pt back" : " pts back") : " GB"); }
+        }
+        return new String[] { where, gapS };
+    }
+    private void load(final String[] lg) {
         Object[] c = cache.get(lg[0]);
         if (c != null && System.currentTimeMillis() - (Long) c[0] < 10 * 60000L) return;
         if (!loading.add(lg[0])) return;
@@ -550,6 +588,7 @@ final class StandingsView extends View {
                 } else errors.put(lg[0], fe);
                 boardKey = "";
                 invalidate();
+                if (fg != null && onTables != null) onTables.run();
             } });
         } }, "standings").start();
     }
@@ -1004,64 +1043,75 @@ final class StandingsView extends View {
         drawFoot(c, w);
     }
 
-    /** the leagues (text tabs, the one shown underlined) and the views (one switch with a sliding thumb) */
+    /** the leagues on the left and the views on the right: Sports' own controls (SportsLook), the chosen one's
+        fill gliding to it, and the ring and glow round the one the remote is on */
     private void drawTop(Canvas c, int w) {
-        float pad = 4 * R, by = 2.1f * R;
-        boolean here = team == null;
+        float pad = 4 * R, ch = SportsLook.CTRL_H * R, by = 2.3f * R, top = by - ch / 2, bot = by + ch / 2, cp = 1.2f * R, gap = .7f * R, rad = SportsLook.ctrlRadius(ch);
+        boolean here = team == null && remote, air = GlassPanel.look.equals("air");
         List<String> vs = views();
         viewHits.clear();
         float segL = w - pad;
+        RectF on = null;                              // the control the remote is on
+        t.setTypeface(fSemi); t.setTextSize(SportsLook.T_CTRL * R); t.setLetterSpacing(air ? .05f : 0);
         if (vs.size() > 1) {
-            t.setTypeface(fSemi); t.setTextSize(1.15f * R);
-            float[] ws = new float[vs.size()]; float tw = .5f * R;
-            for (int i = 0; i < vs.size(); i++) { ws[i] = t.measureText(vs.get(i)) + 2.8f * R; tw += ws[i]; }
+            String[] ls = new String[vs.size()];
+            float[] ws = new float[vs.size()]; float tw = 0;
+            for (int i = 0; i < vs.size(); i++) { ls[i] = air ? vs.get(i).toUpperCase(Locale.US) : vs.get(i); ws[i] = t.measureText(ls[i]) + 2 * cp; tw += ws[i] + (i > 0 ? gap : 0); }
             segL = w - pad - tw;
-            rf.set(segL, by - 1.35f * R, w - pad, by + 1.35f * R);
-            p.setColor(TRACK); c.drawRoundRect(rf, 1.35f * R, 1.35f * R, p);
-            stroke(c, rf, 1.35f * R, EDGE, Math.max(1, .07f * R));
             int vi = viewIndex();
-            float ax = segL + .25f * R, tx = 0;
-            for (int i = 0; i < vs.size(); i++) { if (i == vi) tx = ax; viewHits.add(new RectF(ax, by - 1.35f * R, ax + ws[i], by + 1.35f * R)); ax += ws[i]; }
+            float ax = segL, tx = 0;
+            for (int i = 0; i < vs.size(); i++) {
+                if (i == vi) tx = ax;
+                viewHits.add(new RectF(ax, top, ax + ws[i], bot));
+                rf.set(ax, top, ax + ws[i], bot); SportsLook.ctrl(c, p, rf, R, false);
+                ax += ws[i] + gap;
+            }
             if (thumbX < 0 || !motion) { thumbX = tx; thumbW = ws[vi]; }
             thumbX += (tx - thumbX) * .3f; thumbW += (ws[vi] - thumbW) * .3f;
             if (Math.abs(thumbX - tx) > .5f || Math.abs(thumbW - ws[vi]) > .5f) anim = true; else { thumbX = tx; thumbW = ws[vi]; }
-            rf.set(thumbX, by - 1.1f * R, thumbX + thumbW, by + 1.1f * R);
-            p.setColor(focus == 1 && here ? AMBER : 0xFFE9EEF3); c.drawRoundRect(rf, 1.1f * R, 1.1f * R, p);
-            ax = segL + .25f * R;
+            rf.set(thumbX, top, thumbX + thumbW, bot); SportsLook.ctrl(c, p, rf, R, true);
+            if (focus == 1 && here) on = new RectF(rf);
+            ax = segL;
             for (int i = 0; i < vs.size(); i++) {
                 boolean under = Math.abs(thumbX + thumbW / 2 - (ax + ws[i] / 2)) < ws[i] / 2;
-                text(c, vs.get(i), ax + ws[i] / 2, by + .42f * R, fSemi, 1.15f, under ? BG : SUB, Paint.Align.CENTER);
-                ax += ws[i];
+                t.setLetterSpacing(air ? .05f : 0);
+                text(c, ls[i], ax + ws[i] / 2, by + .46f * R, fSemi, SportsLook.T_CTRL, SportsLook.ctrlText(under), Paint.Align.CENTER);
+                ax += ws[i] + gap;
             }
         } else thumbX = -1;
         // the leagues, shifted along when the one shown would be past the room
         chipHits.clear();
-        if (chips.isEmpty()) return;
-        float room = segL - 3 * R - pad;
+        if (chips.isEmpty()) { t.setLetterSpacing(0); return; }
+        float room = segL - 2 * R - pad;
+        String[] ls = new String[chips.size()];
         float[] ws = new float[chips.size()];
-        t.setTextSize(1.3f * R);
-        for (int i = 0; i < chips.size(); i++) { t.setTypeface(i == sel ? fSemi : fMed); ws[i] = t.measureText(chips.get(i)[4]); }
-        float selX0 = 0; for (int i = 0; i < sel; i++) selX0 += ws[i] + 2.2f * R;
-        float shift = Math.max(0, selX0 + ws[sel] - room + R);
-        c.save(); c.clipRect(pad - 1.4f * R, 0, segL - 1.5f * R, 4.4f * R);
-        float x = pad - shift, ux = 0;
-        boolean pill = focus == 0 && here;
+        t.setTypeface(fSemi); t.setTextSize(SportsLook.T_CTRL * R); t.setLetterSpacing(air ? .05f : 0);
+        for (int i = 0; i < chips.size(); i++) { ls[i] = air ? chips.get(i)[4].toUpperCase(Locale.US) : chips.get(i)[4]; ws[i] = t.measureText(ls[i]) + 2 * cp; }
+        float selX0 = 0; for (int i = 0; i < sel; i++) selX0 += ws[i] + gap;
+        float shift = Math.max(0, selX0 + ws[sel] - room);
+        c.save(); c.clipRect(pad - .2f * R, 0, pad + room, bot + R);
+        float x = pad - shift, ux = pad - shift + selX0;
         for (int i = 0; i < chips.size(); i++) {
-            boolean on = i == sel;
-            chipHits.add(new RectF(x - 1.1f * R, 0, x + ws[i] + 1.1f * R, 4.2f * R));
-            if (on) {
-                ux = x;
-                if (pill) { rf.set(x - 1.1f * R, by - 1.35f * R, x + ws[i] + 1.1f * R, by + 1.35f * R); p.setColor(AMBER); c.drawRoundRect(rf, 1.35f * R, 1.35f * R, p); }
-            }
-            text(c, chips.get(i)[4], x, by + .45f * R, on ? fSemi : fMed, 1.3f, on ? (pill ? BG : INK) : TER, Paint.Align.LEFT);
-            x += ws[i] + 2.2f * R;
+            chipHits.add(new RectF(x, 0, x + ws[i], bot + .6f * R));
+            rf.set(x, top, x + ws[i], bot); SportsLook.ctrl(c, p, rf, R, false);
+            x += ws[i] + gap;
         }
-        // the underline glides to the league shown
+        // the chosen fill glides to the league shown
         if (tabX < 0 || !motion) { tabX = ux; tabW = ws[sel]; }
         tabX += (ux - tabX) * .3f; tabW += (ws[sel] - tabW) * .3f;
         if (Math.abs(tabX - ux) > .5f || Math.abs(tabW - ws[sel]) > .5f) anim = true; else { tabX = ux; tabW = ws[sel]; }
-        if (!pill) { rf.set(tabX, by + 1.25f * R, tabX + tabW, by + 1.47f * R); p.setColor(INK); c.drawRoundRect(rf, .11f * R, .11f * R, p); }
+        rf.set(tabX, top, tabX + tabW, bot); SportsLook.ctrl(c, p, rf, R, true);
+        if (focus == 0 && here) on = new RectF(rf);
+        x = pad - shift;
+        for (int i = 0; i < chips.size(); i++) {
+            boolean under = Math.abs(tabX + tabW / 2 - (x + ws[i] / 2)) < ws[i] / 2;
+            t.setLetterSpacing(air ? .05f : 0);
+            text(c, ls[i], x + ws[i] / 2, by + .46f * R, fSemi, SportsLook.T_CTRL, SportsLook.ctrlText(under), Paint.Align.CENTER);
+            x += ws[i] + gap;
+        }
         c.restore();
+        t.setLetterSpacing(0);
+        if (on != null) { SportsLook.glow(c, p, on, rad, R, SportsLook.GOLD, .8f, SportsLook.GLOW_CTRL); SportsLook.ring(c, p, on, rad, R, 255); }
     }
 
     /** a column's panel, its title and column names; returns where each figure column ends (its right edge) */
@@ -1211,7 +1261,7 @@ final class StandingsView extends View {
         p.setShader(new LinearGradient(glow.left, 0, glow.right, 0, new int[] { withA(col, 245), withA(col, 120), withA(col, 46) }, new float[] { 0, .55f, 1 }, Shader.TileMode.CLAMP));
         c.drawRoundRect(glow, .7f * R, .7f * R, p);
         p.setShader(null);
-        stroke(c, glow, .7f * R, 0xD9FFFFFF, .12f * R);
+        SportsLook.ring(c, p, glow, .7f * R, R, 255);
     }
     /** soccer: what the coloured rails mean, beside the table */
     private void drawZones(Canvas c, float x, float y) {
@@ -1330,7 +1380,7 @@ final class StandingsView extends View {
             for (int i = 0; i < n; i++) {
                 int res = result(td.past.get(n - 1 - i), r.id);
                 rf.set(x0 + i * (d + gp), hy + 5.4f * R, x0 + i * (d + gp) + d, hy + 5.4f * R + d);
-                p.setColor(res > 0 ? IN : res < 0 ? RED : 0xFF8E99A8); p.setAlpha(235); c.drawRoundRect(rf, .4f * R, .4f * R, p); p.setAlpha(255);
+                p.setColor(res > 0 ? IN : res < 0 ? RED : SportsLook.TER); p.setAlpha(235); c.drawRoundRect(rf, .4f * R, .4f * R, p); p.setAlpha(255);
                 text(c, res > 0 ? "W" : res < 0 ? "L" : soccer ? "D" : "T", rf.centerX(), rf.top + 1.15f * R, fSemi, .9f, BG, Paint.Align.CENTER);
             }
         }
@@ -1427,7 +1477,7 @@ final class StandingsView extends View {
         int gc = lift(teamColor(r), .2);
         p.setShader(new LinearGradient(box.left, 0, box.right, 0, withA(gc, 150), withA(gc, 22), Shader.TileMode.CLAMP));
         c.drawRoundRect(box, rad, rad, p); p.setShader(null);
-        stroke(c, box, rad, 0xD9FFFFFF, .14f * R);
+        SportsLook.ring(c, p, box, rad, R, 255);
     }
     /** the header's numbers: record, places, the gap to the line (soccer: points and goal difference), streak */
     private List<String[]> headline(Row r) {
@@ -1469,7 +1519,7 @@ final class StandingsView extends View {
         if (result) {
             int res = result(e, us.id);
             rf.set(cx, mid - .85f * R, cx + 1.7f * R, mid + .85f * R);
-            p.setColor(res > 0 ? IN : res < 0 ? RED : 0xFF8E99A8); c.drawRoundRect(rf, .45f * R, .45f * R, p);
+            p.setColor(res > 0 ? IN : res < 0 ? RED : SportsLook.TER); c.drawRoundRect(rf, .45f * R, .45f * R, p);
             text(c, res > 0 ? "W" : res < 0 ? "L" : teamLg[1].equals("soccer") ? "D" : "T", rf.centerX(), mid + .38f * R, fSemi, 1f, BG, Paint.Align.CENTER);
             cx += 2.6f * R;
         } else {

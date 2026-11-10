@@ -938,6 +938,19 @@ final class VodPlayer extends FrameLayout {
         if (next != null) { final JSONObject nx = next; final TitleView tv = from;
             l.add("Next episode · " + nx.optString("name", nx.optString("title"))); final JSONObject was = stream; a.add(new Runnable() { @Override public void run() { close(); if (tv != null) tv.afterEpisode(nx, was); } }); }
         l.add("Choose another stream"); a.add(new Runnable() { @Override public void run() { close(); } });
+        /* sends the last few minutes and a picture of the screen as it is now, with the player and its controls
+           still up (reporting from Settings meant leaving the player first, so the report never showed them) */
+        l.add("Report a glitch"); a.add(new Runnable() { @Override public void run() {
+            showBar();
+            postDelayed(new Runnable() { @Override public void run() {
+                if (!shownNow()) return;
+                NativePlayer p2 = h.act.nativePlayer();
+                Diag.ev("vod: glitch reported while watching · controls " + (barShown() ? "up" : "away") + " (alpha " + bar.getAlpha() + ") · " + (paused ? "paused" : "playing") + (scrubbing ? " · scrubbing" : "")
+                        + " · row " + row + " · " + state() + (p2 == null ? "" : " · " + p2.state()));
+                h.bridge.reportGlitch("Player");
+                h.toast("Sending what just happened…");
+            } }, 700);
+        } });
         h.showMenu(l, a, null, 1f, item.optString("name"));
     }
     private void later(Runnable r) { postDelayed(r, 60); }
