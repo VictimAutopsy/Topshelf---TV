@@ -1340,7 +1340,7 @@ final class SportsData {
             Row r = new Row(); r.id = "lg-" + id;
             if (items.isEmpty()) {
                 String er = errNow.get(id);
-                r.title = lg.name; r.note = busyNow.contains(id) ? "Loading…" : er != null && !er.isEmpty() ? "Couldn't load (" + er + ")" : "No games in the next few days";
+                r.title = lg.name; r.note = busyNow.contains(id) ? "Loading…" : er != null && !er.isEmpty() ? "Couldn't load right now" : "No games in the next few days";
                 rows.add(r); continue;
             }
             Collections.sort(items, new Comparator<Ev>() { @Override public int compare(Ev a, Ev b) {

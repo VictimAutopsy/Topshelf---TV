@@ -39,6 +39,7 @@ final class TitleView extends FrameLayout {
     private final float R;
     private final ImageView bg, logo;
     private final TextView title, meta, desc, hint;
+    private final View hintShade;
     private final Panel panel;
 
     private JSONObject item;               // the title as Movies & TV listed it
@@ -120,13 +121,13 @@ final class TitleView extends FrameLayout {
     private void trailerEnter() {
         trFull = true;
         trHost.animate().cancel(); trHost.animate().alpha(1f).setDuration(700).start();
-        for (View v : new View[] { panel, shade, shade2, hint, epBg }) { v.animate().cancel(); v.animate().alpha(0f).setDuration(700).start(); }
+        for (View v : new View[] { panel, shade, shade2, hint, hintShade, epBg }) { v.animate().cancel(); v.animate().alpha(0f).setDuration(700).start(); }
     }
     private void trailerExit() {
         trFull = false;
         if (tp != null) tp.stop();
         trHost.animate().cancel(); trHost.animate().alpha(0f).setDuration(350).start();
-        for (View v : new View[] { panel, shade, shade2, hint }) { v.animate().cancel(); v.animate().alpha(1f).setDuration(350).start(); }
+        for (View v : new View[] { panel, shade, shade2, hint, hintShade }) { v.animate().cancel(); v.animate().alpha(1f).setDuration(350).start(); }
         epBg.animate().cancel(); epBg.animate().alpha(epBgFor.isEmpty() ? 0f : 1f).setDuration(350).start();
         scheduleTrailer();
     }
@@ -134,7 +135,7 @@ final class TitleView extends FrameLayout {
     void stopTrailer() {
         removeCallbacks(trLater);
         trHost.animate().cancel(); trHost.setAlpha(0f);
-        if (trFull) { trFull = false; for (View v : new View[] { panel, shade, shade2, hint }) { v.animate().cancel(); v.setAlpha(1f); } }
+        if (trFull) { trFull = false; for (View v : new View[] { panel, shade, shade2, hint, hintShade }) { v.animate().cancel(); v.setAlpha(1f); } }
         if (tp != null) { tp.release(); tp = null; }
     }
 
@@ -212,6 +213,10 @@ final class TitleView extends FrameLayout {
         panel = new Panel(getContext());
         addView(panel, new LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.MATCH_PARENT));
         title.setVisibility(GONE); meta.setVisibility(GONE); desc.setVisibility(GONE); logo.setVisibility(GONE);
+        // (a shade under the hint: the page scrolls beneath it, and its words were drawn over the cast's faces)
+        hintShade = new View(getContext());
+        hintShade.setBackground(new GradientDrawable(GradientDrawable.Orientation.TOP_BOTTOM, new int[] { 0x0007080D, 0xD907080D, 0xFF07080D }));
+        addView(hintShade, new LayoutParams(LayoutParams.MATCH_PARENT, h.px(6.5f), android.view.Gravity.BOTTOM));
         hint = h.text(h.fReg, 1.35f, 0x8CFFFFFF);
         addView(hint, h.at(5, h.SH - 2.9f, h.px(Math.min(100, h.SW - 10)), LayoutParams.WRAP_CONTENT));
         if (h.portrait) {
@@ -221,7 +226,7 @@ final class TitleView extends FrameLayout {
             shade.setBackground(new GradientDrawable(GradientDrawable.Orientation.TOP_BOTTOM, new int[] { 0x3307080D, 0x1A07080D, 0x8C07080D, 0xFF07080D }));
             LayoutParams sl = (LayoutParams) shade.getLayoutParams(); sl.height = ih + 2; shade.setLayoutParams(sl);
             shade2.setVisibility(GONE);
-            hint.setVisibility(GONE);
+            hint.setVisibility(GONE); hintShade.setVisibility(GONE);
         }
         setVisibility(GONE);
     }
@@ -242,7 +247,7 @@ final class TitleView extends FrameLayout {
         epRating.clear();
         trEndedOnce = false; trFull = false; epBgFor = ""; removeCallbacks(epBgLater);
         epBg.animate().cancel(); epBg.setAlpha(0f); drop(epBg);
-        for (View v : new View[] { panel, shade, shade2, hint }) { v.animate().cancel(); v.setAlpha(1f); }
+        for (View v : new View[] { panel, shade, shade2, hint, hintShade }) { v.animate().cancel(); v.setAlpha(1f); }
         traktPct = 0; traktVotes = 0; similar.clear(); reviews.clear(); traktCast.clear(); reviewOpen = -1; castFor = null; castCache = null; rowState.clear();
         series = "series".equals(m.optString("type"));
         seasons.clear(); eps.clear(); streams.clear(); asked.clear(); videoId = ""; streamsFor = ""; strSel = 0; epSel = 0;
@@ -1470,7 +1475,7 @@ final class TitleView extends FrameLayout {
                 c.save(); c.translate(x, 17.5f * R - sl.getHeight()); sl.draw(c); c.restore();
                 big.clearShadowLayer();
             }
-            // genres • year • IMDb
+            // genres · year · IMDb
             float y = 21.4f * R;
             small.setTextSize(1.75f * R); small.setColor(0xD9FFFFFF);
             List<String> g = new ArrayList<>();
@@ -1481,7 +1486,7 @@ final class TitleView extends FrameLayout {
             List<String> r1 = new ArrayList<>();
             if (!g.isEmpty()) r1.add(TextUtils.join(", ", g));
             if (!yr.isEmpty()) r1.add(yr.replace("-", "–"));
-            String line = TextUtils.join("   •   ", r1);
+            String line = TextUtils.join("   ·   ", r1);
             c.drawText(line, x, y, small);
             float lx = x + small.measureText(line);
             String rating = f.optString("imdbRating", item.optString("rating"));
@@ -1527,7 +1532,7 @@ final class TitleView extends FrameLayout {
             if (!f.optString("country").isEmpty()) r2.add(f.optString("country"));
             if (!f.optString("language").isEmpty()) r2.add(f.optString("language"));
             small.setTextSize(1.6f * R); small.setColor(0xB3FFFFFF);
-            if (!r2.isEmpty()) c.drawText(TextUtils.ellipsize(TextUtils.join("   •   ", r2), small, cw(70) - (bx - x), TextUtils.TruncateAt.END).toString(), bx + (bx > x ? .4f * R : 0), y + .55f * R, small);
+            if (!r2.isEmpty()) c.drawText(TextUtils.ellipsize(TextUtils.join("   ·   ", r2), small, cw(70) - (bx - x), TextUtils.TruncateAt.END).toString(), bx + (bx > x ? .4f * R : 0), y + .55f * R, small);
             // credits
             y = 28.6f * R;
             List<String> cr = new ArrayList<>();
@@ -2267,7 +2272,7 @@ final class TitleView extends FrameLayout {
                 if (!en.isEmpty()) { tq.setTextSize(2f * R); tq.setColor(Color.WHITE); c.drawText(TextUtils.ellipsize(en, tq, lx1 - lx0, TextUtils.TruncateAt.END).toString(), cx, y + 3.2f * R, tq); }
             } else {
                 tq.setTextSize(1.75f * R);
-                c.drawText(TextUtils.ellipsize(meta.getText().toString().replace("   ·   ", "  •  "), tq, lx1 - lx0, TextUtils.TruncateAt.END).toString(), cx, y, tq);
+                c.drawText(TextUtils.ellipsize(meta.getText().toString().replace("   ·   ", "  ·  "), tq, lx1 - lx0, TextUtils.TruncateAt.END).toString(), cx, y, tq);
             }
             JSONObject pr = Progress.get(getContext(), videoId);
             if (pr != null && !Progress.done(pr) && Progress.fraction(pr) > 0) {

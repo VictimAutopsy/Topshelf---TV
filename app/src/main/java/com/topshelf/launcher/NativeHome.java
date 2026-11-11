@@ -173,7 +173,7 @@ final class NativeHome extends FrameLayout {
         menuTop = 0; menuTitleText = title == null ? "" : title;
         int longest = 0; for (String l : labels) longest = Math.max(longest, l.length());
         LayoutParams lp = (LayoutParams) menuBox.getLayoutParams();
-        lp.width = px(longest > 26 || (title != null && title.length() > 34) ? 32 : 22);
+        lp.width = px(Math.min(SW - 4, longest > 44 ? 46 : longest > 26 || (title != null && title.length() > 34) ? 32 : 22));
         menuBox.setLayoutParams(lp);
         menuFrom = mode.equals("menu") ? menuFrom : mode;
     }

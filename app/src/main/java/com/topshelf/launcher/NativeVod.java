@@ -540,7 +540,7 @@ final class NativeVod extends FrameLayout {
         x.strip.setTranslationX(-h.px(x.scroll));
         if (x.items != null && x.items.isEmpty()) {
             TextView e = h.text(h.fMed, 1.4f, 0x8CFFFFFF);
-            e.setText(x.err.isEmpty() ? "Nothing here yet" : "Couldn't load this row (" + x.err + ")");
+            e.setText(x.err.isEmpty() ? "Nothing here yet" : "Couldn't load this row right now");
             x.strip.addView(e, h.at(PAD + .2f, 8, LayoutParams.WRAP_CONTENT, LayoutParams.WRAP_CONTENT));
         }
     }
@@ -619,7 +619,7 @@ final class NativeVod extends FrameLayout {
             main().post(new Runnable() { @Override public void run() {
                 x.loading = false;
                 x.items = res == null ? new ArrayList<JSONObject>() : res;
-                if (res == null) x.err = er.isEmpty() ? "offline" : er;
+                if (res == null) { x.err = er.isEmpty() ? "offline" : er; Diag.ev("vod: a row didn't load (" + x.err + ")"); }
                 else cat.put(url, new Object[] { System.currentTimeMillis(), res });
                 if (!t.equals(type) || !rows.contains(x)) return;
                 int idx = rows.indexOf(x);

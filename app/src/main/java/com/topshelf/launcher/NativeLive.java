@@ -1065,9 +1065,11 @@ final class NativeLive extends FrameLayout {
         iTitle.setText(p != null ? (tx[0].isEmpty() ? "Untitled" : tx[0]) : ch.n);
         String when = "";
         if (p != null) {
-            if (p[0] <= now && now < p[1]) when = fmt(p[0]) + " – " + fmt(p[1]) + " · " + Math.max(1, Math.round((p[1] - now) / 60000.0)) + " min left";
-            else if (p[0] > now) when = fmt(p[0]) + " – " + fmt(p[1]) + " · starts in " + dur(p[0] - now);
-            else when = fmt(p[0]) + " – " + fmt(p[1]);
+            // (a listing that fills the day, "12:00 AM – 12:00 AM", reads as "All day")
+            String span = p[1] - p[0] >= 24 * 3600000L && fmt(p[0]).equals(fmt(p[1])) ? "All day" : fmt(p[0]) + " – " + fmt(p[1]);
+            if (p[0] <= now && now < p[1]) when = span + " · " + dur(Math.max(60000, p[1] - now)) + " left";
+            else if (p[0] > now) when = span + " · starts in " + dur(p[0] - now);
+            else when = span;
         }
         iWhen.setText(when.isEmpty() ? "No guide information" : when);
         float pr = p != null && p[0] <= now && now < p[1] ? (now - p[0]) / (float) (p[1] - p[0]) : -1;
@@ -1949,8 +1951,9 @@ final class NativeLive extends FrameLayout {
         if (p != null && !tx[0].trim().isEmpty()) {
             final JSONObject rule = rec().ruleFor(ch.u, tx[0]);
             if (rule == null) {
-                l.add("● Record all new episodes of “" + tx[0] + "”"); a.add(new Runnable() { @Override public void run() { recordSeries(ch, tx[0], "new"); } });
-                l.add("● Record every airing of “" + tx[0] + "”"); a.add(new Runnable() { @Override public void run() { recordSeries(ch, tx[0], "all"); } });
+                // (the line above already names the show: three lines each ending in "…" told nothing apart)
+                l.add(r == null ? "● Record all new episodes" : "● Record all new episodes of “" + tx[0] + "”"); a.add(new Runnable() { @Override public void run() { recordSeries(ch, tx[0], "new"); } });
+                l.add(r == null ? "● Record every airing" : "● Record every airing of “" + tx[0] + "”"); a.add(new Runnable() { @Override public void run() { recordSeries(ch, tx[0], "all"); } });
             } else {
                 l.add("Stop recording “" + tx[0] + "” (series)");
                 a.add(new Runnable() { @Override public void run() { rec().removeRule(rule.optString("id")); h.toast("Series recording stopped"); recChanged.run(); } });
@@ -2833,7 +2836,7 @@ final class NativeLive extends FrameLayout {
             h.toast("Sending what just happened…");
         } });
         l.add("Multiview · add channels"); a.add(new Runnable() { @Override public void run() { multiview(ch, null); } });
-        l.add(sleepAt > 0 ? "Sleep timer · " + Math.max(0, Math.round((sleepAt - System.currentTimeMillis()) / 60000.0)) + " min left" : "Sleep timer");
+        l.add(sleepAt > 0 ? "Sleep timer · " + dur(Math.max(0, sleepAt - System.currentTimeMillis())) + " left" : "Sleep timer");
         a.add(new Runnable() { @Override public void run() { later(new Runnable() { @Override public void run() { sleepMenu(); } }); } });
         if (h.linkOn) { l.add("Watch on your other TV"); a.add(new Runnable() { @Override public void run() {
             h.page("lkSend({type:'open',what:'channel',u:" + JSONObject.quote(ch.u) + ",n:" + JSONObject.quote(ch.n) + "}).then(r=>{if(r)toast('Sent to '+lkTvName())})");
