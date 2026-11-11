@@ -3960,13 +3960,19 @@ final class NativeHome extends FrameLayout {
         if (toastView == null) {
             toastView = text(fMed, Ui.TEXT_M, Color.WHITE);
             toastView.setPadding(px(1.8f), px(1f), px(1.8f), px(1f));
-            GradientDrawable bg = new GradientDrawable(); bg.setCornerRadius(3 * R); bg.setColor(0xE6202024);
-            toastView.setBackground(bg);
             FrameLayout.LayoutParams lp = new FrameLayout.LayoutParams(LayoutParams.WRAP_CONTENT, LayoutParams.WRAP_CONTENT, Gravity.BOTTOM | Gravity.CENTER_HORIZONTAL);
             lp.bottomMargin = px(4);
             addView(toastView, lp);
             toastView.setAlpha(0f);
         }
+        // its shape follows the look (set each time: the look can change in Settings): On Air's square bar with the red edge
+        GradientDrawable tbg = new GradientDrawable(); tbg.setCornerRadius(GlassPanel.corner(3 * R)); tbg.setColor(0xE6202024);
+        if (GlassPanel.look.equals("air")) {
+            GradientDrawable edge = new GradientDrawable(); edge.setColor(GlassPanel.airColor);
+            android.graphics.drawable.LayerDrawable ld = new android.graphics.drawable.LayerDrawable(new android.graphics.drawable.Drawable[] { tbg, edge });
+            ld.setLayerWidth(1, px(.4f)); ld.setLayerGravity(1, Gravity.LEFT | Gravity.FILL_VERTICAL);
+            toastView.setBackground(ld);
+        } else toastView.setBackground(tbg);
         toastView.bringToFront();
         toastView.setText(msg);
         toastView.setTranslationY(px(1));

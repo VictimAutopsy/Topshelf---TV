@@ -41,7 +41,7 @@ final class SportsAlert extends FrameLayout {
         card.setBackground(bg);
         card.setClipToOutline(true);
         card.setOutlineProvider(new android.view.ViewOutlineProvider() {
-            @Override public void getOutline(View v, android.graphics.Outline o) { o.setRoundRect(0, 0, v.getWidth(), v.getHeight(), 1.1f * h.R); }
+            @Override public void getOutline(View v, android.graphics.Outline o) { o.setRoundRect(0, 0, v.getWidth(), v.getHeight(), GlassPanel.corner(1.1f * h.R)); }
         });
         card.setElevation(h.px(1.4f));
         // the two ends: each team's colour, its logo (or a short word when it's not a game: TD, FINAL…)
@@ -92,6 +92,10 @@ final class SportsAlert extends FrameLayout {
      * line; a / b: the two teams (or null: then badge words A / B on the accent colour); hint: "OK · Watch on FOX" or "".
      */
     void show(String kickerText, int kickerColor, String headlineText, String detail, End a, End b, String wordA, String wordB, int accent, String hintText, Runnable ok, long ms) {
+        // the card's corners and its OK button follow the look
+        GradientDrawable bg = new GradientDrawable(); bg.setColor(0xFA0B0D12); bg.setCornerRadius(GlassPanel.corner(1.1f * h.R));
+        card.setBackground(bg); card.invalidateOutline();
+        GlassPanel.onButton(hint, 1.2f * h.R, h.px(1.4f), h.px(.35f));
         kicker.setText(kickerText); kicker.setTextColor(kickerColor);
         headline.setText(headlineText);
         line.setText(detail == null ? "" : detail); line.setVisibility(detail == null || detail.isEmpty() ? GONE : VISIBLE);

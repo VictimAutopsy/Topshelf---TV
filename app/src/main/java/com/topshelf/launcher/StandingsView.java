@@ -1118,8 +1118,8 @@ final class StandingsView extends View {
     private float[] paneBack(Canvas c, Pane pn) {
         float x = pn.x, y = pn.y, w = pn.w, in = 1.3f * R;
         rf.set(x, y, x + w, y + pn.hh);
-        p.setColor(PANEL); c.drawRoundRect(rf, 1.2f * R, 1.2f * R, p);
-        stroke(c, rf, 1.2f * R, EDGE, Math.max(1, .07f * R));
+        p.setColor(PANEL); c.drawRoundRect(rf, SportsLook.card(1.2f * R), SportsLook.card(1.2f * R), p);
+        stroke(c, rf, SportsLook.card(1.2f * R), EDGE, Math.max(1, .07f * R));
         float yy = y;
         if (!pn.title.isEmpty()) {
             text(c, pn.title, x + 1.4f * R, yy + 2.45f * R, fSemi, 1.7f, INK, Paint.Align.LEFT);
@@ -1321,7 +1321,7 @@ final class StandingsView extends View {
         float k = (float) (.5 + .5 * Math.sin(SystemClock.uptimeMillis() / 380.0));
         for (int pn = 0; pn < 2; pn++) {
             float x = pad + pn * (pw + gap);
-            rf.set(x, top, x + pw, top + 40 * R); p.setColor(PANEL); c.drawRoundRect(rf, 1.2f * R, 1.2f * R, p);
+            rf.set(x, top, x + pw, top + 40 * R); p.setColor(PANEL); c.drawRoundRect(rf, SportsLook.card(1.2f * R), SportsLook.card(1.2f * R), p);
             for (int i = 0; i < 12; i++) {
                 float y = top + 3.2f * R + i * 3 * R;
                 p.setColor(TRACK); p.setAlpha((int) (150 + 80 * k));
@@ -1349,11 +1349,11 @@ final class StandingsView extends View {
         int col = lift(teamColor(r), .14);
         rf.set(pad, hy, w - pad, hy + hH);
         p.setShader(new LinearGradient(pad, 0, w - pad, 0, new int[] { withA(col, 255), withA(col, 95), PANEL }, new float[] { 0, .55f, 1 }, Shader.TileMode.CLAMP));
-        c.drawRoundRect(rf, 1.4f * R, 1.4f * R, p);
+        c.drawRoundRect(rf, SportsLook.card(1.4f * R), SportsLook.card(1.4f * R), p);
         p.setShader(new LinearGradient(0, hy, 0, hy + hH, 0x0FFFFFFF, Ui.BLACK_25, Shader.TileMode.CLAMP));
-        c.drawRoundRect(rf, 1.4f * R, 1.4f * R, p);
+        c.drawRoundRect(rf, SportsLook.card(1.4f * R), SportsLook.card(1.4f * R), p);
         p.setShader(null);
-        stroke(c, rf, 1.4f * R, Ui.WHITE_7, Math.max(1, .07f * R));
+        stroke(c, rf, SportsLook.card(1.4f * R), Ui.WHITE_7, Math.max(1, .07f * R));
         float ls = 8 * R, lx = pad + 2 * R;
         if (teamLogo != null) { rf.set(lx, hy + (hH - ls) / 2, lx + ls, hy + (hH + ls) / 2); c.drawBitmap(teamLogo, null, rf, p); }
         float nx = lx + ls + 2.2f * R;
@@ -1388,7 +1388,7 @@ final class StandingsView extends View {
         if (td == null || td.loading) {
             text(c, "Getting " + r.name + "'s games…", pad, top + 1.2f * R, fSemi, 1.35f, SUB, Paint.Align.LEFT);
             float kk = (float) (.5 + .5 * Math.sin(SystemClock.uptimeMillis() / 380.0));
-            for (int i = 0; i < 3; i++) { float x = pad + i * 38 * R; rf.set(x, top + 2.4f * R, x + 35.6f * R, top + 12.9f * R); p.setColor(PANEL); p.setAlpha((int) (170 + 85 * kk)); c.drawRoundRect(rf, 1.2f * R, 1.2f * R, p); p.setAlpha(255); }
+            for (int i = 0; i < 3; i++) { float x = pad + i * 38 * R; rf.set(x, top + 2.4f * R, x + 35.6f * R, top + 12.9f * R); p.setColor(PANEL); p.setAlpha((int) (170 + 85 * kk)); c.drawRoundRect(rf, SportsLook.card(1.2f * R), SportsLook.card(1.2f * R), p); p.setAlpha(255); }
             anim = true;
             c.restoreToCount(save);
             return;
@@ -1399,14 +1399,14 @@ final class StandingsView extends View {
         List<SportsData.Ev> nx0 = teamList(0);
         text(c, "Next game", ax, top + 1.2f * R, fSemi, 1.35f, INK, Paint.Align.LEFT);
         if (nx0.isEmpty()) {
-            rf.set(ax, fy, ax + aw, fy + 4 * R); p.setColor(PANEL); c.drawRoundRect(rf, 1.2f * R, 1.2f * R, p);
+            rf.set(ax, fy, ax + aw, fy + 4 * R); p.setColor(PANEL); c.drawRoundRect(rf, SportsLook.card(1.2f * R), SportsLook.card(1.2f * R), p);
             text(c, td.err.isEmpty() ? "No games scheduled." : "ESPN didn't send the schedule (" + td.err + ").", ax + 1.4f * R, fy + 2.5f * R, fMed, 1.2f, SUB, Paint.Align.LEFT);
         } else {
             SportsData.Ev e = nx0.get(0);
             rf.set(ax, fy, ax + aw, fy + fh);
             teamHits.add(new Object[] { new RectF(rf), 0, 0 });
-            p.setColor(PANEL); c.drawRoundRect(rf, 1.2f * R, 1.2f * R, p);
-            if (tcol == 0 && tsel == 0) chosenFill(c, rf, 1.2f * R, r);
+            p.setColor(PANEL); c.drawRoundRect(rf, SportsLook.card(1.2f * R), SportsLook.card(1.2f * R), p);
+            if (tcol == 0 && tsel == 0) chosenFill(c, rf, SportsLook.card(1.2f * R), r);
             SportsData.Team opp = other(e, r.id), me = ours(e, r.id);
             if (featLogo != null && opp != null && opp.logo.equals(featFor)) { rf.set(ax + 2.4f * R, fy + (fh - 5 * R) / 2, ax + 7.4f * R, fy + (fh + 5 * R) / 2); c.drawBitmap(featLogo, null, rf, p); }
             float tx = ax + 9.6f * R;
@@ -1417,7 +1417,7 @@ final class StandingsView extends View {
             if (live && me != null && opp != null) { t.setTypeface(fSemi); t.setTextSize(2.4f * R); scoreW = t.measureText(me.score + "–" + opp.score) + 2 * R; t.setTextSize(2.1f * R); }
             text(c, TextUtils.ellipsize(vs, t, aw - 11 * R - scoreW, TextUtils.TruncateAt.END).toString(), tx, fy + 3.7f * R, fSemi, 2.1f, INK, Paint.Align.LEFT);
             if (live) {
-                rf.set(tx, fy + 4.9f * R, tx + 4.6f * R, fy + 6.7f * R); p.setColor(RED); c.drawRoundRect(rf, .9f * R, .9f * R, p);
+                rf.set(tx, fy + 4.9f * R, tx + 4.6f * R, fy + 6.7f * R); p.setColor(RED); c.drawRoundRect(rf, SportsLook.card(.9f * R), SportsLook.card(.9f * R), p);
                 text(c, "Live", rf.centerX(), fy + 6.15f * R, fSemi, 1.05f, Color.WHITE, Paint.Align.CENTER);
                 text(c, e.detail, tx + 5.4f * R, fy + 6.2f * R, fMed, 1.25f, SUB, Paint.Align.LEFT);
                 if (me != null && opp != null) text(c, me.score + "–" + opp.score, ax + aw - 1.6f * R, fy + 3.9f * R, fSemi, 2.4f, INK, Paint.Align.RIGHT);
@@ -1437,7 +1437,7 @@ final class StandingsView extends View {
         // results
         List<SportsData.Ev> ps = teamList(1);
         text(c, "Results", bx, top + 1.2f * R, fSemi, 1.35f, INK, Paint.Align.LEFT);
-        if (ps.isEmpty()) { rf.set(bx, fy, bx + bw, fy + 4 * R); p.setColor(PANEL); c.drawRoundRect(rf, 1.2f * R, 1.2f * R, p); text(c, "No results yet this season.", bx + 1.4f * R, fy + 2.5f * R, fMed, 1.2f, SUB, Paint.Align.LEFT); }
+        if (ps.isEmpty()) { rf.set(bx, fy, bx + bw, fy + 4 * R); p.setColor(PANEL); c.drawRoundRect(rf, SportsLook.card(1.2f * R), SportsLook.card(1.2f * R), p); text(c, "No results yet this season.", bx + 1.4f * R, fy + 2.5f * R, fMed, 1.2f, SUB, Paint.Align.LEFT); }
         for (int i = 0; i < ps.size(); i++) {
             float y = fy + i * 3.4f * R;
             teamHits.add(new Object[] { new RectF(bx, y, bx + bw, y + 3 * R), 1, i });
@@ -1454,7 +1454,7 @@ final class StandingsView extends View {
                 if (one == null) continue;
                 JSONObject ath = one.optJSONObject("athlete");
                 float y = fy + shown * 4.8f * R;
-                rf.set(cx, y, cx + cw, y + 4.4f * R); p.setColor(PANEL); c.drawRoundRect(rf, .8f * R, .8f * R, p);
+                rf.set(cx, y, cx + cw, y + 4.4f * R); p.setColor(PANEL); c.drawRoundRect(rf, SportsLook.card(.8f * R), SportsLook.card(.8f * R), p);
                 text(c, cat.optString("displayName"), cx + 1.2f * R, y + 1.7f * R, fMed, 1.05f, TER, Paint.Align.LEFT);
                 t.setTypeface(fMed); t.setTextSize(1.15f * R);
                 String val = TextUtils.ellipsize(one.optString("displayValue"), t, cw * .45f, TextUtils.TruncateAt.END).toString();
@@ -1511,8 +1511,8 @@ final class StandingsView extends View {
     private void listRow(Canvas c, SportsData.Ev e, Row us, float x, float y, float w, boolean on, boolean result) {
         float rh = 3 * R, mid = y + rh / 2, base = mid + .45f * R;
         rf.set(x, y, x + w, y + rh);
-        p.setColor(PANEL); c.drawRoundRect(rf, .8f * R, .8f * R, p);
-        if (on) chosenFill(c, new RectF(rf), .8f * R, us);
+        p.setColor(PANEL); c.drawRoundRect(rf, SportsLook.card(.8f * R), SportsLook.card(.8f * R), p);
+        if (on) chosenFill(c, new RectF(rf), SportsLook.card(.8f * R), us);
         SportsData.Team me = ours(e, us.id), them = other(e, us.id);
         if (me == null || them == null) return;
         float cx = x + 1.2f * R;

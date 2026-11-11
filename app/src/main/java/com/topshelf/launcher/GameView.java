@@ -368,7 +368,7 @@ final class GameView extends FrameLayout {
             head(c, base ? "BY INNING" : sport.equals("hockey") ? "BY PERIOD" : sport.equals("soccer") ? "BY HALF" : "BY QUARTER", x, y + 1.4f * R);
             float top = y + 2.8f * R, rowH = 3.4f * R, nameW = 14 * R, colW = Math.min(5.2f * R, (cw - nameW - 6 * R) / (n + 1));
             RectF box = new RectF(x, top, x + nameW + colW * (n + 1) + 3 * R, top + rowH * 3 + R);
-            p.setColor(CARD); c.drawRoundRect(box, 1.2f * R, 1.2f * R, p);
+            p.setColor(CARD); c.drawRoundRect(box, SportsLook.card(1.2f * R), SportsLook.card(1.2f * R), p);
             for (int k = 0; k < n; k++) {
                 String lab = base ? String.valueOf(k + 1) : sport.equals("football") || sport.equals("basketball") ? (k < 4 ? String.valueOf(k + 1) : "OT" + (k > 4 ? (k - 3) : "")) : String.valueOf(k + 1);
                 text(c, lab, cond, 1.2f, DIM, x + nameW + colW * k + colW / 2, top + 2.3f * R, Paint.Align.CENTER, 0);
@@ -392,7 +392,7 @@ final class GameView extends FrameLayout {
             head(c, "WIN CHANCE", x, y + 1.4f * R);
             float top = y + 2.8f * R, gh = 13 * R;
             RectF box = new RectF(x, top, x + cw, top + gh + 2 * R);
-            p.setColor(CARD); c.drawRoundRect(box, 1.2f * R, 1.2f * R, p);
+            p.setColor(CARD); c.drawRoundRect(box, SportsLook.card(1.2f * R), SportsLook.card(1.2f * R), p);
             float gx0 = x + 9 * R, gx1 = x + cw - 2 * R, gy0 = top + R, gy1 = top + gh + R, mid = (gy0 + gy1) / 2;
             int n = wp.length();
             Path line = new Path(), upper = new Path(), lower = new Path();
@@ -433,7 +433,7 @@ final class GameView extends FrameLayout {
                 JSONArray cats = tl.optJSONArray("leaders");
                 int rows = cats == null ? 0 : Math.min(4, cats.length());
                 RectF box = new RectF(cx0, top, cx0 + colW, top + rows * rowH + 3.4f * R);
-                p.setColor(CARD); c.drawRoundRect(box, 1.2f * R, 1.2f * R, p);
+                p.setColor(CARD); c.drawRoundRect(box, SportsLook.card(1.2f * R), SportsLook.card(1.2f * R), p);
                 p.setColor(teamCol(side)); c.drawRect(cx0, top + 1.2f * R, cx0 + .4f * R, top + 2.6f * R, p);
                 text(c, tm == null ? "" : tm.optString("displayName", tm.optString("abbreviation")), heavy, 1.5f, Color.WHITE, cx0 + 1.4f * R, top + 2.4f * R, Paint.Align.LEFT, 0);
                 for (int k = 0; k < rows; k++) {
@@ -460,7 +460,7 @@ final class GameView extends FrameLayout {
             float top = y + 2.8f * R, rowH = 3.6f * R;
             int n = Math.min(12, sp.length());
             RectF box = new RectF(x, top, x + cw, top + n * rowH + R);
-            p.setColor(CARD); c.drawRoundRect(box, 1.2f * R, 1.2f * R, p);
+            p.setColor(CARD); c.drawRoundRect(box, SportsLook.card(1.2f * R), SportsLook.card(1.2f * R), p);
             for (int k = 0; k < n; k++) {
                 JSONObject pl = sp.optJSONObject(sp.length() - 1 - k);
                 if (pl == null) continue;
@@ -493,7 +493,7 @@ final class GameView extends FrameLayout {
             float top = y + 2.8f * R, rowH = 3.4f * R;
             int n = Math.min(14, Math.min(s0.length(), s1.length()));
             RectF box = new RectF(x, top, x + cw, top + n * rowH + R);
-            p.setColor(CARD); c.drawRoundRect(box, 1.2f * R, 1.2f * R, p);
+            p.setColor(CARD); c.drawRoundRect(box, SportsLook.card(1.2f * R), SportsLook.card(1.2f * R), p);
             float mid = x + cw / 2;
             for (int k = 0; k < n; k++) {
                 JSONObject a = s0.optJSONObject(k), b = s1.optJSONObject(k);

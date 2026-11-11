@@ -327,9 +327,10 @@ final class NativeStats extends View {
         int w = getWidth(), hh = getHeight();
         if (w == 0) return;
         rf.set(0, 0, w, hh);
-        fill.setColor(0xEB0D0E13); c.drawRoundRect(rf, 2 * R, 2 * R, fill);
+        float pr = GlassPanel.corner(2 * R);
+        fill.setColor(0xEB0D0E13); c.drawRoundRect(rf, pr, pr, fill);
         fill.setStyle(Paint.Style.STROKE); fill.setStrokeWidth(Math.max(1, .1f * R)); fill.setColor(Ui.WHITE_12);
-        rf.inset(.05f * R, .05f * R); c.drawRoundRect(rf, 2 * R, 2 * R, fill); fill.setStyle(Paint.Style.FILL);
+        rf.inset(.05f * R, .05f * R); c.drawRoundRect(rf, pr, pr, fill); fill.setStyle(Paint.Style.FILL);
         float pad = 2.2f * R, x0 = pad, x1 = w - pad;
         float y = pad;
         // the title line
@@ -369,8 +370,9 @@ final class NativeStats extends View {
             Model.Side s = m.sides[i];
             rf.set(x0 + i * (tabW + R), y, x0 + i * (tabW + R) + tabW, y + 2.6f * R);
             boolean on = i == side;
-            fill.setColor(on ? Color.WHITE : Ui.WHITE_7); c.drawRoundRect(rf, 1.3f * R, 1.3f * R, fill);
-            tBody.setColor(on ? 0xFF111111 : Ui.WHITE_85);
+            float tr = on ? GlassPanel.selRadius(1.3f * R) : GlassPanel.corner(1.3f * R);
+            fill.setColor(on ? GlassPanel.selFill() : Ui.WHITE_7); c.drawRoundRect(rf, tr, tr, fill);
+            tBody.setColor(on ? GlassPanel.selText() : Ui.WHITE_85);
             String lab = (i == 0 ? "◀  " : "") + (s.abbr.isEmpty() ? (i == 0 ? "Away" : "Home") : s.abbr) + " players" + (i == 1 ? "  ▶" : "");
             tBody.setTextAlign(Paint.Align.CENTER);
             c.drawText(lab, rf.centerX(), rf.centerY() + tBody.getTextSize() * .36f, tBody);

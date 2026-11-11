@@ -362,6 +362,9 @@ final class VodPlayer extends FrameLayout {
         upName.setText(next.optString("name", next.optString("title", "Next episode")));
         upPlay.setText("▶  Play now · " + upLeft);
         hideSkip();
+        GradientDrawable ub = new GradientDrawable(); ub.setCornerRadius(GlassPanel.corner(h.px(1.8f))); ub.setColor(0xE6141820); ub.setStroke(Math.max(1, h.px(.08f)), Ui.WHITE_20);
+        upCard.setBackground(ub);
+        GlassPanel.onButton(upPlay, h.px(1.6f), h.px(1.6f), h.px(.7f));
         upCard.setVisibility(VISIBLE); upCard.bringToFront();
         upCard.setTranslationX(h.px(3)); upCard.animate().alpha(1f).translationX(0).setDuration(Ui.MOVE).start();
         removeCallbacks(upTick); postDelayed(upTick, 1000);
@@ -449,6 +452,8 @@ final class VodPlayer extends FrameLayout {
         if (in == null) { hideSkip(); return; }
         if (in[2] == 2 && next != null && from != null && h.S.optBoolean("autoNext", true)) { segNow = null; return; }   // (the Up next card has the credits)
         skipBtn.setText(in[2] == 2 ? (next != null ? "Next episode  ›" : "Skip credits  ›") : in[2] == 1 ? "Skip recap  ›" : "Skip intro  ›");
+        GlassPanel.onButton(skipBtn, h.px(2.4f), h.px(2.2f), h.px(1.1f));
+        skipBtn.setElevation(GlassPanel.look.equals("air") ? 0 : h.px(.6f));     // (no square shadow behind the slanted end)
         skipBtn.setVisibility(VISIBLE); skipBtn.bringToFront();
         skipBtn.animate().alpha(1f).setDuration(Ui.BASE).start();
     }

@@ -737,12 +737,12 @@ final class NativeSports extends FrameLayout {
         } else if (tab.equals("Standings")) {
             // (Standings shows its own)
         } else if (zone.equals("hero") && featured != null && heroWidth > 0) {
-            to = new RectF(h.px(PAD), h.px(HERO_Y), h.px(PAD) + h.px(heroWidth), h.px(HERO_Y) + h.px(HERO_H)); rad = 2.2f * R; col = gameGlow(featured);
+            to = new RectF(h.px(PAD), h.px(HERO_Y), h.px(PAD) + h.px(heroWidth), h.px(HERO_Y) + h.px(HERO_H)); rad = SportsLook.card(2.2f * R); col = gameGlow(featured);
         } else if (zone.equals("side") && sideSel < sideItems.size() && side.getVisibility() == VISIBLE) {
             float[] cr = sideCard(sideSel);
             Side sd = sideItems.get(sideSel);
             float x = h.px(SW - PAD - SIDE_W), y = h.px(sideY + cr[0]);
-            to = new RectF(x, y, x + h.px(SIDE_W), y + h.px(cr[1])); rad = 1.4f * R;
+            to = new RectF(x, y, x + h.px(SIDE_W), y + h.px(cr[1])); rad = SportsLook.card(1.4f * R);
             col = sd.game != null && "in".equals(sd.game.optString("state")) ? LIVE_C : sd.kind.equals("team") ? SportsLook.glowColor(teamCol(sd.team, GOLD)) : sd.kind.equals("fy") ? 0xFF8E7BFF : GOLD;
         } else if (zone.equals("rail") && rail.getVisibility() == VISIBLE) {
             RectF cr = rail.chipAt(leagueSel);
@@ -750,7 +750,7 @@ final class NativeSports extends FrameLayout {
         } else if (zone.equals("grid") && focused != null && focused.getParent() != null) {
             float x = h.px(PAD + col(r) * (CW + GAP)) - h.px(scroll(r)), y = h.px(ROWS_Y) + h.px(3.4f) + h.px(.6f);
             float w = h.px(CW), hh = h.px(CH), gx = w * .03f, gy = hh * .03f;       // (the card you're on is drawn 6% larger)
-            to = new RectF(x - gx, y - gy, x + w + gx, y + hh + gy); rad = 1.6f * R * 1.06f; col = gameGlow(focused.item);
+            to = new RectF(x - gx, y - gy, x + w + gx, y + hh + gy); rad = SportsLook.card(1.6f * R * 1.06f); col = gameGlow(focused.item);
         }
         if (to == null) ring.off(smooth); else ring.to(to, rad, col, ctl, smooth);
     }
@@ -930,7 +930,7 @@ final class NativeSports extends FrameLayout {
             img.setScaleType(ImageView.ScaleType.FIT_XY);
             addView(img, new LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.MATCH_PARENT));
             setPivotX(h.px(CW) / 2f); setPivotY(h.px(CH) / 2f);
-            GradientDrawable ph = new GradientDrawable(); ph.setCornerRadius(1.6f * R); ph.setColor(0xFF101826);
+            GradientDrawable ph = new GradientDrawable(); ph.setCornerRadius(SportsLook.card(1.6f * R)); ph.setColor(0xFF101826);
             setBackground(ph);
             paint();
         }
@@ -965,7 +965,7 @@ final class NativeSports extends FrameLayout {
             if (smooth) animate().scaleX(s).scaleY(s).setDuration(Ui.FAST).setInterpolator(TileView.EASE).start(); else { setScaleX(s); setScaleY(s); }
             setZ(f ? 3 : 0);
             setElevation(f ? 1.4f * R : 0);
-            setOutlineProvider(new android.view.ViewOutlineProvider() { @Override public void getOutline(View v, android.graphics.Outline o) { o.setRoundRect(0, 0, v.getWidth(), v.getHeight(), 1.6f * R); } });
+            setOutlineProvider(new android.view.ViewOutlineProvider() { @Override public void getOutline(View v, android.graphics.Outline o) { o.setRoundRect(0, 0, v.getWidth(), v.getHeight(), SportsLook.card(1.6f * R)); } });
         }
     }
 
@@ -1100,7 +1100,7 @@ final class NativeSports extends FrameLayout {
             c.drawColor(0xFF0E1A16);
             p.setStyle(Paint.Style.STROKE); p.setStrokeWidth(.12f * R); p.setColor(0x59A8FF60);
             p.setPathEffect(new android.graphics.DashPathEffect(new float[] { .6f * R, .4f * R }, 0));
-            c.drawRoundRect(new RectF(.4f * R, .4f * R, w - .4f * R, hh - .4f * R), 1.3f * R, 1.3f * R, p);
+            c.drawRoundRect(new RectF(.4f * R, .4f * R, w - .4f * R, hh - .4f * R), SportsLook.card(1.3f * R), SportsLook.card(1.3f * R), p);
             p.setPathEffect(null); p.setStyle(Paint.Style.FILL);
             text(c, "+", h.fReg, 3.4f, GREEN, w / 2f, hh / 2f - .2f * R, Paint.Align.CENTER, 0);
             text(c, it.optString("label"), h.fSemi, 1.2f, Color.WHITE, w / 2f, hh / 2f + 2.2f * R, Paint.Align.CENTER, 0);
@@ -1112,7 +1112,7 @@ final class NativeSports extends FrameLayout {
         String state = it.optString("state");
         boolean live = state.equals("in"), post = state.equals("post"), fight = it.optBoolean("card");
         int[] cs = pairCols(ts, fight);
-        float rad = 1.6f * R;
+        float rad = SportsLook.card(1.6f * R);
         c.drawColor(GROUND);
         Path clip = new Path(); clip.addRoundRect(new RectF(0, 0, w, hh), rad, rad, Path.Direction.CW);
         c.save(); c.clipPath(clip);
@@ -1215,7 +1215,7 @@ final class NativeSports extends FrameLayout {
         Bitmap out = Bitmap.createBitmap(w, hh, Bitmap.Config.ARGB_8888);
         Canvas c = new Canvas(out);
         Paint p = new Paint(Paint.ANTI_ALIAS_FLAG | Paint.FILTER_BITMAP_FLAG);
-        float rad = 2.2f * R;
+        float rad = SportsLook.card(2.2f * R);
         Path clip = new Path(); clip.addRoundRect(new RectF(0, 0, w, hh), rad, rad, Path.Direction.CW);
         c.clipPath(clip);
         JSONArray ts = it.optJSONArray("teams");
@@ -1420,7 +1420,7 @@ final class NativeSports extends FrameLayout {
         Bitmap out = Bitmap.createBitmap(w, hh, Bitmap.Config.ARGB_8888);
         Canvas c = new Canvas(out);
         Paint p = new Paint(Paint.ANTI_ALIAS_FLAG | Paint.FILTER_BITMAP_FLAG);
-        float rad = 2f * R;
+        float rad = SportsLook.card(2f * R);
         Path clip = new Path(); clip.addRoundRect(new RectF(0, 0, w, hh), rad, rad, Path.Direction.CW);
         c.clipPath(clip);
         JSONArray ts = it.optJSONArray("teams");
@@ -1616,7 +1616,7 @@ final class NativeSports extends FrameLayout {
         } });
     }
     private void paintSideCard(Canvas c, Paint p, Side s, float[] cr, int w) {
-        float top = cr[0] * R, ch = cr[1] * R, rad = 1.4f * R;
+        float top = cr[0] * R, ch = cr[1] * R, rad = SportsLook.card(1.4f * R);
         RectF rc = new RectF(0, top, w, top + ch);
         boolean live = s.game != null && "in".equals(s.game.optString("state"));
         c.save();
@@ -1933,7 +1933,7 @@ final class NativeSports extends FrameLayout {
         Bitmap out = Bitmap.createBitmap(w, hh, Bitmap.Config.ARGB_8888);
         Canvas c = new Canvas(out);
         Paint p = new Paint(Paint.ANTI_ALIAS_FLAG | Paint.FILTER_BITMAP_FLAG);
-        float rad = 2.4f * R;
+        float rad = SportsLook.card(2.4f * R);
         Path clip = new Path(); clip.addRoundRect(new RectF(0, 0, w, hh), rad, rad, Path.Direction.CW);
         c.clipPath(clip);
         if (it.optBoolean("fyEdit")) {

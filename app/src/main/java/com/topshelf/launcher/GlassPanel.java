@@ -228,6 +228,16 @@ final class GlassPanel extends FrameLayout {
     static int raiseFill() { return look.equals("air") ? airColor : look.equals("shelf") ? 0xFF241D20 : look.equals("ink") ? (inkColor | 0xFF000000) : 0xFF34333D; }
     static int raiseRing() { return look.equals("air") ? Ui.WHITE_95 : look.equals("shelf") ? shelfLight() : look.equals("ink") ? inkPaper() : Ui.WHITE_85; }
     static float corner(float r) { return look.equals("air") ? 0 : look.equals("shelf") || look.equals("ink") ? Math.min(r, .5f * rem) : r; }
+    /** a button that is always the one you're on (Skip intro, Play now, an alert's OK): the look's highlight and
+        words and, On Air, its capitals and the room for its slanted end. Called each time it shows, so a change
+        of look in Settings is picked up. */
+    static void onButton(android.widget.TextView b, float radius, float padX, float padY) {
+        boolean air = look.equals("air");
+        b.setBackground(buttonBg(true, radius, 0xFFFFFFFF));
+        b.setTextColor(buttonText(true));
+        b.setAllCaps(air); b.setLetterSpacing(air ? .06f : 0f);
+        b.setPadding(Math.round(padX), Math.round(padY), Math.round(padX + (air ? .9f * rem : 0)), Math.round(padY));
+    }
     static int buttonText(boolean on) {
         if (look.equals("air")) return 0xFFFFFFFF;
         if (look.equals("shelf")) return on ? 0xFF1A1410 : 0xFFFFFFFF;

@@ -46,6 +46,9 @@ final class SportsLook {
         return heavy;
     }
 
+    /** a card's corner (a game, a team, a table): the look's — square On Air, slight on the shelf and in ink */
+    static float card(float r) { return GlassPanel.corner(r); }
+
     // ------------------------------------------------------------------ a control
     /** a control's height (rem) and the room either side of its words */
     static final float CTRL_H = 2.9f, CTRL_PAD = 1.4f;
