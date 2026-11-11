@@ -341,8 +341,8 @@ final class NativeHome extends FrameLayout {
         // the shade at the top and bottom (only where it's not clear: the middle quarter is left alone)
         scrim = new FrameLayout(c) { @Override public boolean hasOverlappingRendering() { return false; } };
         View sTop = new View(c), sBot = new View(c);
-        sTop.setBackground(new GradientDrawable(GradientDrawable.Orientation.TOP_BOTTOM, new int[] { 0x6B000000, 0x00000000 }));
-        sBot.setBackground(new GradientDrawable(GradientDrawable.Orientation.TOP_BOTTOM, new int[] { 0x00000000, 0x14000000, 0x73000000 }));
+        sTop.setBackground(new GradientDrawable(GradientDrawable.Orientation.TOP_BOTTOM, new int[] { Ui.BLACK_45, 0x00000000 }));
+        sBot.setBackground(new GradientDrawable(GradientDrawable.Orientation.TOP_BOTTOM, new int[] { 0x00000000, 0x14000000, Ui.BLACK_45 }));
         ((FrameLayout) scrim).addView(sTop, new LayoutParams(LayoutParams.MATCH_PARENT, Math.round(H * .25f)));
         LayoutParams sbl = new LayoutParams(LayoutParams.MATCH_PARENT, H - Math.round(H * .5f));
         sbl.topMargin = Math.round(H * .5f);
@@ -360,7 +360,7 @@ final class NativeHome extends FrameLayout {
             billboard.setVisibility(INVISIBLE);
             addView(billboard, new LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.MATCH_PARENT));
         } else if (homeStyle.equals("gallery")) buildGallery(c);
-        dock = glass(3.4f, 0x0DFFFFFF);
+        dock = glass(3.4f, Ui.WHITE_7);
         content.addView(dock, at(3, DOCK_PANEL_Y, px(SW - 6), px(DOCK_PANEL_H)));
         glow = new View(c);
         glow.setBackground(new Glow());
@@ -370,8 +370,8 @@ final class NativeHome extends FrameLayout {
         dockCells.setClipChildren(false);
         content.addView(dockCells, new LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.MATCH_PARENT));
         // a small handle under the dock: the app drawer is down there (Down opens it)
-        hint = text(fMed, .95f, 0xB8FFFFFF);
-        GradientDrawable hb = new GradientDrawable(); hb.setColor(0x8CFFFFFF); hb.setCornerRadius(px(.3f));
+        hint = text(fMed, Ui.TEXT_XS, Ui.WHITE_75);
+        GradientDrawable hb = new GradientDrawable(); hb.setColor(Ui.WHITE_60); hb.setCornerRadius(px(.3f));
         hint.setBackground(hb);
         hint.setElevation(px(.2f));
         FrameLayout.LayoutParams hl = new FrameLayout.LayoutParams(px(5.2f), Math.max(3, px(.42f)), Gravity.BOTTOM | Gravity.CENTER_HORIZONTAL);
@@ -389,8 +389,8 @@ final class NativeHome extends FrameLayout {
         tshelf.setClipChildren(true);
         tshelf.setAlpha(0f);
         content.addView(tshelf, at(3, DOCK_PANEL_Y - 17.5f, px(SW - 6), px(16.6f)));
-        tsHead = text(fSemi, 1.2f, 0xE0FFFFFF);
-        tsHead.setShadowLayer(.6f * R, 0, .1f * R, 0x99000000);
+        tsHead = text(fSemi, Ui.TEXT_M, Ui.WHITE_85);
+        tsHead.setShadowLayer(.6f * R, 0, .1f * R, Ui.BLACK_60);
         tshelf.addView(tsHead, at(3, 0, LayoutParams.WRAP_CONTENT, LayoutParams.WRAP_CONTENT));
         tsStrip = new FrameLayout(c);
         tsStrip.setClipChildren(false);
@@ -453,24 +453,24 @@ final class NativeHome extends FrameLayout {
         else addView(tabs, at(1.6f, 1.6f, px(Math.min(22f, SW - 4)), px(SH - 3.2f)));
         tabs.setAlpha(0f); if (!mRail) tabs.setTranslationX(-px(3));
         // (the round-button bar is gone: kept, empty and hidden, for the code that still mentions it)
-        topbar = glass(3f, 0x12FFFFFF);
+        topbar = glass(3f, Ui.WHITE_7);
         topRow = new LinearLayout(c);
         topbar.addView(topRow, new LayoutParams(LayoutParams.WRAP_CONTENT, LayoutParams.WRAP_CONTENT));
         addView(topbar, new LayoutParams(1, 1));
         topbar.setVisibility(GONE);
-        tip = text(fMed, 1.05f, Color.WHITE);
+        tip = text(fMed, Ui.TEXT_S, Color.WHITE);
         tip.setAlpha(0f);
         addView(tip, new LayoutParams(LayoutParams.WRAP_CONTENT, LayoutParams.WRAP_CONTENT));
         } else if (!barStyle.equals("classic")) {
         buildStyledBar(c);
         } else {
         // --- tab bar
-        tabs = glass(3f, 0x12FFFFFF);
+        tabs = glass(3f, Ui.WHITE_7);
         tabsRow = new LinearLayout(c);
         tabsRow.setPadding(px(.55f), px(.55f), px(.55f), px(.55f));
         tabViews = new TextView[TAB_IDS.length];
         for (int i = 0; i < TAB_IDS.length; i++) {
-            TextView t = text(fSemi, portrait ? 1.3f : 1.35f, 0xC7FFFFFF);
+            TextView t = text(fSemi, portrait ? 1.3f : 1.35f, Ui.WHITE_75);
             t.setText(TAB_NAMES[i]);
             float tp = portrait ? 1.2f : 2.1f;
             t.setPadding(px(tp), px(.95f), px(tp), px(.95f));
@@ -486,7 +486,7 @@ final class NativeHome extends FrameLayout {
         addView(tabs, tl);
 
         // --- top bar (round buttons, weather, clock)
-        topbar = glass(3f, 0x12FFFFFF);
+        topbar = glass(3f, Ui.WHITE_7);
         topRow = new LinearLayout(c);
         topRow.setGravity(Gravity.CENTER_VERTICAL);
         topRow.setPadding(px(.55f), px(.55f), px(1.4f), px(.55f));
@@ -494,8 +494,8 @@ final class NativeHome extends FrameLayout {
         FrameLayout.LayoutParams bl = new FrameLayout.LayoutParams(LayoutParams.WRAP_CONTENT, LayoutParams.WRAP_CONTENT, Gravity.TOP | Gravity.RIGHT);
         bl.topMargin = px(2.3f); bl.rightMargin = px(portrait ? 2.4f : 4.6f);
         addView(topbar, bl);
-        tip = text(fMed, 1.05f, Color.WHITE);
-        tip.setShadowLayer(.6f * R, 0, .1f * R, 0x99000000);
+        tip = text(fMed, Ui.TEXT_S, Color.WHITE);
+        tip.setShadowLayer(.6f * R, 0, .1f * R, Ui.BLACK_60);
         tip.setAlpha(0f);
         addView(tip, new LayoutParams(LayoutParams.WRAP_CONTENT, LayoutParams.WRAP_CONTENT));
         }
@@ -504,10 +504,10 @@ final class NativeHome extends FrameLayout {
         // --- photo mode: caption, hint, pause badge, screensaver clock
         caption = new LinearLayout(c);
         caption.setOrientation(LinearLayout.VERTICAL);
-        capSub = text(fSemi, 1.05f, 0x9EFFFFFF); capSub.setLetterSpacing(.08f); capSub.setAllCaps(true);
+        capSub = text(fSemi, Ui.TEXT_S, Ui.WHITE_60); capSub.setLetterSpacing(.08f); capSub.setAllCaps(true);
         capTitle = text(fSemi, 3f, Color.WHITE); capTitle.setMaxLines(2); capTitle.setLetterSpacing(-.015f);
-        capBy = text(fReg, 1.1f, 0x9EFFFFFF);
-        for (TextView t : new TextView[] { capSub, capTitle, capBy }) t.setShadowLayer(R, 0, .1f * R, 0x8C000000);
+        capBy = text(fReg, Ui.TEXT_S, Ui.WHITE_60);
+        for (TextView t : new TextView[] { capSub, capTitle, capBy }) t.setShadowLayer(R, 0, .1f * R, Ui.BLACK_55);
         caption.addView(capSub);
         LinearLayout.LayoutParams ct = new LinearLayout.LayoutParams(LayoutParams.WRAP_CONTENT, LayoutParams.WRAP_CONTENT); ct.topMargin = px(.45f);
         caption.addView(capTitle, ct);
@@ -517,25 +517,25 @@ final class NativeHome extends FrameLayout {
         FrameLayout.LayoutParams cl = new FrameLayout.LayoutParams(px(Math.min(62, SW - 10)), LayoutParams.WRAP_CONTENT, Gravity.BOTTOM | Gravity.LEFT);
         cl.leftMargin = px(6); cl.bottomMargin = px(SH - 60);
         addView(caption, cl);
-        shelfHint = text(fReg, 1.1f, 0x9EFFFFFF);
+        shelfHint = text(fReg, Ui.TEXT_S, Ui.WHITE_60);
         shelfHint.setText("◀ ▶ browse photos  ·  OK pause  ·  ▼ or Back to return");
-        shelfHint.setShadowLayer(.6f * R, 0, .1f * R, 0x99000000);
+        shelfHint.setShadowLayer(.6f * R, 0, .1f * R, Ui.BLACK_60);
         shelfHint.setAlpha(0f);
         FrameLayout.LayoutParams sh = new FrameLayout.LayoutParams(LayoutParams.WRAP_CONTENT, LayoutParams.WRAP_CONTENT, Gravity.BOTTOM | Gravity.RIGHT);
         sh.rightMargin = px(6); sh.bottomMargin = px(5.4f);
         addView(shelfHint, sh);
         pause = glass(3f, 0x4D141418);
-        TextView pt = text(fSemi, 1.1f, Color.WHITE); pt.setText("Slideshow paused");
+        TextView pt = text(fSemi, Ui.TEXT_S, Color.WHITE); pt.setText("Slideshow paused");
         pt.setPadding(px(1), px(.5f), px(1), px(.5f));
         pause.addView(pt, new LayoutParams(LayoutParams.WRAP_CONTENT, LayoutParams.WRAP_CONTENT));
         pause.setAlpha(0f);
         addView(pause, at(6, 3.2f, LayoutParams.WRAP_CONTENT, LayoutParams.WRAP_CONTENT));
         bigClock = new LinearLayout(c);
         bigClock.setOrientation(LinearLayout.VERTICAL);
-        bcTime = text(fMed, 7f, Color.WHITE); bcDate = text(fMed, 1.5f, 0xDDFFFFFF);
-        bcNext = text(fSemi, 1.45f, Color.WHITE);
+        bcTime = text(fMed, 7f, Color.WHITE); bcDate = text(fMed, Ui.TEXT_XL, Ui.WHITE_85);
+        bcNext = text(fSemi, Ui.TEXT_XL, Color.WHITE);
         bcNext.setSingleLine(true); bcNext.setEllipsize(android.text.TextUtils.TruncateAt.END); bcNext.setMaxWidth(px(60));
-        for (TextView t : new TextView[] { bcTime, bcDate, bcNext }) t.setShadowLayer(1.6f * R, 0, .2f * R, 0x80000000);
+        for (TextView t : new TextView[] { bcTime, bcDate, bcNext }) t.setShadowLayer(1.6f * R, 0, .2f * R, Ui.BLACK_55);
         bigClock.addView(bcTime); bigClock.addView(bcDate);
         LinearLayout.LayoutParams bnl = new LinearLayout.LayoutParams(LayoutParams.WRAP_CONTENT, LayoutParams.WRAP_CONTENT); bnl.topMargin = px(1f);
         bigClock.addView(bcNext, bnl);
@@ -551,7 +551,7 @@ final class NativeHome extends FrameLayout {
         menuRows.setPadding(px(.8f), px(.8f), px(.8f), px(.8f));
         menuBox = new LinearLayout(c);
         menuBox.setOrientation(LinearLayout.VERTICAL);
-        menuTitle = text(fSemi, 1.05f, 0x99FFFFFF);
+        menuTitle = text(fSemi, Ui.TEXT_S, Ui.WHITE_60);
         menuTitle.setPadding(px(2.1f), px(1.4f), px(2.1f), px(.1f));
         menuTitle.setMaxLines(2); menuTitle.setEllipsize(android.text.TextUtils.TruncateAt.END);
         menuBox.addView(menuTitle, new LinearLayout.LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT));
@@ -560,7 +560,7 @@ final class NativeHome extends FrameLayout {
         menuPanel.setAlpha(0f); menuPanel.setVisibility(GONE);
         addView(menuPanel, new LayoutParams(LayoutParams.WRAP_CONTENT, LayoutParams.WRAP_CONTENT));
         launchOv = new FrameLayout(c);
-        launchOv.setBackgroundColor(0xE6000000);
+        launchOv.setBackgroundColor(Ui.BLACK_90);
         launchOv.setAlpha(0f); launchOv.setVisibility(GONE);
         addView(launchOv, new LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.MATCH_PARENT));
 
@@ -629,9 +629,9 @@ final class NativeHome extends FrameLayout {
         tabsRow.setGravity(Gravity.CENTER_VERTICAL);
         tabViews = new TextView[TAB_IDS.length];
         for (int i = 0; i < TAB_IDS.length; i++) {
-            TextView t = text(fSemi, fl ? 1.5f : 1.35f, 0xBFFFFFFF);
+            TextView t = text(fSemi, fl ? 1.5f : 1.35f, Ui.WHITE_75);
             t.setText(TAB_NAMES[i]);
-            if (fl) { t.setShadowLayer(.8f * R, 0, .1f * R, 0x8C000000); t.setPadding(px(1.4f), px(.75f), px(1.4f), px(1.35f)); }
+            if (fl) { t.setShadowLayer(.8f * R, 0, .1f * R, Ui.BLACK_55); t.setPadding(px(1.4f), px(.75f), px(1.4f), px(1.35f)); }
             else t.setPadding(px(1.7f), px(.85f), px(1.7f), px(.85f));
             TabBg bg = new TabBg();
             bg.rad = st ? 1.1f * R : cap ? 1.3f * R : -1; bg.ringW = Math.max(2f, .2f * R);
@@ -649,7 +649,7 @@ final class NativeHome extends FrameLayout {
             tabs = glass(0f, 0x33141418);
             tabs.setLiquidAllowed(false);
             FrameLayout row = new FrameLayout(c);
-            TextView brand = text(fSemi, 1.55f, Color.WHITE);
+            TextView brand = text(fSemi, Ui.TEXT_XL, Color.WHITE);
             brand.setText("TopShelf");
             FrameLayout.LayoutParams b = new FrameLayout.LayoutParams(LayoutParams.WRAP_CONTENT, LayoutParams.WRAP_CONTENT, Gravity.LEFT | Gravity.CENTER_VERTICAL);
             b.leftMargin = px(4.6f);
@@ -661,7 +661,7 @@ final class NativeHome extends FrameLayout {
             tabs.addView(row, new LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.MATCH_PARENT));
             addView(tabs, new LayoutParams(LayoutParams.MATCH_PARENT, px(6.6f)));
         } else {
-            tabs = glass(cap ? 1.9f : 3f, cap ? 0x33141418 : 0x12FFFFFF);
+            tabs = glass(cap ? 1.9f : 3f, cap ? 0x33141418 : Ui.WHITE_7);
             if (fl) { tabs.setBare(); tabs.setLiquidAllowed(false); tabs.addView(tabsRow, new LayoutParams(LayoutParams.WRAP_CONTENT, LayoutParams.WRAP_CONTENT)); }
             else {
                 // one capsule: the tabs, a thin divider, then the buttons
@@ -670,7 +670,7 @@ final class NativeHome extends FrameLayout {
                 row.setPadding(px(.5f), px(.5f), px(.5f), px(.5f));
                 row.addView(tabsRow);
                 View div = new View(c);
-                div.setBackgroundColor(0x38FFFFFF);
+                div.setBackgroundColor(Ui.WHITE_20);
                 LinearLayout.LayoutParams dl = new LinearLayout.LayoutParams(Math.max(1, px(.1f)), px(2.2f));
                 dl.leftMargin = px(.9f); dl.rightMargin = px(.6f);
                 row.addView(div, dl);
@@ -681,7 +681,7 @@ final class NativeHome extends FrameLayout {
             tl.topMargin = px(2.1f);
             addView(tabs, tl);
         }
-        topbar = glass(3f, 0x12FFFFFF);
+        topbar = glass(3f, Ui.WHITE_7);
         if (fl) {
             // the buttons and the weather straight on the photo, at the right
             topbar.setBare(); topbar.setLiquidAllowed(false);
@@ -703,8 +703,8 @@ final class NativeHome extends FrameLayout {
             addView(cornerR, rl);
             barExtras.add(cornerL); barExtras.add(cornerR);
         }
-        tip = text(fMed, 1.05f, Color.WHITE);
-        tip.setShadowLayer(.6f * R, 0, .1f * R, 0x99000000);
+        tip = text(fMed, Ui.TEXT_S, Color.WHITE);
+        tip.setShadowLayer(.6f * R, 0, .1f * R, Ui.BLACK_60);
         tip.setAlpha(0f);
         addView(tip, new LayoutParams(LayoutParams.WRAP_CONTENT, LayoutParams.WRAP_CONTENT));
     }
@@ -760,10 +760,10 @@ final class NativeHome extends FrameLayout {
             topRow.addView(b, lp);
             topItems.add(b); topActs.add(a);
         }
-        wx = text(fMed, 1.35f, Color.WHITE);
-        wx.setShadowLayer(.8f * R, 0, .1f * R, 0x73000000);
+        wx = text(fMed, Ui.TEXT_L, Color.WHITE);
+        wx.setShadowLayer(.8f * R, 0, .1f * R, Ui.BLACK_45);
         clock = text(fMed, styled && !st ? 1.9f : 1.75f, Color.WHITE);
-        clock.setShadowLayer(.8f * R, 0, .1f * R, 0x73000000);
+        clock.setShadowLayer(.8f * R, 0, .1f * R, Ui.BLACK_45);
         clock.setFontFeatureSettings("tnum");
         LinearLayout.LayoutParams wl = new LinearLayout.LayoutParams(LayoutParams.WRAP_CONTENT, LayoutParams.WRAP_CONTENT); wl.leftMargin = px(.8f);
         LinearLayout.LayoutParams kl = new LinearLayout.LayoutParams(LayoutParams.WRAP_CONTENT, LayoutParams.WRAP_CONTENT); kl.leftMargin = px(.6f);
@@ -780,7 +780,7 @@ final class NativeHome extends FrameLayout {
         } else {
             if (st) {
                 View div = new View(getContext());
-                div.setBackgroundColor(0x38FFFFFF);
+                div.setBackgroundColor(Ui.WHITE_20);
                 LinearLayout.LayoutParams dl = new LinearLayout.LayoutParams(Math.max(1, px(.1f)), px(2f));
                 dl.leftMargin = px(1f); dl.rightMargin = px(.2f);
                 topRow.addView(div, dl);
@@ -808,10 +808,10 @@ final class NativeHome extends FrameLayout {
         hd.setGravity(Gravity.CENTER_VERTICAL);
         clock = text(fSemi, card ? 1.9f : rl ? 1.7f : 2.2f, Color.WHITE);
         clock.setFontFeatureSettings("tnum");
-        wx = text(fMed, 1.3f, 0xD9FFFFFF);
+        wx = text(fMed, Ui.TEXT_L, Ui.WHITE_85);
         wx.setVisibility(GONE);
         if (card) {
-            for (TextView t : new TextView[] { clock, wx }) t.setShadowLayer(.8f * R, 0, .1f * R, 0x99000000);
+            for (TextView t : new TextView[] { clock, wx }) t.setShadowLayer(.8f * R, 0, .1f * R, Ui.BLACK_60);
             hd.addView(clock);
             LinearLayout.LayoutParams wl = new LinearLayout.LayoutParams(LayoutParams.WRAP_CONTENT, LayoutParams.WRAP_CONTENT); wl.leftMargin = px(1.2f);
             hd.addView(wx, wl);
@@ -843,7 +843,7 @@ final class NativeHome extends FrameLayout {
             App ap = items.get(i);
             if (ap.special) continue;
             if (na == 0) {
-                if (panel) { TextView hl = text(fSemi, 1f, 0xB3FFFFFF); hl.setText("APPS"); hl.setLetterSpacing(.1f); hl.setPadding(px(1.1f), px(1.2f), 0, px(.3f)); tabsRow.addView(hl); }
+                if (panel) { TextView hl = text(fSemi, Ui.TEXT_S, Ui.WHITE_75); hl.setText("APPS"); hl.setLetterSpacing(.1f); hl.setPadding(px(1.1f), px(1.2f), 0, px(.3f)); tabsRow.addView(hl); }
                 else divider(tabsRow);
             }
             TextView t = menuRow(ap.label, appMark(ap));
@@ -852,7 +852,7 @@ final class NativeHome extends FrameLayout {
         }
         // menu + what's on: your team's game and what you're watching, a press away
         if (glance) {
-            nowHead = text(fSemi, 1f, 0xB3FFFFFF); nowHead.setText("RIGHT NOW"); nowHead.setLetterSpacing(.12f); nowHead.setPadding(px(1.3f), px(2f), 0, px(.6f));
+            nowHead = text(fSemi, Ui.TEXT_S, Ui.WHITE_75); nowHead.setText("RIGHT NOW"); nowHead.setLetterSpacing(.12f); nowHead.setPadding(px(1.3f), px(2f), 0, px(.6f));
             tabsRow.addView(nowHead);
             nowGame = nowRow(); topItems.add(nowGame); topActs.add("now:game"); topLabels.add("");
             nowCw = nowRow(); topItems.add(nowCw); topActs.add("now:cw"); topLabels.add("");
@@ -886,7 +886,7 @@ final class NativeHome extends FrameLayout {
             }
             for (String a0 : acts) {
                 HomeIcons ic = toolIcon(a0);
-                TextView t = text(fMed, 1.2f, Color.WHITE);
+                TextView t = text(fMed, Ui.TEXT_M, Color.WHITE);
                 ic.setBounds(0, 0, px(2.2f), px(2.2f));
                 t.setCompoundDrawables(null, ic, null, null);
                 t.setGravity(Gravity.CENTER);
@@ -906,7 +906,7 @@ final class NativeHome extends FrameLayout {
         tick();
     }
     private void divider(LinearLayout to) {
-        View div = new View(getContext()); div.setBackgroundColor(0x24FFFFFF);
+        View div = new View(getContext()); div.setBackgroundColor(Ui.WHITE_12);
         LinearLayout.LayoutParams dl = new LinearLayout.LayoutParams(LayoutParams.MATCH_PARENT, Math.max(1, px(.08f))); dl.setMargins(px(1.1f), px(1f), px(1.1f), px(.8f));
         to.addView(div, dl);
     }
@@ -927,7 +927,7 @@ final class NativeHome extends FrameLayout {
     }
     /** a "right now" row: two lines (what, when) */
     private TextView nowRow() {
-        TextView t = text(fMed, 1.45f, Color.WHITE);
+        TextView t = text(fMed, Ui.TEXT_XL, Color.WHITE);
         t.setMaxLines(2); t.setEllipsize(android.text.TextUtils.TruncateAt.END);
         t.setGravity(Gravity.CENTER_VERTICAL);
         t.setPadding(px(1.3f), 0, px(1f), 0);
@@ -972,7 +972,7 @@ final class NativeHome extends FrameLayout {
         return menuRow(label, icon, tabsRow, lp);
     }
     private TextView menuRow(String label, android.graphics.drawable.Drawable icon, LinearLayout parent, LinearLayout.LayoutParams lp) {
-        TextView t = text(fMed, 1.5f, Color.WHITE);
+        TextView t = text(fMed, Ui.TEXT_XL, Color.WHITE);
         t.setText(label);
         t.setSingleLine(true);
         t.setGravity(Gravity.CENTER_VERTICAL);
@@ -997,7 +997,7 @@ final class NativeHome extends FrameLayout {
         if (railAnim != null) railAnim.cancel();
         if (open) railLabels(true);
         railAnim = ValueAnimator.ofInt(lp.width, to);
-        railAnim.setDuration(open ? 240 : 200);
+        railAnim.setDuration(open ? Ui.BASE : Ui.FAST);
         railAnim.setInterpolator(TileView.EASE);
         railAnim.addUpdateListener(new ValueAnimator.AnimatorUpdateListener() { @Override public void onAnimationUpdate(ValueAnimator va) { lp.width = (Integer) va.getAnimatedValue(); tabs.setLayoutParams(lp); } });
         railAnim.addListener(new android.animation.AnimatorListenerAdapter() { @Override public void onAnimationEnd(android.animation.Animator a) { if (!railOpen) railLabels(false); } });
@@ -1018,10 +1018,10 @@ final class NativeHome extends FrameLayout {
         if (!rail() || tabs == null) return;
         boolean show = railOpen || railShown();
         tabs.animate().cancel();
-        tabs.animate().alpha(show ? 1f : 0f).setDuration(200).start();
+        tabs.animate().alpha(show ? 1f : 0f).setDuration(Ui.FAST).start();
         boolean room = railShown();
         if (billboard != null) billboard.railRoom(room);
-        if (gallery != null) gallery.animate().translationX(room ? px(RAIL_CLOSED - 2.5f) : 0).setDuration(220).start();
+        if (gallery != null) gallery.animate().translationX(room ? px(RAIL_CLOSED - 2.5f) : 0).setDuration(Ui.FAST).start();
     }
 
     /** a tab's mark in the menu: a rounded square of its colour with a letter */
@@ -1185,13 +1185,13 @@ final class NativeHome extends FrameLayout {
         int col = focus % COLS;
         float fx = (10 + col * 80f / (COLS - 1)) / 100f;
         float x = fx * dock.getWidth() - glow.getLayoutParams().width / 2f;
-        if (animate) glow.animate().translationX(x).setDuration(500).setInterpolator(TileView.EASE).start(); else glow.setTranslationX(x);
+        if (animate) glow.animate().translationX(x).setDuration(Ui.SLOW).setInterpolator(TileView.EASE).start(); else glow.setTranslationX(x);
         // the light on the glass edges stays put (top-left), like light from the room, whatever is focused
         final float la = 120f;
         if (rimAnim != null) rimAnim.cancel();
         if (!animate || rimAngle == la) { setRimAngle(la); return; }
         rimAnim = ValueAnimator.ofFloat(rimAngle, la);
-        rimAnim.setDuration(500);
+        rimAnim.setDuration(Ui.SLOW);
         rimAnim.setInterpolator(TileView.EASE);
         rimAnim.addUpdateListener(new ValueAnimator.AnimatorUpdateListener() {
             @Override public void onAnimationUpdate(ValueAnimator va) { setRimAngle((Float) va.getAnimatedValue()); }
@@ -1213,14 +1213,14 @@ final class NativeHome extends FrameLayout {
         else if (bot > s + visible) s = bot - visible;
         if (s == drawerScroll) return;
         drawerScroll = s;
-        if (animate) drawerGrid.animate().translationY(-px(s)).setDuration(380).setInterpolator(TileView.EASE).start();
+        if (animate) drawerGrid.animate().translationY(-px(s)).setDuration(Ui.SLIDE).setInterpolator(TileView.EASE).start();
         else drawerGrid.setTranslationY(-px(s));
     }
 
     /** what's showing for the current mode: drawer, photo mode, top-bar selection */
     private void applyMode(boolean animate) {
         if (onVod()) return;
-        long d = animate ? 550 : 0;
+        long d = animate ? Ui.SLOW : 0;
         boolean shelf = mode.equals("shelf");
         /* All apps slides up over the dock, which stays where it is (fading it out meant blending all of
            it on every frame of the slide); once covered it isn't drawn at all */
@@ -1261,19 +1261,19 @@ final class NativeHome extends FrameLayout {
             else g.dimTo(dz, dms);
         }
         // behind the open drawer the photo is already darkened, so the top/bottom shade isn't drawn
-        scrim.animate().alpha(shelf ? .55f : deep ? 0f : 1f).setDuration(animate ? 600 : 0).start();
-        if (widgets != null) widgets.animate().alpha(!deep && !shelf && !saver && tab.equals("home") ? 1f : 0f).setDuration(animate ? 400 : 0).start();
+        scrim.animate().alpha(shelf ? .55f : deep ? 0f : 1f).setDuration(animate ? Ui.SLOWER : 0).start();
+        if (widgets != null) widgets.animate().alpha(!deep && !shelf && !saver && tab.equals("home") ? 1f : 0f).setDuration(animate ? Ui.SLIDE : 0).start();
         syncHomeStyle(animate);
         if (!side) {
-            tabs.animate().alpha(shelf || barsHidden ? 0f : 1f).setDuration(animate ? 400 : 0).start();
-            topbar.animate().alpha(shelf || barsHidden ? 0f : 1f).setDuration(animate ? 400 : 0).start();
-            for (View x : barExtras) x.animate().alpha(shelf || barsHidden ? 0f : 1f).setDuration(animate ? 400 : 0).start();
+            tabs.animate().alpha(shelf || barsHidden ? 0f : 1f).setDuration(animate ? Ui.SLIDE : 0).start();
+            topbar.animate().alpha(shelf || barsHidden ? 0f : 1f).setDuration(animate ? Ui.SLIDE : 0).start();
+            for (View x : barExtras) x.animate().alpha(shelf || barsHidden ? 0f : 1f).setDuration(animate ? Ui.SLIDE : 0).start();
         }
-        caption.animate().alpha(shelf ? 1f : 0f).setDuration(animate ? 500 : 0).start();
-        shelfHint.animate().alpha(shelf && !saver ? 1f : 0f).setDuration(animate ? 500 : 0).start();
-        pause.animate().alpha(shelf && paused ? 1f : 0f).setDuration(300).start();
-        bigClock.animate().alpha(saver ? 1f : 0f).setDuration(animate ? 600 : 0).start();
-        hint.animate().alpha(!deep && !shelf && items.size() > (noDock() ? 0 : COLS) ? 1f : 0f).setDuration(400).start();
+        caption.animate().alpha(shelf ? 1f : 0f).setDuration(animate ? Ui.SLOW : 0).start();
+        shelfHint.animate().alpha(shelf && !saver ? 1f : 0f).setDuration(animate ? Ui.SLOW : 0).start();
+        pause.animate().alpha(shelf && paused ? 1f : 0f).setDuration(Ui.MOVE).start();
+        bigClock.animate().alpha(saver ? 1f : 0f).setDuration(animate ? Ui.SLOWER : 0).start();
+        hint.animate().alpha(!deep && !shelf && items.size() > (noDock() ? 0 : COLS) ? 1f : 0f).setDuration(Ui.SLIDE).start();
         if (!deep) { drawerScroll = 0; drawerGrid.setTranslationY(0); }
         updateBars();          // (All apps: the bars step aside)
     }
@@ -1329,12 +1329,12 @@ final class NativeHome extends FrameLayout {
             if (i < TAB_IDS.length) {
                 TextView t = (TextView) v;
                 boolean active = TAB_IDS[i].equals(tab);
-                if (fl) { bg.set(sel ? 0x40FFFFFF : 0, 0, active ? Color.WHITE : 0); t.setTextColor(sel || active ? Color.WHITE : 0xBFFFFFFF); }
-                else if (st) { bg.set(sel ? GlassPanel.selFill() : active ? 0x2EFFFFFF : 0, 0, 0); t.setTextColor(sel ? GlassPanel.selText() : active ? Color.WHITE : 0xBFFFFFFF); }
-                else { bg.set(active ? 0x2EFFFFFF : 0, sel ? GlassPanel.selFill() : 0, 0); t.setTextColor(sel || active ? Color.WHITE : 0xBFFFFFFF); }
+                if (fl) { bg.set(sel ? Ui.WHITE_25 : 0, 0, active ? Color.WHITE : 0); t.setTextColor(sel || active ? Color.WHITE : Ui.WHITE_75); }
+                else if (st) { bg.set(sel ? GlassPanel.selFill() : active ? Ui.WHITE_20 : 0, 0, 0); t.setTextColor(sel ? GlassPanel.selText() : active ? Color.WHITE : Ui.WHITE_75); }
+                else { bg.set(active ? Ui.WHITE_20 : 0, sel ? GlassPanel.selFill() : 0, 0); t.setTextColor(sel || active ? Color.WHITE : Ui.WHITE_75); }
             } else {
                 HomeIcons ic = (HomeIcons) v.getTag();
-                if (fl) { bg.set(sel ? 0x40FFFFFF : 0, 0, 0); ic.setColor(Color.WHITE); }
+                if (fl) { bg.set(sel ? Ui.WHITE_25 : 0, 0, 0); ic.setColor(Color.WHITE); }
                 else if (st) { bg.set(sel ? GlassPanel.selFill() : 0, 0, 0); ic.setColor(sel ? GlassPanel.selText() : Color.WHITE); }
                 else { bg.set(0, sel ? GlassPanel.selFill() : 0, 0); ic.setColor(Color.WHITE); }
             }
@@ -1351,8 +1351,8 @@ final class NativeHome extends FrameLayout {
             v.getLocationInWindow(p); getLocationInWindow(me);
             tip.setX(p[0] - me[0] + v.getWidth() / 2f - tip.getMeasuredWidth() / 2f);
             tip.setY(p[1] - me[1] + v.getHeight() + px(gapRem));
-            tip.animate().alpha(1f).setDuration(200).start();
-        } else tip.animate().alpha(0f).setDuration(150).start();
+            tip.animate().alpha(1f).setDuration(Ui.FAST).start();
+        } else tip.animate().alpha(0f).setDuration(Ui.QUICK).start();
     }
     private void drawTopTop() {
         if (!barStyle.equals("classic")) { drawTopStyled(); return; }
@@ -1363,10 +1363,10 @@ final class NativeHome extends FrameLayout {
             if (i < TAB_IDS.length) {
                 TextView t = (TextView) v;
                 boolean active = TAB_IDS[i].equals(tab);
-                int on = tab.equals("movies") ? 0x42FFB040 : tab.equals("series") ? 0x3D64D2FF : tab.equals("live") ? 0x47FF453A : tab.equals("sports") ? 0x4234C759 : 0x33FFFFFF;
+                int on = tab.equals("movies") ? 0x42FFB040 : tab.equals("series") ? 0x3D64D2FF : tab.equals("live") ? 0x47FF453A : tab.equals("sports") ? 0x4234C759 : Ui.WHITE_20;
                 int onText = tab.equals("movies") ? 0xFFFFE2B3 : tab.equals("series") ? 0xFFD2F2FF : tab.equals("live") ? 0xFFFFD9D6 : tab.equals("sports") ? 0xFFD4FFE0 : Color.WHITE;
                 t.setBackground(pill(sel ? GlassPanel.selFill() : active ? on : Color.TRANSPARENT));
-                t.setTextColor(sel ? GlassPanel.selText() : active ? onText : 0xC7FFFFFF);
+                t.setTextColor(sel ? GlassPanel.selText() : active ? onText : Ui.WHITE_75);
                 t.setScaleX(1f); t.setScaleY(1f);
             } else {
                 GradientDrawable bg = (GradientDrawable) v.getBackground();
@@ -1384,8 +1384,8 @@ final class NativeHome extends FrameLayout {
             v.getLocationInWindow(p); getLocationInWindow(me);
             tip.setX(p[0] - me[0] + v.getWidth() / 2f - tip.getMeasuredWidth() / 2f);
             tip.setY(p[1] - me[1] + px(4.7f));
-            tip.animate().alpha(1f).setDuration(200).start();
-        } else tip.animate().alpha(0f).setDuration(150).start();
+            tip.animate().alpha(1f).setDuration(Ui.FAST).start();
+        } else tip.animate().alpha(0f).setDuration(Ui.QUICK).start();
     }
     private void drawTop() {
         if (topSel >= topItems.size()) topSel = 0;
@@ -1395,7 +1395,7 @@ final class NativeHome extends FrameLayout {
             TextView t = (TextView) topItems.get(i);
             boolean sel = top && i == topSel, active = i < TAB_IDS.length && TAB_IDS[i].equals(tab);
             boolean btn = rowStart >= 0 && i >= rowStart && t.getText().length() == 0, now = topActs.get(i).startsWith("now:");
-            int fillC = sel ? GlassPanel.selFill() : active ? 0x2EFFFFFF : btn || now ? 0x14FFFFFF : Color.TRANSPARENT;
+            int fillC = sel ? GlassPanel.selFill() : active ? Ui.WHITE_20 : btn || now ? Ui.WHITE_7 : Color.TRANSPARENT;
             if (GlassPanel.look.equals("air")) t.setBackground(new GlassPanel.Cut(fillC));       // (On Air: bars with a cut end)
             else ((GradientDrawable) t.getBackground()).setColor(fillC);
             t.setTextColor(sel ? GlassPanel.selText() : Color.WHITE);
@@ -1413,15 +1413,15 @@ final class NativeHome extends FrameLayout {
         if (rail()) railSet(on);
         else {
             tabs.animate().cancel();
-            tabs.animate().alpha(on ? 1f : 0f).translationX(on ? 0 : -px(3)).setDuration(on ? 240 : 180).setInterpolator(TileView.EASE).start();
-            if (menuHead != null) menuHead.animate().alpha(on ? 1f : 0f).setDuration(on ? 240 : 180).start();
+            tabs.animate().alpha(on ? 1f : 0f).translationX(on ? 0 : -px(3)).setDuration(on ? Ui.BASE : Ui.FAST).setInterpolator(TileView.EASE).start();
+            if (menuHead != null) menuHead.animate().alpha(on ? 1f : 0f).setDuration(on ? Ui.BASE : Ui.FAST).start();
         }
         if (widgets != null) {
             float mw = menuStyle.equals("glance") ? 32f : menuStyle.equals("card") ? 27f : menuStyle.equals("rail") ? RAIL_OPEN : Math.min(22f, SW - 4);
             float shift = mw + .6f, room = SW - 3 - widgets.getWidth() / R - 2;
             boolean fits = !portrait && shift <= room;
             float base = !deep && !mode.equals("shelf") && !saver && tab.equals("home") ? 1f : 0f;
-            widgets.animate().translationX(on && fits ? px(shift) : 0).alpha(base * (on && !fits ? .25f : 1f)).setDuration(on ? 240 : 180).setInterpolator(TileView.EASE).start();
+            widgets.animate().translationX(on && fits ? px(shift) : 0).alpha(base * (on && !fits ? .25f : 1f)).setDuration(on ? Ui.BASE : Ui.FAST).setInterpolator(TileView.EASE).start();
         }
     }
 
@@ -1910,7 +1910,7 @@ final class NativeHome extends FrameLayout {
             main.postDelayed(new Runnable() { @Override public void run() {
                 if (!onVod()) return;
                 photoBox.setVisibility(INVISIBLE); scrim.setVisibility(INVISIBLE); content.setVisibility(INVISIBLE); drawer.setVisibility(INVISIBLE);
-            } }, 380);
+            } }, Ui.SLIDE);
         }
         drawTop();
         updateBars();
@@ -1941,7 +1941,7 @@ final class NativeHome extends FrameLayout {
             nv.setAlpha(0f);
             final ImageView ov = old >= 0 ? g.layer[old] : null;
             final GlassPanel gg = g;
-            nv.animate().alpha(1f).setDuration(old < 0 ? 300 : 900).withEndAction(new Runnable() { @Override public void run() {
+            nv.animate().alpha(1f).setDuration(old < 0 ? Ui.MOVE : 900).withEndAction(new Runnable() { @Override public void run() {
                 if (ov != null && vodGlassLayer == next) ov.setAlpha(0f);
                 gg.refreshTint();
             } }).start();
@@ -1978,7 +1978,7 @@ final class NativeHome extends FrameLayout {
                 || (browsing && (tab.equals("movies") || tab.equals("series") || isSports()))
                 || (browsing && tab.equals("home") && deep);
         // upright, the round buttons and the clock are Home's (the other tabs have their own things up there)
-        if (portrait && topbar != null) { float ta = !hide && tab.equals("home") ? 1f : 0f; if (topbar.getAlpha() != ta) topbar.animate().alpha(ta).setDuration(250).start(); }
+        if (portrait && topbar != null) { float ta = !hide && tab.equals("home") ? 1f : 0f; if (topbar.getAlpha() != ta) topbar.animate().alpha(ta).setDuration(Ui.BASE).start(); }
         if (hide == barsHidden) return;
         barsHidden = hide;
         setBarsHidden(hide);
@@ -1987,9 +1987,9 @@ final class NativeHome extends FrameLayout {
     }
     private void setBarsHiddenTop(boolean hide) {
         Diag.ev(hide ? "top bars hidden" : "top bars shown");
-        tabs.animate().alpha(hide ? 0f : 1f).setDuration(hide ? 200 : 400).start();
-        for (View x : barExtras) x.animate().alpha(hide ? 0f : 1f).setDuration(hide ? 200 : 400).start();
-        topbar.animate().alpha(hide || (portrait && !tab.equals("home")) ? 0f : 1f).setDuration(hide ? 200 : 400).start();
+        tabs.animate().alpha(hide ? 0f : 1f).setDuration(hide ? Ui.FAST : Ui.SLIDE).start();
+        for (View x : barExtras) x.animate().alpha(hide ? 0f : 1f).setDuration(hide ? Ui.FAST : Ui.SLIDE).start();
+        topbar.animate().alpha(hide || (portrait && !tab.equals("home")) ? 0f : 1f).setDuration(hide ? Ui.FAST : Ui.SLIDE).start();
         if (hide) tip.setAlpha(0f);
     }
     private boolean liveTold, sportsTold;
@@ -2173,7 +2173,7 @@ final class NativeHome extends FrameLayout {
             fySetup.setBackgroundColor(0xF20A0B10);
             fySetup.setClickable(true);
             LinearLayout card = new LinearLayout(getContext()); card.setOrientation(LinearLayout.HORIZONTAL); card.setGravity(Gravity.CENTER_VERTICAL);
-            GradientDrawable cb = new GradientDrawable(); cb.setCornerRadius(2.4f * R); cb.setColor(0xFF17181F); cb.setStroke(Math.max(1, px(.1f)), 0x24FFFFFF);
+            GradientDrawable cb = new GradientDrawable(); cb.setCornerRadius(2.4f * R); cb.setColor(0xFF17181F); cb.setStroke(Math.max(1, px(.1f)), Ui.WHITE_12);
             card.setBackground(cb); card.setPadding(px(3), px(3), px(3.4f), px(3));
             FrameLayout qb = new FrameLayout(getContext());
             GradientDrawable wb = new GradientDrawable(); wb.setCornerRadius(1.4f * R); wb.setColor(Color.WHITE); qb.setBackground(wb);
@@ -2183,10 +2183,10 @@ final class NativeHome extends FrameLayout {
             card.addView(qb, new LinearLayout.LayoutParams(LayoutParams.WRAP_CONTENT, LayoutParams.WRAP_CONTENT));
             LinearLayout col = new LinearLayout(getContext()); col.setOrientation(LinearLayout.VERTICAL); col.setPadding(px(3), 0, 0, 0);
             TextView t = text(fSemi, 2.2f, Color.WHITE); suTitle = t;
-            TextView s1 = text(fReg, 1.15f, 0xD9FFFFFF); s1.setLineSpacing(0, 1.3f); suSteps = s1;
-            fyUrl = text(fReg, .95f, 0x8CFFFFFF);
-            fyState = text(fMed, 1.1f, 0xFFB9A8FF);
-            TextView back = text(fReg, .95f, 0x80FFFFFF); back.setText("Back · close");
+            TextView s1 = text(fReg, Ui.TEXT_M, Ui.WHITE_85); s1.setLineSpacing(0, 1.3f); suSteps = s1;
+            fyUrl = text(fReg, Ui.TEXT_XS, Ui.WHITE_60);
+            fyState = text(fMed, Ui.TEXT_S, 0xFFB9A8FF);
+            TextView back = text(fReg, Ui.TEXT_XS, Ui.WHITE_50); back.setText("Back · close");
             col.addView(t);
             LinearLayout.LayoutParams gl = new LinearLayout.LayoutParams(LayoutParams.WRAP_CONTENT, LayoutParams.WRAP_CONTENT); gl.topMargin = px(1.4f);
             col.addView(s1, gl);
@@ -2209,7 +2209,7 @@ final class NativeHome extends FrameLayout {
         fyUrl.setText("Or type this on your phone:  " + url);
         setupRefresh();
         fySetup.setVisibility(VISIBLE); fySetup.bringToFront();
-        fySetup.setAlpha(0f); fySetup.animate().alpha(1f).setDuration(250).start();
+        fySetup.setAlpha(0f); fySetup.animate().alpha(1f).setDuration(Ui.BASE).start();
     }
     void setupRefresh() {
         if (fySetup == null) return;
@@ -2260,7 +2260,7 @@ final class NativeHome extends FrameLayout {
         if (st.optBoolean("connected")) page("typeof refreshSettings === 'function' && refreshSettings()");
     }
     private boolean fySetupOpen() { return fySetup != null && fySetup.getVisibility() == VISIBLE; }
-    private void fySetupClose() { fySetup.animate().alpha(0f).setDuration(200).withEndAction(new Runnable() { @Override public void run() { fySetup.setVisibility(GONE); } }).start(); }
+    private void fySetupClose() { fySetup.animate().alpha(0f).setDuration(Ui.FAST).withEndAction(new Runnable() { @Override public void run() { fySetup.setVisibility(GONE); } }).start(); }
     static Bitmap qrBitmapOf(String text) { return qrBitmap(text); }
 
     // ================================================================== a title's streams, and playing them (addons)
@@ -2688,7 +2688,7 @@ final class NativeHome extends FrameLayout {
         menuActs.clear(); menuActs.addAll(acts);
         menuRows.removeAllViews();
         for (String l : labels) {
-            TextView t = text(fMed, 1.35f, Color.WHITE);
+            TextView t = text(fMed, Ui.TEXT_L, Color.WHITE);
             t.setText(l);
             t.setPadding(px(1.3f), px(1f), px(1.3f), px(1f));
             menuRows.addView(t, new LinearLayout.LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT));
@@ -2714,7 +2714,7 @@ final class NativeHome extends FrameLayout {
         menuPanel.setX(x); menuPanel.setY(y);
         menuPanel.setScaleX(.92f); menuPanel.setScaleY(.92f);
         menuPanel.setPivotX(0); menuPanel.setPivotY(0);
-        menuPanel.animate().alpha(1f).scaleX(1f).scaleY(1f).setDuration(250).setInterpolator(TileView.SPRING).start();
+        menuPanel.animate().alpha(1f).scaleX(1f).scaleY(1f).setDuration(Ui.BASE).setInterpolator(TileView.SPRING).start();
         act.haptic();
     }
 
@@ -2726,7 +2726,7 @@ final class NativeHome extends FrameLayout {
             iv.setScaleType(ImageView.ScaleType.CENTER_CROP);
             iv.setImageBitmap(backdrop);
             launchOv.addView(iv, new LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.MATCH_PARENT));
-            View d = new View(getContext()); d.setBackgroundColor(0xB3000000);
+            View d = new View(getContext()); d.setBackgroundColor(Ui.BLACK_70);
             launchOv.addView(d, new LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.MATCH_PARENT));
         }
         LinearLayout box = new LinearLayout(getContext());
@@ -2734,15 +2734,15 @@ final class NativeHome extends FrameLayout {
         box.setGravity(Gravity.CENTER_HORIZONTAL);
         TextView name = text(fSemi, 3f, Color.WHITE); name.setText(title); name.setGravity(Gravity.CENTER);
         box.addView(name, new LinearLayout.LayoutParams(LayoutParams.WRAP_CONTENT, LayoutParams.WRAP_CONTENT));
-        TextView st = text(fMed, 1.4f, 0xB3FFFFFF); st.setText(sub);
+        TextView st = text(fMed, Ui.TEXT_L, Ui.WHITE_75); st.setText(sub);
         LinearLayout.LayoutParams sl = new LinearLayout.LayoutParams(LayoutParams.WRAP_CONTENT, LayoutParams.WRAP_CONTENT); sl.topMargin = px(.8f);
         box.addView(st, sl);
         launchOv.addView(box, new LayoutParams(LayoutParams.WRAP_CONTENT, LayoutParams.WRAP_CONTENT, Gravity.CENTER));
         box.setScaleX(.94f); box.setScaleY(.94f); box.setAlpha(0f);
         launchOv.bringToFront();
         launchOv.setVisibility(VISIBLE);
-        launchOv.animate().alpha(1f).setDuration(220).start();
-        box.animate().scaleX(1f).scaleY(1f).alpha(1f).setDuration(380).setInterpolator(TileView.SPRING).start();
+        launchOv.animate().alpha(1f).setDuration(Ui.FAST).start();
+        box.animate().scaleX(1f).scaleY(1f).alpha(1f).setDuration(Ui.SLIDE).setInterpolator(TileView.SPRING).start();
         main.removeCallbacks(launchHide);
         main.postDelayed(launchHide, 6000);
     }
@@ -2875,7 +2875,7 @@ final class NativeHome extends FrameLayout {
                 ((FrameLayout) t.getParent()).removeView(t);
                 home.addView(t, new LayoutParams(px(TW), px(TH + 4)));
                 t.setX(px(x)); t.setY(px(y));
-            } else t.animate().x(px(x)).y(px(y)).setDuration(380).setInterpolator(TileView.EASE).start();
+            } else t.animate().x(px(x)).y(px(y)).setDuration(Ui.SLIDE).setInterpolator(TileView.EASE).start();
         }
     }
     private void endMove() {
@@ -2908,7 +2908,7 @@ final class NativeHome extends FrameLayout {
         menuHead(a.label, labels);
         menuRows.removeAllViews();
         for (String l : labels) {
-            TextView t = text(fMed, 1.35f, Color.WHITE);
+            TextView t = text(fMed, Ui.TEXT_L, Color.WHITE);
             t.setText(l);
             t.setPadding(px(1.3f), px(1f), px(1.3f), px(1f));
             menuRows.addView(t, new LinearLayout.LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT));
@@ -2933,7 +2933,7 @@ final class NativeHome extends FrameLayout {
         menuPanel.setX(x); menuPanel.setY(y);
         menuPanel.setScaleX(.92f); menuPanel.setScaleY(.92f);
         menuPanel.setPivotX(0); menuPanel.setPivotY(0);
-        menuPanel.animate().alpha(1f).scaleX(1f).scaleY(1f).setDuration(250).setInterpolator(TileView.SPRING).start();
+        menuPanel.animate().alpha(1f).scaleX(1f).scaleY(1f).setDuration(Ui.BASE).setInterpolator(TileView.SPRING).start();
         act.haptic();
     }
     /* a long menu (subtitles…) shows a window of rows that follows the selection, so it never runs off the screen */
@@ -2962,7 +2962,7 @@ final class NativeHome extends FrameLayout {
     }
     private void closeMenu() {
         mode = menuFrom.equals("sheet") && sheet != null && sheet.shownNow() ? "sheet" : menuFrom.equals("find") && find != null && find.shownNow() ? "find" : "grid";
-        menuPanel.animate().alpha(0f).setDuration(200).withEndAction(new Runnable() { @Override public void run() { menuPanel.setVisibility(GONE); } }).start();
+        menuPanel.animate().alpha(0f).setDuration(Ui.FAST).withEndAction(new Runnable() { @Override public void run() { menuPanel.setVisibility(GONE); } }).start();
         applyFocus(true, ' ');
         updateBars();
     }
@@ -2995,14 +2995,14 @@ final class NativeHome extends FrameLayout {
         TextView name = text(fSemi, 2.4f, Color.WHITE); name.setText(a.label);
         LinearLayout.LayoutParams nl = new LinearLayout.LayoutParams(LayoutParams.WRAP_CONTENT, LayoutParams.WRAP_CONTENT); nl.topMargin = px(2.4f);
         box.addView(name, nl);
-        TextView sub = text(fMed, 1.3f, 0x9EFFFFFF); sub.setText("Opening…");
+        TextView sub = text(fMed, Ui.TEXT_L, Ui.WHITE_60); sub.setText("Opening…");
         LinearLayout.LayoutParams sl = new LinearLayout.LayoutParams(LayoutParams.WRAP_CONTENT, LayoutParams.WRAP_CONTENT); sl.topMargin = px(.6f);
         box.addView(sub, sl);
         launchOv.addView(box, new LayoutParams(LayoutParams.WRAP_CONTENT, LayoutParams.WRAP_CONTENT, Gravity.CENTER));
         box.setScaleX(.9f); box.setScaleY(.9f); box.setAlpha(0f);
         launchOv.setVisibility(VISIBLE);
-        launchOv.animate().alpha(1f).setDuration(220).start();
-        box.animate().scaleX(1f).scaleY(1f).alpha(1f).setDuration(380).setInterpolator(TileView.SPRING).start();
+        launchOv.animate().alpha(1f).setDuration(Ui.FAST).start();
+        box.animate().scaleX(1f).scaleY(1f).alpha(1f).setDuration(Ui.SLIDE).setInterpolator(TileView.SPRING).start();
         main.postDelayed(new Runnable() { @Override public void run() {
             boolean ok = false;
             try { ok = bridge.launch(a.id); } catch (Exception ignored) { }
@@ -3012,7 +3012,7 @@ final class NativeHome extends FrameLayout {
     }
     void hideLaunch() {
         if (launchOv == null || launchOv.getVisibility() != VISIBLE) return;
-        launchOv.animate().alpha(0f).setDuration(250).withEndAction(new Runnable() { @Override public void run() { launchOv.setVisibility(GONE); } }).start();
+        launchOv.animate().alpha(0f).setDuration(Ui.BASE).withEndAction(new Runnable() { @Override public void run() { launchOv.setVisibility(GONE); } }).start();
     }
 
     // ================================================================== Top Shelf row
@@ -3089,25 +3089,25 @@ final class NativeHome extends FrameLayout {
             iv.setScaleType(ImageView.ScaleType.CENTER_CROP);
             card.addView(iv, new LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.MATCH_PARENT));
             View shade = new View(getContext());
-            shade.setBackground(new GradientDrawable(GradientDrawable.Orientation.BOTTOM_TOP, new int[] { 0x99000000, 0x00000000, 0x00000000 }));
+            shade.setBackground(new GradientDrawable(GradientDrawable.Orientation.BOTTOM_TOP, new int[] { Ui.BLACK_60, 0x00000000, 0x00000000 }));
             card.addView(shade, new LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.MATCH_PARENT));
-            TextView name = text(fSemi, 1.2f, Color.WHITE);
+            TextView name = text(fSemi, Ui.TEXT_M, Color.WHITE);
             name.setText(m == null ? "" : m.optString("name"));
             name.setSingleLine(true); name.setEllipsize(android.text.TextUtils.TruncateAt.END);
-            name.setShadowLayer(.5f * R, 0, .1f * R, 0xB3000000);
+            name.setShadowLayer(.5f * R, 0, .1f * R, Ui.BLACK_70);
             FrameLayout.LayoutParams nl = new FrameLayout.LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT, Gravity.BOTTOM);
             nl.leftMargin = px(1); nl.rightMargin = px(1); nl.bottomMargin = px(.8f);
             card.addView(name, nl);
             if (m != null && m.optBoolean("cw")) {
                 // how far in, and which episode
-                View track = new View(getContext()); track.setBackgroundColor(0x80000000);
+                View track = new View(getContext()); track.setBackgroundColor(Ui.BLACK_55);
                 card.addView(track, new FrameLayout.LayoutParams(LayoutParams.MATCH_PARENT, px(.4f), Gravity.BOTTOM));
                 View fill = new View(getContext()); fill.setBackgroundColor(0xFFFF453A);
                 card.addView(fill, new FrameLayout.LayoutParams(Math.round(px(22) * (float) m.optDouble("cwPct", 0)), px(.4f), Gravity.BOTTOM));
                 String lab = m.optString("cwLabel");
                 if (!lab.isEmpty()) {
-                    TextView ep = text(fSemi, .85f, Color.WHITE); ep.setText(lab); ep.setSingleLine(true); ep.setEllipsize(android.text.TextUtils.TruncateAt.END);
-                    GradientDrawable eb = new GradientDrawable(); eb.setCornerRadius(.4f * R); eb.setColor(0xD9000000); ep.setBackground(eb);
+                    TextView ep = text(fSemi, Ui.TEXT_XS, Color.WHITE); ep.setText(lab); ep.setSingleLine(true); ep.setEllipsize(android.text.TextUtils.TruncateAt.END);
+                    GradientDrawable eb = new GradientDrawable(); eb.setCornerRadius(.4f * R); eb.setColor(Ui.BLACK_85); ep.setBackground(eb);
                     ep.setPadding(px(.5f), px(.2f), px(.5f), px(.2f));
                     FrameLayout.LayoutParams el = new FrameLayout.LayoutParams(LayoutParams.WRAP_CONTENT, LayoutParams.WRAP_CONTENT, Gravity.TOP | Gravity.LEFT);
                     el.topMargin = px(.7f); el.leftMargin = px(.7f); el.rightMargin = px(.7f);
@@ -3115,8 +3115,8 @@ final class NativeHome extends FrameLayout {
                 }
             }
             if (m != null && m.optBoolean("mine")) {
-                TextView mk = text(fSemi, .9f, 0xFF111111); mk.setText("✓"); mk.setGravity(Gravity.CENTER);
-                GradientDrawable mb = new GradientDrawable(); mb.setShape(GradientDrawable.OVAL); mb.setColor(0xE6FFFFFF); mk.setBackground(mb);
+                TextView mk = text(fSemi, Ui.TEXT_XS, 0xFF111111); mk.setText("✓"); mk.setGravity(Gravity.CENTER);
+                GradientDrawable mb = new GradientDrawable(); mb.setShape(GradientDrawable.OVAL); mb.setColor(Ui.WHITE_95); mk.setBackground(mb);
                 FrameLayout.LayoutParams ml = new FrameLayout.LayoutParams(px(1.8f), px(1.8f), Gravity.TOP | Gravity.RIGHT); ml.topMargin = px(.7f); ml.rightMargin = px(.7f);
                 card.addView(mk, ml);
             }
@@ -3153,7 +3153,7 @@ final class NativeHome extends FrameLayout {
         for (int i = 0; i < tsCards.size(); i++) {
             FrameLayout c = tsCards.get(i);
             boolean f = mode.equals("tshelf") && i == tsSel;
-            c.animate().scaleX(f ? 1.08f : 1f).scaleY(f ? 1.08f : 1f).translationZ(f ? 1.6f * R : 0).setDuration(animate ? 250 : 0).setInterpolator(TileView.EASE).start();
+            c.animate().scaleX(f ? 1.08f : 1f).scaleY(f ? 1.08f : 1f).translationZ(f ? 1.6f * R : 0).setDuration(animate ? Ui.BASE : 0).setInterpolator(TileView.EASE).start();
             c.setForeground(f ? ring() : null);
             c.setZ(f ? 3 : 0);
         }
@@ -3162,20 +3162,20 @@ final class NativeHome extends FrameLayout {
             float sx = -tsStrip.getTranslationX() / R;
             if (left < sx) sx = Math.max(0, left);
             else if (left + 22 + 6 > sx + visible) sx = left + 22 + 6 - visible;
-            tsStrip.animate().translationX(-px(sx)).setDuration(animate ? 380 : 0).setInterpolator(TileView.EASE).start();
+            tsStrip.animate().translationX(-px(sx)).setDuration(animate ? Ui.SLIDE : 0).setInterpolator(TileView.EASE).start();
         }
     }
     private android.graphics.drawable.Drawable ring() {
         GradientDrawable g = new GradientDrawable();
         g.setCornerRadius(GlassPanel.look.equals("air") ? 0 : 1.2f * R);
-        g.setStroke(Math.max(2, px(GlassPanel.look.equals("air") ? .24f : .16f)), GlassPanel.look.equals("glass") || GlassPanel.look.equals("spot") ? 0xE6FFFFFF : GlassPanel.selFill());
+        g.setStroke(Math.max(2, px(GlassPanel.look.equals("air") ? .24f : .16f)), GlassPanel.look.equals("glass") || GlassPanel.look.equals("spot") ? Ui.WHITE_95 : GlassPanel.selFill());
         return g;
     }
 
     private void updateTshelf(boolean animate) {
         if (tshelf == null) return;
         boolean on = tshelfWanted();
-        tshelf.animate().alpha(on ? 1f : 0f).translationY(on ? 0 : px(1.6f)).setDuration(animate ? 450 : 0).setInterpolator(TileView.EASE).start();
+        tshelf.animate().alpha(on ? 1f : 0f).translationY(on ? 0 : px(1.6f)).setDuration(animate ? Ui.SLOW : 0).setInterpolator(TileView.EASE).start();
         if (on && tsCards.isEmpty() && tsItems.length() > 0) buildTshelf();
         if (!mode.equals("tshelf")) markTshelf(animate);
     }
@@ -3489,14 +3489,14 @@ final class NativeHome extends FrameLayout {
     }
 
     private void setCaption(final JSONObject p) {
-        caption.animate().translationY(px(.6f)).alpha(mode.equals("shelf") ? 0f : 0f).setDuration(300).withEndAction(new Runnable() { @Override public void run() {
+        caption.animate().translationY(px(.6f)).alpha(mode.equals("shelf") ? 0f : 0f).setDuration(Ui.MOVE).withEndAction(new Runnable() { @Override public void run() {
             boolean other = !p.optString("src").isEmpty();
             capSub.setText(other ? p.optString("src") : "r/" + p.optString("sub", sub()));
             capTitle.setText(cleanTitle(p.optString("title")));
             String by = p.optString("author");
             capBy.setText(by.isEmpty() ? "" : other ? "by " + by : "u/" + by);
             if (gCapT != null) { gCapT.setText(capTitle.getText()); gCapB.setText(by.isEmpty() ? capSub.getText() : capSub.getText() + "  ·  " + capBy.getText()); }
-            caption.animate().translationY(0).alpha(mode.equals("shelf") ? 1f : 0f).setDuration(500).setInterpolator(TileView.EASE).start();
+            caption.animate().translationY(0).alpha(mode.equals("shelf") ? 1f : 0f).setDuration(Ui.SLOW).setInterpolator(TileView.EASE).start();
         } }).start();
     }
     static String cleanTitle(String t) {
@@ -3530,10 +3530,10 @@ final class NativeHome extends FrameLayout {
         gallery = new LinearLayout(c);
         gallery.setOrientation(LinearLayout.VERTICAL);
         gTime = text(fReg, 8.2f, Color.WHITE); gTime.setLetterSpacing(-.035f); gTime.setFontFeatureSettings("tnum");
-        gDate = text(fMed, 1.9f, 0xF0FFFFFF);
+        gDate = text(fMed, 1.9f, Ui.WHITE_95);
         gNext = text(fSemi, 1.75f, Color.WHITE);
         gNext.setSingleLine(true); gNext.setEllipsize(android.text.TextUtils.TruncateAt.END); gNext.setMaxWidth(px(60));
-        for (TextView t : new TextView[] { gTime, gDate, gNext }) t.setShadowLayer(1.2f * R, 0, .12f * R, 0x8C000000);
+        for (TextView t : new TextView[] { gTime, gDate, gNext }) t.setShadowLayer(1.2f * R, 0, .12f * R, Ui.BLACK_55);
         gallery.addView(gTime);
         LinearLayout.LayoutParams dl = new LinearLayout.LayoutParams(LayoutParams.WRAP_CONTENT, LayoutParams.WRAP_CONTENT); dl.topMargin = px(.2f);
         gallery.addView(gDate, dl);
@@ -3547,8 +3547,8 @@ final class NativeHome extends FrameLayout {
         galleryCap = new LinearLayout(c);
         galleryCap.setOrientation(LinearLayout.VERTICAL);
         galleryCap.setGravity(Gravity.RIGHT);
-        gCapT = text(fSemi, 1.45f, Color.WHITE); gCapB = text(fReg, 1.25f, 0xE6FFFFFF);
-        for (TextView t : new TextView[] { gCapT, gCapB }) { t.setShadowLayer(R, 0, .1f * R, 0x8C000000); t.setGravity(Gravity.RIGHT); t.setSingleLine(true); t.setEllipsize(android.text.TextUtils.TruncateAt.END); t.setMaxWidth(px(44)); }
+        gCapT = text(fSemi, Ui.TEXT_XL, Color.WHITE); gCapB = text(fReg, Ui.TEXT_M, Ui.WHITE_95);
+        for (TextView t : new TextView[] { gCapT, gCapB }) { t.setShadowLayer(R, 0, .1f * R, Ui.BLACK_55); t.setGravity(Gravity.RIGHT); t.setSingleLine(true); t.setEllipsize(android.text.TextUtils.TruncateAt.END); t.setMaxWidth(px(44)); }
         galleryCap.addView(gCapT);
         LinearLayout.LayoutParams bl = new LinearLayout.LayoutParams(LayoutParams.WRAP_CONTENT, LayoutParams.WRAP_CONTENT); bl.topMargin = px(.3f);
         galleryCap.addView(gCapB, bl);
@@ -3601,15 +3601,15 @@ final class NativeHome extends FrameLayout {
             /* Featured is Home's picture: it stays behind All apps too (dimmed, held still), so the photo
                slideshow never shows through, and it has its own dark ground while its first picture loads */
             boolean vis = built && tab.equals("home") && !mode.equals("shelf") && !saver;
-            if (vis) { if (billboard.getVisibility() != VISIBLE) { billboard.setAlpha(0f); billboard.setVisibility(VISIBLE); } billboard.animate().alpha(deep ? .35f : 1f).setDuration(animate ? 400 : 0).start(); }
+            if (vis) { if (billboard.getVisibility() != VISIBLE) { billboard.setAlpha(0f); billboard.setVisibility(VISIBLE); } billboard.animate().alpha(deep ? .35f : 1f).setDuration(animate ? Ui.SLIDE : 0).start(); }
             else { billboard.animate().cancel(); billboard.setAlpha(0f); billboard.setVisibility(INVISIBLE); }
             billboard.setShown(vis);
             applyCover();
         }
         updateRail();
         if (gallery != null) {
-            gallery.animate().alpha(on ? 1f : 0f).setDuration(animate ? 400 : 0).start();
-            galleryCap.animate().alpha(on ? 1f : 0f).setDuration(animate ? 400 : 0).start();
+            gallery.animate().alpha(on ? 1f : 0f).setDuration(animate ? Ui.SLIDE : 0).start();
+            galleryCap.animate().alpha(on ? 1f : 0f).setDuration(animate ? Ui.SLIDE : 0).start();
             if (on) galleryNext();
         }
     }
@@ -3678,7 +3678,7 @@ final class NativeHome extends FrameLayout {
     private LinearLayout card(float wRem) {
         LinearLayout k = new LinearLayout(getContext());
         k.setOrientation(LinearLayout.VERTICAL);
-        GradientDrawable g = new GradientDrawable(); g.setCornerRadius(2f * R); g.setColor(0x8C14161E); g.setStroke(Math.max(1, px(.07f)), 0x1FFFFFFF);
+        GradientDrawable g = new GradientDrawable(); g.setCornerRadius(2f * R); g.setColor(0x8C14161E); g.setStroke(Math.max(1, px(.07f)), Ui.WHITE_12);
         k.setBackground(g);
         k.setPadding(px(2f), px(1.6f), px(2f), px(1.7f));
         LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(wRem > 0 ? px(wRem) : LayoutParams.WRAP_CONTENT, LayoutParams.MATCH_PARENT);
@@ -3689,7 +3689,7 @@ final class NativeHome extends FrameLayout {
     }
     private TextView wText(LinearLayout into, Typeface tf, float size, int color, float topRem) {
         TextView t = text(tf, size, color);
-        t.setShadowLayer(.5f * R, 0, .08f * R, 0x66000000);
+        t.setShadowLayer(.5f * R, 0, .08f * R, Ui.BLACK_45);
         LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(LayoutParams.WRAP_CONTENT, LayoutParams.WRAP_CONTENT); lp.topMargin = px(topRem);
         into.addView(t, lp);
         return t;
@@ -3700,7 +3700,7 @@ final class NativeHome extends FrameLayout {
         wClock = card(0);
         wClock.setMinimumWidth(px(20));
         wTime = wText(wClock, fSemi, 5.6f, Color.WHITE, 0); wTime.setLetterSpacing(-.03f); wTime.setFontFeatureSettings("tnum");
-        wDate = wText(wClock, fMed, 1.45f, 0xE6FFFFFF, .5f);
+        wDate = wText(wClock, fMed, 1.45f, Ui.WHITE_95, .5f);
         // the weather: now, today's high and low, and the next five hours
         wWx = card(27);
         LinearLayout top = new LinearLayout(getContext()); top.setGravity(Gravity.CENTER_VERTICAL);
@@ -3708,8 +3708,8 @@ final class NativeHome extends FrameLayout {
         wTemp = text(fSemi, 3.8f, Color.WHITE); top.addView(wTemp);
         View gap = new View(getContext()); top.addView(gap, new LinearLayout.LayoutParams(0, 1, 1));
         LinearLayout rc = new LinearLayout(getContext()); rc.setOrientation(LinearLayout.VERTICAL); rc.setGravity(Gravity.RIGHT);
-        wCond = text(fMed, 1.3f, 0xF2FFFFFF); wCond.setGravity(Gravity.RIGHT); rc.addView(wCond);
-        wHiLo = text(fMed, 1.2f, 0xD9FFFFFF); wHiLo.setGravity(Gravity.RIGHT); rc.addView(wHiLo);
+        wCond = text(fMed, Ui.TEXT_L, Ui.WHITE_95); wCond.setGravity(Gravity.RIGHT); rc.addView(wCond);
+        wHiLo = text(fMed, Ui.TEXT_M, Ui.WHITE_85); wHiLo.setGravity(Gravity.RIGHT); rc.addView(wHiLo);
         LinearLayout.LayoutParams rl = new LinearLayout.LayoutParams(LayoutParams.WRAP_CONTENT, LayoutParams.WRAP_CONTENT); rl.leftMargin = px(1.6f);
         top.addView(rc, rl);
         wHours = new LinearLayout(getContext());
@@ -3720,10 +3720,10 @@ final class NativeHome extends FrameLayout {
         wNext = card(27);
         wLabA = wText(wNext, fSemi, 1f, 0xFFFFC23D, 0); wLabA.setLetterSpacing(.1f);
         wNextA = wText(wNext, fSemi, 1.6f, Color.WHITE, .5f);
-        wNextA2 = wText(wNext, fMed, 1.2f, 0xE0FFFFFF, .3f);
+        wNextA2 = wText(wNext, fMed, 1.2f, Ui.WHITE_85, .3f);
         wLabB = wText(wNext, fSemi, 1f, 0xFF9FD3FF, 1.2f); wLabB.setLetterSpacing(.1f);
         wNextB = wText(wNext, fSemi, 1.45f, Color.WHITE, .5f);
-        wNextB2 = wText(wNext, fMed, 1.2f, 0xE0FFFFFF, .3f);
+        wNextB2 = wText(wNext, fMed, 1.2f, Ui.WHITE_85, .3f);
         for (TextView t : new TextView[] { wNextA, wNextA2, wNextB, wNextB2 }) { t.setSingleLine(true); t.setEllipsize(android.text.TextUtils.TruncateAt.END); t.setMaxWidth(px(portrait ? SW - 10 : 23)); }
         wNext.setVisibility(GONE);
         main.removeCallbacks(wxLoad); main.postDelayed(wxLoad, 1500);
@@ -3807,8 +3807,8 @@ final class NativeHome extends FrameLayout {
                 try { h24 = Integer.parseInt(hh.substring(11, 13)); } catch (Exception ignored) { }
                 String lab = "24".equals(S.optString("clock")) ? String.format(Locale.US, "%02d:00", h24) : (h24 % 12 == 0 ? 12 : h24 % 12) + (h24 < 12 ? " AM" : " PM");
                 LinearLayout col = new LinearLayout(getContext()); col.setOrientation(LinearLayout.VERTICAL); col.setGravity(Gravity.CENTER_HORIZONTAL);
-                TextView a = text(fMed, 1.05f, 0xD9FFFFFF); a.setText(lab); col.addView(a);
-                TextView b = text(fSemi, 1.35f, Color.WHITE); b.setText(Math.round(hv.optDouble(i)) + "°");
+                TextView a = text(fMed, Ui.TEXT_S, Ui.WHITE_85); a.setText(lab); col.addView(a);
+                TextView b = text(fSemi, Ui.TEXT_L, Color.WHITE); b.setText(Math.round(hv.optDouble(i)) + "°");
                 LinearLayout.LayoutParams bl = new LinearLayout.LayoutParams(LayoutParams.WRAP_CONTENT, LayoutParams.WRAP_CONTENT); bl.topMargin = px(.35f);
                 col.addView(b, bl);
                 wHours.addView(col, new LinearLayout.LayoutParams(0, LayoutParams.WRAP_CONTENT, 1));
@@ -3926,16 +3926,16 @@ final class NativeHome extends FrameLayout {
 
     // ---- toasts while the page is hidden
     private TextView toastView;
-    private final Runnable toastHide = new Runnable() { @Override public void run() { if (toastView != null) toastView.animate().alpha(0f).translationY(px(1)).setDuration(300).start(); } };
+    private final Runnable toastHide = new Runnable() { @Override public void run() { if (toastView != null) toastView.animate().alpha(0f).translationY(px(1)).setDuration(Ui.MOVE).start(); } };
     /** what the TV test is doing, top left (the page's own label isn't drawn while Home is native) */
     private TextView hud;
     void setHud(String t) {
         if (!built) return;
         if (t == null || t.isEmpty()) { if (hud != null) hud.setVisibility(GONE); return; }
         if (hud == null) {
-            hud = text(fMed, 1.05f, Color.WHITE);
+            hud = text(fMed, Ui.TEXT_S, Color.WHITE);
             hud.setPadding(px(1), px(.5f), px(1), px(.5f));
-            GradientDrawable b = new GradientDrawable(); b.setCornerRadius(R); b.setColor(0xB8000000); hud.setBackground(b);
+            GradientDrawable b = new GradientDrawable(); b.setCornerRadius(R); b.setColor(Ui.BLACK_70); hud.setBackground(b);
             addView(hud, at(1.2f, 1.2f, LayoutParams.WRAP_CONTENT, LayoutParams.WRAP_CONTENT));
         }
         hud.setText(t);
@@ -3958,7 +3958,7 @@ final class NativeHome extends FrameLayout {
     void toast(String msg) {
         if (!built) return;
         if (toastView == null) {
-            toastView = text(fMed, 1.25f, Color.WHITE);
+            toastView = text(fMed, Ui.TEXT_M, Color.WHITE);
             toastView.setPadding(px(1.8f), px(1f), px(1.8f), px(1f));
             GradientDrawable bg = new GradientDrawable(); bg.setCornerRadius(3 * R); bg.setColor(0xE6202024);
             toastView.setBackground(bg);
@@ -3970,7 +3970,7 @@ final class NativeHome extends FrameLayout {
         toastView.bringToFront();
         toastView.setText(msg);
         toastView.setTranslationY(px(1));
-        toastView.animate().alpha(1f).translationY(0).setDuration(300).setInterpolator(TileView.EASE).start();
+        toastView.animate().alpha(1f).translationY(0).setDuration(Ui.MOVE).setInterpolator(TileView.EASE).start();
         main.removeCallbacks(toastHide);
         main.postDelayed(toastHide, 3000);
     }
@@ -4221,7 +4221,7 @@ final class NativeHome extends FrameLayout {
             c.translate(b.exactCenterX(), b.exactCenterY());
             c.scale(b.width() / 2f, b.height() / 2f);
             // (the same unit-circle light every time: made once, not on every frame the dock moves)
-            if (p.getShader() == null) p.setShader(new RadialGradient(0, 0, 1, new int[] { 0x3DFFFFFF, 0x00FFFFFF }, new float[] { 0, .7f }, Shader.TileMode.CLAMP));
+            if (p.getShader() == null) p.setShader(new RadialGradient(0, 0, 1, new int[] { Ui.WHITE_25, 0x00FFFFFF }, new float[] { 0, .7f }, Shader.TileMode.CLAMP));
             c.drawCircle(0, 0, 1, p);
             c.restore();
         }

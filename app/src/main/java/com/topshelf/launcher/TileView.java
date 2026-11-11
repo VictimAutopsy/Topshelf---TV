@@ -98,7 +98,7 @@ final class TileView extends FrameLayout {
         label.setSingleLine(true);
         label.setEllipsize(android.text.TextUtils.TruncateAt.END);
         label.setGravity(Gravity.CENTER_HORIZONTAL);
-        label.setShadowLayer(.6f * rem, 0, .1f * rem, 0x80000000);
+        label.setShadowLayer(.6f * rem, 0, .1f * rem, Ui.BLACK_55);
         label.setAlpha(0f);
         label.setTranslationY(-.5f * rem);
         LayoutParams ll = new LayoutParams(Math.round(tw * 1.5f), LayoutParams.WRAP_CONTENT);
@@ -151,8 +151,8 @@ final class TileView extends FrameLayout {
         }
         long d = 260;
         card.animate().scaleX(f ? 1.12f : 1f).scaleY(f ? 1.12f : 1f).translationZ(f && shadowsOn ? 2.2f * R : 0f).setDuration(d).setInterpolator(EASE).start();
-        gloss.animate().alpha(f ? 1f : 0f).setDuration(animate ? 300 : 0).start();
-        label.animate().alpha(f && labelOn ? 1f : 0f).translationY(f ? 0f : -.5f * R).setDuration(animate ? 220 : 0).setInterpolator(EASE).start();
+        gloss.animate().alpha(f ? 1f : 0f).setDuration(animate ? Ui.MOVE : 0).start();
+        label.animate().alpha(f && labelOn ? 1f : 0f).translationY(f ? 0f : -.5f * R).setDuration(animate ? Ui.FAST : 0).setInterpolator(EASE).start();
         setZ(f ? 10 : 0);
         if (f && animate) {
             float span = tw * 1.2f * 1.3f;
@@ -172,36 +172,36 @@ final class TileView extends FrameLayout {
         float rx = 0, ry = 0;
         if (dir == 'l') ry = -5; else if (dir == 'r') ry = 5; else if (dir == 'u') rx = 5; else if (dir == 'd') rx = -5;
         card.animate().rotationX(rx).rotationY(ry).setDuration(140).setInterpolator(EASE).withEndAction(new Runnable() {
-            @Override public void run() { card.animate().rotationX(0).rotationY(0).setDuration(500).setInterpolator(SPRING).start(); }
+            @Override public void run() { card.animate().rotationX(0).rotationY(0).setDuration(Ui.SLOW).setInterpolator(SPRING).start(); }
         }).start();
     }
 
     void bump(char dir) {
         float dx = dir == 'l' ? -.7f * R : dir == 'r' ? .7f * R : 0, dy = dir == 'u' ? -.6f * R : dir == 'd' ? .6f * R : 0;
         card.animate().translationX(dx).translationY(dy).setDuration(128).setInterpolator(EASE).withEndAction(new Runnable() {
-            @Override public void run() { card.animate().translationX(0).translationY(0).setDuration(190).setInterpolator(EASE).start(); }
+            @Override public void run() { card.animate().translationX(0).translationY(0).setDuration(Ui.FAST).setInterpolator(EASE).start(); }
         }).start();
     }
 
     void press() {
         card.animate().scaleX(1.04f).scaleY(1.04f).setDuration(100).withEndAction(new Runnable() {
-            @Override public void run() { card.animate().scaleX(focused ? 1.12f : 1f).scaleY(focused ? 1.12f : 1f).setDuration(200).setInterpolator(EASE).start(); }
+            @Override public void run() { card.animate().scaleX(focused ? 1.12f : 1f).scaleY(focused ? 1.12f : 1f).setDuration(Ui.FAST).setInterpolator(EASE).start(); }
         }).start();
     }
 
     void setMoving(boolean on) {
         if (wiggle != null) { wiggle.cancel(); wiggle = null; card.setRotation(0); }
         if (on) {
-            card.animate().scaleX(1.16f).scaleY(1.16f).setDuration(200).start();
+            card.animate().scaleX(1.16f).scaleY(1.16f).setDuration(Ui.FAST).start();
             wiggle = ObjectAnimator.ofFloat(card, "rotation", -1.3f, 1.3f);
-            wiggle.setDuration(260);
+            wiggle.setDuration(Ui.BASE);
             wiggle.setRepeatCount(ValueAnimator.INFINITE);
             wiggle.setRepeatMode(ValueAnimator.REVERSE);
             wiggle.setInterpolator(new LinearInterpolator());
             wiggle.start();
-            label.animate().alpha(labelOn ? 1f : 0f).translationY(0).setDuration(200).start();
+            label.animate().alpha(labelOn ? 1f : 0f).translationY(0).setDuration(Ui.FAST).start();
         } else {
-            card.animate().scaleX(focused ? 1.12f : 1f).scaleY(focused ? 1.12f : 1f).setDuration(200).start();
+            card.animate().scaleX(focused ? 1.12f : 1f).scaleY(focused ? 1.12f : 1f).setDuration(Ui.FAST).start();
         }
     }
 
@@ -209,7 +209,7 @@ final class TileView extends FrameLayout {
     static final class Gloss extends Drawable {
         private final Paint p = new Paint();
         @Override protected void onBoundsChange(android.graphics.Rect b) {
-            p.setShader(new RadialGradient(0, 0, 1f, new int[] { 0x47FFFFFF, 0x00FFFFFF }, new float[] { 0f, .6f }, Shader.TileMode.CLAMP));
+            p.setShader(new RadialGradient(0, 0, 1f, new int[] { Ui.WHITE_25, 0x00FFFFFF }, new float[] { 0f, .6f }, Shader.TileMode.CLAMP));
         }
         @Override public void draw(Canvas c) {
             android.graphics.Rect b = getBounds();
@@ -233,7 +233,7 @@ final class TileView extends FrameLayout {
             float len = Math.abs(b.width() * dx) + Math.abs(b.height() * dy);
             float cx = b.exactCenterX(), cy = b.exactCenterY();
             p.setShader(new LinearGradient(cx - dx * len / 2, cy - dy * len / 2, cx + dx * len / 2, cy + dy * len / 2,
-                    new int[] { 0, 0, 0x42FFFFFF, 0, 0 }, new float[] { 0f, .38f, .5f, .62f, 1f }, Shader.TileMode.CLAMP));
+                    new int[] { 0, 0, Ui.WHITE_25, 0, 0 }, new float[] { 0f, .38f, .5f, .62f, 1f }, Shader.TileMode.CLAMP));
         }
         @Override public void draw(Canvas c) { c.drawRect(getBounds(), p); }
         @Override public void setAlpha(int a) { p.setAlpha(a); }
@@ -252,14 +252,14 @@ final class TileView extends FrameLayout {
             p.setStyle(Paint.Style.STROKE);
             float sw = .07f * R;
             p.setStrokeWidth(sw);
-            p.setColor(0x24FFFFFF);
+            p.setColor(Ui.WHITE_12);
             c.drawRoundRect(new RectF(r.left + sw / 2, r.top + sw / 2, r.right - sw / 2, r.bottom - sw / 2), rad, rad, p);
             p.setStyle(Paint.Style.FILL);
-            p.setColor(0x61FFFFFF);
+            p.setColor(Ui.WHITE_40);
             c.save(); c.clipRect(r.left, r.top, r.right, r.top + .1f * R);
             android.graphics.Path path = new android.graphics.Path(); path.addRoundRect(r, rad, rad, android.graphics.Path.Direction.CW);
             c.clipPath(path); c.drawRect(r, p); c.restore();
-            p.setColor(0x40000000);
+            p.setColor(Ui.BLACK_25);
             c.save(); c.clipRect(r.left, r.bottom - .1f * R, r.right, r.bottom); c.clipPath(path); c.drawRect(r, p); c.restore();
         }
         @Override public void setAlpha(int a) { }

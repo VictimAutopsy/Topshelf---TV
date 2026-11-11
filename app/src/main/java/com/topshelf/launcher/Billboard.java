@@ -121,7 +121,7 @@ final class Billboard extends FrameLayout {
         fightArt = new FrameLayout(getContext());
         fightArt.setAlpha(0f);
         fightArt.setBackground(new GradientDrawable(GradientDrawable.Orientation.TL_BR, new int[] { 0xFF0A0204, 0xFF3A0A12, 0xFF120306 }));
-        vs = h.text(heavy, 18f, 0x1FFFFFFF);
+        vs = h.text(heavy, 18f, Ui.WHITE_12);
         vs.setText("VS");
         FrameLayout.LayoutParams vl = new FrameLayout.LayoutParams(LayoutParams.WRAP_CONTENT, LayoutParams.WRAP_CONTENT, Gravity.CENTER_VERTICAL);
         vl.leftMargin = Math.round(h.W * .6f);
@@ -139,17 +139,17 @@ final class Billboard extends FrameLayout {
         ambient = new AmbientBars(getContext());
         // the shade that keeps the words readable: from the left, and from the bottom
         View sl = new View(getContext());
-        sl.setBackground(new GradientDrawable(GradientDrawable.Orientation.LEFT_RIGHT, new int[] { 0xF0000000, 0xB3000000, 0x40000000, 0x00000000 }));
+        sl.setBackground(new GradientDrawable(GradientDrawable.Orientation.LEFT_RIGHT, new int[] { Ui.BLACK_90, Ui.BLACK_70, Ui.BLACK_25, 0x00000000 }));
         addView(sl, new LayoutParams(Math.round(h.W * .72f), LayoutParams.MATCH_PARENT));
         View sb = new View(getContext());
-        sb.setBackground(new GradientDrawable(GradientDrawable.Orientation.TOP_BOTTOM, new int[] { 0x00000000, 0x99000000, 0xD9000000 }));
+        sb.setBackground(new GradientDrawable(GradientDrawable.Orientation.TOP_BOTTOM, new int[] { 0x00000000, Ui.BLACK_60, Ui.BLACK_85 }));
         addView(sb, new LayoutParams(LayoutParams.MATCH_PARENT, Math.round(h.H * .4f), Gravity.BOTTOM));
         View st = new View(getContext());
-        st.setBackground(new GradientDrawable(GradientDrawable.Orientation.TOP_BOTTOM, new int[] { 0x80000000, 0x00000000 }));
+        st.setBackground(new GradientDrawable(GradientDrawable.Orientation.TOP_BOTTOM, new int[] { Ui.BLACK_55, 0x00000000 }));
         addView(st, new LayoutParams(LayoutParams.MATCH_PARENT, Math.round(h.H * .22f)));
 
         clock = h.text(h.fMed, 2.1f, Color.WHITE);
-        clock.setShadowLayer(.8f * h.R, 0, .1f * h.R, 0x80000000);
+        clock.setShadowLayer(.8f * h.R, 0, .1f * h.R, Ui.BLACK_55);
         addView(clock, h.at(6, 4f, LayoutParams.WRAP_CONTENT, LayoutParams.WRAP_CONTENT));
 
         // ---- the story: why it's here, what it is, two buttons
@@ -157,13 +157,13 @@ final class Billboard extends FrameLayout {
         info.setOrientation(LinearLayout.VERTICAL);
         eyebrow = new LinearLayout(getContext());
         eyebrow.setGravity(Gravity.CENTER_VERTICAL);
-        chip = h.text(h.fSemi, 1.05f, Color.WHITE);
+        chip = h.text(h.fSemi, Ui.TEXT_S, Color.WHITE);
         chip.setText("LIVE"); chip.setLetterSpacing(.08f);
         GradientDrawable cb = new GradientDrawable(); cb.setColor(0xFFE5484D); cb.setCornerRadius(GlassPanel.look.equals("air") ? 0 : .5f * h.R);
         chip.setBackground(cb); chip.setPadding(h.px(.75f), h.px(.25f), h.px(.75f), h.px(.25f));
         LinearLayout.LayoutParams cl = new LinearLayout.LayoutParams(LayoutParams.WRAP_CONTENT, LayoutParams.WRAP_CONTENT); cl.rightMargin = h.px(1f);
         eyebrow.addView(chip, cl);
-        tag = h.text(h.fSemi, 1.25f, Color.WHITE);
+        tag = h.text(h.fSemi, Ui.TEXT_M, Color.WHITE);
         tag.setLetterSpacing(.1f); tag.setSingleLine(true); tag.setEllipsize(android.text.TextUtils.TruncateAt.END);
         eyebrow.addView(tag);
         info.addView(eyebrow);
@@ -176,7 +176,7 @@ final class Billboard extends FrameLayout {
         title = h.text(heavy, 6f, Color.WHITE);
         title.setLetterSpacing(-.02f); title.setMaxLines(2); title.setEllipsize(android.text.TextUtils.TruncateAt.END);
         title.setLineSpacing(0, .92f);
-        title.setShadowLayer(1.2f * h.R, 0, .15f * h.R, 0x66000000);
+        title.setShadowLayer(1.2f * h.R, 0, .15f * h.R, Ui.BLACK_45);
         LinearLayout.LayoutParams tl = new LinearLayout.LayoutParams(h.px(58), LayoutParams.WRAP_CONTENT); tl.topMargin = h.px(1.2f);
         info.addView(title, tl);
         scoreRow = new LinearLayout(getContext());
@@ -191,15 +191,15 @@ final class Billboard extends FrameLayout {
         scoreRow.addView(sLogoB, new LinearLayout.LayoutParams(h.px(6), h.px(6)));
         LinearLayout.LayoutParams srl = new LinearLayout.LayoutParams(LayoutParams.WRAP_CONTENT, LayoutParams.WRAP_CONTENT); srl.topMargin = h.px(1.4f);
         info.addView(scoreRow, srl);
-        meta = h.text(h.fMed, 1.55f, 0xF0FFFFFF);
+        meta = h.text(h.fMed, Ui.TEXT_XL, Ui.WHITE_95);
         meta.setSingleLine(true); meta.setEllipsize(android.text.TextUtils.TruncateAt.END);
         LinearLayout.LayoutParams ml = new LinearLayout.LayoutParams(h.px(58), LayoutParams.WRAP_CONTENT); ml.topMargin = h.px(1.4f);
         info.addView(meta, ml);
-        desc = h.text(h.fReg, 1.55f, 0xE6FFFFFF);
+        desc = h.text(h.fReg, Ui.TEXT_XL, Ui.WHITE_95);
         desc.setMaxLines(2); desc.setEllipsize(android.text.TextUtils.TruncateAt.END); desc.setLineSpacing(0, 1.18f);
         LinearLayout.LayoutParams dl = new LinearLayout.LayoutParams(h.px(46), LayoutParams.WRAP_CONTENT); dl.topMargin = h.px(.9f);
         info.addView(desc, dl);
-        for (TextView t : new TextView[] { tag, meta, desc, scoreText }) t.setShadowLayer(.8f * h.R, 0, .1f * h.R, 0x80000000);
+        for (TextView t : new TextView[] { tag, meta, desc, scoreText }) t.setShadowLayer(.8f * h.R, 0, .1f * h.R, Ui.BLACK_55);
         buttons = new LinearLayout(getContext());
         bGo = button(); bMore = button();
         buttons.addView(bGo);
@@ -216,8 +216,8 @@ final class Billboard extends FrameLayout {
         FrameLayout.LayoutParams stl = new FrameLayout.LayoutParams(LayoutParams.WRAP_CONTENT, LayoutParams.WRAP_CONTENT, Gravity.BOTTOM | Gravity.LEFT);
         stl.leftMargin = h.px(6); stl.bottomMargin = h.px(4.6f);
         addView(strip, stl);
-        hint = h.text(h.fReg, 1.15f, 0xCCFFFFFF);
-        hint.setShadowLayer(.6f * h.R, 0, .1f * h.R, 0x99000000);
+        hint = h.text(h.fReg, Ui.TEXT_M, Ui.WHITE_85);
+        hint.setShadowLayer(.6f * h.R, 0, .1f * h.R, Ui.BLACK_60);
         FrameLayout.LayoutParams hl = new FrameLayout.LayoutParams(LayoutParams.WRAP_CONTENT, LayoutParams.WRAP_CONTENT, Gravity.BOTTOM | Gravity.RIGHT);
         hl.rightMargin = h.px(6); hl.bottomMargin = h.px(8.6f);
         addView(hint, hl);
@@ -232,9 +232,9 @@ final class Billboard extends FrameLayout {
         return lp;
     }
     private TextView button() {
-        TextView b = h.text(h.fSemi, 1.5f, Color.WHITE);
+        TextView b = h.text(h.fSemi, Ui.TEXT_XL, Color.WHITE);
         b.setPadding(h.px(2.2f), h.px(1f), h.px(2.2f), h.px(1f));
-        b.setBackground(GlassPanel.buttonBg(false, 1.3f * h.R, 0x38FFFFFF));
+        b.setBackground(GlassPanel.buttonBg(false, 1.3f * h.R, Ui.WHITE_20));
         if (GlassPanel.look.equals("air")) { b.setAllCaps(true); b.setLetterSpacing(.06f); b.setPadding(h.px(2.2f), h.px(1f), h.px(3.2f), h.px(1f)); }
         return b;
     }
@@ -252,7 +252,7 @@ final class Billboard extends FrameLayout {
             float hgt = getHeight(), w = getWidth(), rr = hgt / 2f, f = Math.min(1f, fill);
             String lk = GlassPanel.look;
             if (lk.equals("air")) {
-                p.setColor(on ? 0x66FFFFFF : 0x40FFFFFF); c.drawRect(0, 0, w, hgt, p);
+                p.setColor(on ? Ui.WHITE_40 : Ui.WHITE_25); c.drawRect(0, 0, w, hgt, p);
                 if (f > 0) {
                     p.setColor(on || f < 1 ? GlassPanel.airColor : Color.WHITE);
                     float x = w * f, k = Math.min(hgt * 1.2f, x);
@@ -262,7 +262,7 @@ final class Billboard extends FrameLayout {
                 }
             } else if (lk.equals("shelf")) {
                 int light = GlassPanel.shelfLight();
-                p.setColor(0x33FFFFFF); r.set(0, 0, w, hgt); c.drawRoundRect(r, rr, rr, p);
+                p.setColor(Ui.WHITE_20); r.set(0, 0, w, hgt); c.drawRoundRect(r, rr, rr, p);
                 if (f > 0) {
                     p.setColor(light); r.set(0, 0, w * f, hgt); c.drawRoundRect(r, rr, rr, p);
                 }
@@ -272,7 +272,7 @@ final class Billboard extends FrameLayout {
                 p.setColor(GlassPanel.inkColor | 0xFF000000); c.drawRect(0, 0, w - o, hgt - o, p);
                 if (f > 0) { p.setColor(GlassPanel.inkPaper()); c.drawRect(0, 0, (w - o) * f, hgt - o, p); }
             } else {
-                p.setColor(on ? 0x59FFFFFF : 0x40FFFFFF); r.set(0, 0, w, hgt); c.drawRoundRect(r, rr, rr, p);
+                p.setColor(on ? Ui.WHITE_40 : Ui.WHITE_25); r.set(0, 0, w, hgt); c.drawRoundRect(r, rr, rr, p);
                 if (f > 0) { p.setColor(Color.WHITE); r.set(0, 0, w * f, hgt); c.drawRoundRect(r, rr, rr, p); }
             }
         }
@@ -286,8 +286,8 @@ final class Billboard extends FrameLayout {
         if (on == railRoomOn) return;
         railRoomOn = on;
         float dx = on ? h.px(Home.RAIL_SHIFT) : 0;
-        info.animate().translationX(dx).setDuration(220).start();
-        strip.animate().translationX(dx).setDuration(220).start();
+        info.animate().translationX(dx).setDuration(Ui.FAST).start();
+        strip.animate().translationX(dx).setDuration(Ui.FAST).start();
         clock.setVisibility(h.side && !on ? VISIBLE : GONE);
     }
     private boolean shown;
@@ -359,14 +359,14 @@ final class Billboard extends FrameLayout {
         final int g = ++gen;
         if (animate && info.getAlpha() > 0) {
             info.animate().cancel();
-            info.animate().alpha(0f).translationX((railRoomOn ? h.px(Home.RAIL_SHIFT) : 0) - h.px(1.2f)).setDuration(200).withEndAction(new Runnable() { @Override public void run() {
+            info.animate().alpha(0f).translationX((railRoomOn ? h.px(Home.RAIL_SHIFT) : 0) - h.px(1.2f)).setDuration(Ui.FAST).withEndAction(new Runnable() { @Override public void run() {
                 if (g != gen) return;
                 fill(s);
                 float base = railRoomOn ? h.px(Home.RAIL_SHIFT) : 0;
                 info.setTranslationX(base + h.px(1.2f));
-                info.animate().alpha(1f).translationX(base).setDuration(420).setInterpolator(TileView.EASE).start();
+                info.animate().alpha(1f).translationX(base).setDuration(Ui.SLIDE).setInterpolator(TileView.EASE).start();
             } }).start();
-        } else { fill(s); info.animate().cancel(); info.setTranslationX(railRoomOn ? h.px(Home.RAIL_SHIFT) : 0); info.animate().alpha(1f).setDuration(animate ? 420 : 0).start(); }
+        } else { fill(s); info.animate().cancel(); info.setTranslationX(railRoomOn ? h.px(Home.RAIL_SHIFT) : 0); info.animate().alpha(1f).setDuration(animate ? Ui.SLIDE : 0).start(); }
         stopTrailer();
         backdrop(s, g);
         markSeen(s);
@@ -403,7 +403,7 @@ final class Billboard extends FrameLayout {
                 boolean played = trOn;
                 trOn = false; trLoading = false;
                 ambient.stop();
-                trHost.animate().alpha(0f).setDuration(500).start();
+                trHost.animate().alpha(0f).setDuration(Ui.SLOW).start();
                 if (played) slideStart = System.currentTimeMillis() - (SLIDE_MS - 2500);     // (the next one, a moment after; a trailer that never started leaves the slide its usual time)
             }
         });
@@ -475,12 +475,12 @@ final class Billboard extends FrameLayout {
     /** the picture behind: the title's backdrop, the game's photo, or (no photo) the teams' colours */
     private void backdrop(final Slide s, final int g) {
         final ImageView next = bg[1 - bgLayer], was = bg[bgLayer];
-        if (s.bg.isEmpty()) { noPicture(s); was.animate().alpha(0f).setDuration(600).start(); return; }
+        if (s.bg.isEmpty()) { noPicture(s); was.animate().alpha(0f).setDuration(Ui.SLOWER).start(); return; }
         h.imgs.load("bb:" + s.bg, src(s.bg), h.W, h.H, new HomeImages.Done() { @Override public void done(Bitmap b) {
             if (g != gen) return;
-            if (b == null) { noPicture(s); was.animate().alpha(0f).setDuration(600).start(); return; }
-            teamArt.animate().alpha(0f).setDuration(600).start();
-            fightArt.animate().alpha(0f).setDuration(600).start();
+            if (b == null) { noPicture(s); was.animate().alpha(0f).setDuration(Ui.SLOWER).start(); return; }
+            teamArt.animate().alpha(0f).setDuration(Ui.SLOWER).start();
+            fightArt.animate().alpha(0f).setDuration(Ui.SLOWER).start();
             next.setImageBitmap(b);
             next.animate().cancel(); next.setScaleX(1f); next.setScaleY(1f);
             next.setPivotX(h.W * .7f); next.setPivotY(h.H * .4f);
@@ -499,8 +499,8 @@ final class Billboard extends FrameLayout {
     private android.animation.ObjectAnimator push;
     /** no picture: a fight card's poster, a game's team colours, or (a title) your photo */
     private void noPicture(Slide s) {
-        if (!s.cutA.isEmpty() || !s.cutB.isEmpty()) { teamArt.animate().alpha(0f).setDuration(400).start(); showFight(s); return; }
-        fightArt.animate().alpha(0f).setDuration(400).start();
+        if (!s.cutA.isEmpty() || !s.cutB.isEmpty()) { teamArt.animate().alpha(0f).setDuration(Ui.SLIDE).start(); showFight(s); return; }
+        fightArt.animate().alpha(0f).setDuration(Ui.SLIDE).start();
         boolean teams = s.ev != null && s.ev.teams.size() == 2;
         h.billboardCover(teams);
         showTeams(s);
@@ -508,7 +508,7 @@ final class Billboard extends FrameLayout {
     private void showFight(Slide s) {
         fighter(fighterA, s.cutA);
         fighter(fighterB, s.cutB);
-        fightArt.animate().alpha(1f).setDuration(600).withEndAction(new Runnable() { @Override public void run() { h.billboardCover(true); } }).start();
+        fightArt.animate().alpha(1f).setDuration(Ui.SLOWER).withEndAction(new Runnable() { @Override public void run() { h.billboardCover(true); } }).start();
     }
     /** a fighter's picture, no bigger than about one and a half times its own size (it looked soft blown up) */
     private void fighter(final ImageView v, String u) {
@@ -526,13 +526,13 @@ final class Billboard extends FrameLayout {
         } });
     }
     private void showTeams(Slide s) {
-        fightArt.animate().alpha(0f).setDuration(400).start();
-        if (s.ev == null || s.ev.teams.size() != 2) { teamArt.animate().alpha(0f).setDuration(400).start(); return; }
+        fightArt.animate().alpha(0f).setDuration(Ui.SLIDE).start();
+        if (s.ev == null || s.ev.teams.size() != 2) { teamArt.animate().alpha(0f).setDuration(Ui.SLIDE).start(); return; }
         teamA.setBackgroundColor(col(s.ev.teams.get(0).color, 0xFF2A3340));
         teamB.setBackgroundColor(col(s.ev.teams.get(1).color, 0xFF3A2A30));
         teamLogo(teamLogoA, s.ev.teams.get(0).logo, h.px(26));
         teamLogo(teamLogoB, s.ev.teams.get(1).logo, h.px(26));
-        teamArt.animate().alpha(1f).setDuration(600).start();
+        teamArt.animate().alpha(1f).setDuration(Ui.SLOWER).start();
     }
     private static int col(String hex, int dflt) {
         try { return hex == null || hex.isEmpty() ? dflt : (0xFF000000 | Integer.parseInt(hex.replace("#", ""), 16)); } catch (Exception e) { return dflt; }
@@ -543,9 +543,9 @@ final class Billboard extends FrameLayout {
         for (int i = 0; i < deck.size(); i++) {
             LinearLayout cell = new LinearLayout(getContext());
             cell.setOrientation(LinearLayout.VERTICAL);
-            TextView l = h.text(h.fSemi, 1.1f, 0xB3FFFFFF);
+            TextView l = h.text(h.fSemi, Ui.TEXT_S, Ui.WHITE_75);
             l.setText(deck.get(i).strip); l.setSingleLine(true); l.setEllipsize(android.text.TextUtils.TruncateAt.END);
-            l.setShadowLayer(.6f * h.R, 0, .1f * h.R, 0x99000000);
+            l.setShadowLayer(.6f * h.R, 0, .1f * h.R, Ui.BLACK_60);
             cell.addView(l, new LinearLayout.LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT));
             Bar b = new Bar();
             float bh = GlassPanel.look.equals("air") ? .5f : GlassPanel.look.equals("ink") ? .6f : .3f;     // (On Air's and Photo Ink's are bolder)
@@ -565,7 +565,7 @@ final class Billboard extends FrameLayout {
         for (int i = 0; i < barLabels.size(); i++) {
             TextView l = barLabels.get(i);
             boolean c = i == cur;
-            l.setTextColor(c ? Color.WHITE : 0xB3FFFFFF);
+            l.setTextColor(c ? Color.WHITE : Ui.WHITE_75);
             l.setTypeface(c && open ? heavy : h.fSemi);
             l.setVisibility(open ? VISIBLE : INVISIBLE);
         }
@@ -587,10 +587,10 @@ final class Billboard extends FrameLayout {
         drawStrip();
     }
     private void style(TextView b, boolean f) {
-        b.setBackground(GlassPanel.buttonBg(f, 1.3f * h.R, 0x38FFFFFF));
+        b.setBackground(GlassPanel.buttonBg(f, 1.3f * h.R, Ui.WHITE_20));
         b.setTextColor(GlassPanel.buttonText(f));
         float sc = GlassPanel.look.equals("air") ? 1f : f ? 1.06f : 1f;      // (On Air's bars don't grow: like a broadcast's graphics)
-        b.animate().scaleX(sc).scaleY(sc).setDuration(160).start();
+        b.animate().scaleX(sc).scaleY(sc).setDuration(Ui.QUICK).start();
     }
 
     // ================================================================== keys
