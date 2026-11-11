@@ -174,7 +174,10 @@ if (NH.on) {
     const rowOut = r => {
       let v = ''; try { v = typeof r.value === 'function' ? r.value() : ''; } catch (e) {}
       if (r.head) return { head: true, label: r.label, value: '' };
+      // (what the detail panel says about it: setinfo.js)
+      let inf = {}; try { inf = typeof setInfoFor === 'function' ? setInfoFor(r, v == null ? '' : String(v)) : {}; } catch (e) {}
       return { label: r.label, value: v == null ? '' : String(v), cycle: !!r.cycle, chev: !!r.chevron, gap: !!r.gap,
+        about: inf.about || '', opts: inf.opts || [], cur: inf.cur == null ? -1 : inf.cur, how: inf.how || '', pv: inf.pv || '',
         edit: r.edit ? { value: String(r.edit.get() || ''), wide: !!r.edit.wide, type: r.edit.type || '',
           ph: r.edit.ph || (r.id === 'posters' ? 'Paste your Poster URL (with {imdb_id})' : r.edit.wide ? 'Paste link (http://…)' : '') } : null };
     };
@@ -186,7 +189,8 @@ if (NH.on) {
       const data = { title: sub || (SET.sec == null ? 'Settings' : SET_SECTIONS[SET.sec].name), back: sub ? SET_SECTIONS[SET.sec].name : SET.sec == null ? '' : 'Settings',
         foot: f ? f.textContent : '', sel: sSel, rows: sRows.map(rowOut),
         sec: SET.sec == null ? -1 : SET.sec, sub: SET.sub || '',
-        sections: SET_SECTIONS.map((x, i) => ({ name: x.name, about: i === last && typeof UPD !== 'undefined' && UPD.latest && UPD.latest.newer ? `Update ${UPD.latest.name} ready` : x.about })) };
+        about: SET.sec == null || sub ? '' : SET_SECTIONS[SET.sec].about || '',
+        sections: SET_SECTIONS.map((x, i) => ({ name: x.name, about: i === last && typeof UPD !== 'undefined' && UPD.latest && UPD.latest.newer ? `Update ${UPD.latest.name} ready` : (typeof SET_BRIEF !== 'undefined' && SET_BRIEF[x.name]) || x.about })) };
       try { B.nhSheet(JSON.stringify(data)); } catch (e) {}
     };
     const os0 = openSettings;

@@ -22,9 +22,13 @@ import java.util.ArrayList;
 import java.util.List;
 
 /**
- * Settings, drawn by Android. On a TV it's a full screen: the sections listed down the left (moving through
- * them shows each one's settings on the right; ▶ or OK goes into them, ◀ or Back comes out). On a narrow
- * screen it's a glass sheet on the right.
+ * Settings, drawn by Android. On a TV it's a full screen in two steps (Chad's design, 1.0.394):
+ *   1. choosing a section: the sections down the left with their icons, names and a line about each, and the
+ *      chosen one's settings shown beside them;
+ *   2. inside a section (▶ or OK): the sections shrink to a strip of icons, the settings move over, and a detail
+ *      panel on the right says what the setting you're on does and lists its choices. ◀ or Back comes out.
+ * On Air it's edge to edge and solid; the other looks keep their own panel around the same layout.
+ * On a narrow screen it's a glass sheet on the right.
  *
  * Earlier: a glass sheet on the right with a list of rows (a setting and its value,
  * ‹ › to change it, or a section to open). What the rows are and what each one does stays with the
@@ -32,7 +36,7 @@ import java.util.List;
  * section or going back asks the page, which hands back the new rows.
  */
 final class NativeSheet extends FrameLayout {
-    private static final float SHEET_W = 42, RAD = 3, ROWS_TOP = 9.4f, FOOT_H = 4.6f, LEFT_W = 31;
+    private static final float SHEET_W = 42, RAD = 3, ROWS_TOP = 9.4f, PANE_TOP = 11.4f, FOOT_H = 4.6f, LEFT_W = 32.75f, RAIL_W = 8.25f;
 
     /* the full screen's left column: the sections */
     private final boolean pane;
@@ -42,6 +46,14 @@ final class NativeSheet extends FrameLayout {
     private boolean focusLeft = true;
     private String curSub = "";
     private long askedAt;
+    /* the two steps' measures, and the detail panel */
+    private final boolean air;
+    private int pw, ph, lwFull, lwRail, midW, railNow = -1;
+    private View leftBg, div, dDiv;
+    private TextView setTitle, about, dTitle, dAbout, dNote;
+    private LinearLayout head, detail, dOpts;
+    private FrameLayout dPreview;
+    private String detailSig = "";
 
     private final NativeHome h;
     private final float R;
@@ -72,34 +84,46 @@ final class NativeSheet extends FrameLayout {
         panel.setLiquidAllowed(false);
         panel.setElevation(2.4f * R);
         pane = h.SW >= 100;
-        int pw = pane ? h.W - h.px(4) : h.px(Math.min(SHEET_W, h.SW - 4)), ph = h.H - h.px(4);
-        int lw = pane ? h.px(LEFT_W) : 0;
+        air = GlassPanel.look.equals("air");
+        final boolean full = pane && air;                      // On Air: edge to edge, and solid (the screen behind showed through)
+        int inset = full ? 0 : h.px(2);
+        pw = pane ? h.W - 2 * inset : h.px(Math.min(SHEET_W, h.SW - 4)); ph = h.H - 2 * inset;
+        lwFull = pane ? h.px(LEFT_W) : 0; lwRail = pane ? h.px(RAIL_W) : 0;
+        midW = (pw - lwRail) / 2;
+        int lw = lwFull, top = h.px(pane ? PANE_TOP : ROWS_TOP);
         LayoutParams pl = new LayoutParams(pw, ph);
-        pl.leftMargin = h.W - pw - h.px(2); pl.topMargin = h.px(2);
+        pl.leftMargin = h.W - pw - inset; pl.topMargin = inset;
         addView(panel, pl);
+        if (full) { View solid = new View(c); solid.setBackgroundColor(0xFF0B0B0D); panel.addView(solid, new LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.MATCH_PARENT)); }
         if (pane) {
-            TextView st = h.text(h.fSemi, 2.6f, Color.WHITE); st.setLetterSpacing(-.02f); st.setText("Settings");
-            LayoutParams stl = new LayoutParams(LayoutParams.WRAP_CONTENT, LayoutParams.WRAP_CONTENT); stl.leftMargin = h.px(3f); stl.topMargin = h.px(3.6f);
-            panel.addView(st, stl);
-            left = new LinearLayout(c); left.setOrientation(LinearLayout.VERTICAL);
-            LayoutParams ll = new LayoutParams(lw - h.px(3.2f), ph - h.px(ROWS_TOP) - h.px(FOOT_H)); ll.leftMargin = h.px(1.6f); ll.topMargin = h.px(ROWS_TOP);
-            panel.addView(left, ll);
-            View div = new View(c); div.setBackgroundColor(Ui.WHITE_12);
-            LayoutParams dl = new LayoutParams(Math.max(1, h.px(.1f)), ph - h.px(6)); dl.leftMargin = lw; dl.topMargin = h.px(3);
+            leftBg = new View(c); if (air) leftBg.setBackgroundColor(0xFF101013);
+            panel.addView(leftBg, new LayoutParams(lw, ph));
+            div = new View(c); div.setBackgroundColor(air ? 0xFF1F1F25 : Ui.WHITE_12);
+            LayoutParams dl = new LayoutParams(Math.max(1, h.px(.1f)), air ? ph : ph - h.px(6)); dl.leftMargin = lw; dl.topMargin = air ? 0 : h.px(3);
             panel.addView(div, dl);
+            setTitle = h.text(air ? SportsLook.heavy() : h.fSemi, air ? 3.2f : 2.6f, Color.WHITE); setTitle.setText("Settings");
+            if (air) { setTitle.setAllCaps(true); setTitle.setLetterSpacing(.04f); } else setTitle.setLetterSpacing(-.02f);
+            LayoutParams stl = new LayoutParams(LayoutParams.WRAP_CONTENT, LayoutParams.WRAP_CONTENT); stl.leftMargin = h.px(3.75f); stl.topMargin = h.px(4f);
+            panel.addView(setTitle, stl);
+            left = new LinearLayout(c); left.setOrientation(LinearLayout.VERTICAL);
+            LayoutParams ll = new LayoutParams(lw, LayoutParams.WRAP_CONTENT); ll.topMargin = h.px(10.4f);
+            panel.addView(left, ll);
         }
 
-        LinearLayout head = new LinearLayout(c);
+        head = new LinearLayout(c);
         head.setOrientation(LinearLayout.VERTICAL);
         back = h.text(h.fMed, Ui.TEXT_M, Ui.WHITE_60);
         head.addView(back);
-        title = h.text(h.fSemi, 2.6f, Color.WHITE);
-        title.setLetterSpacing(-.02f);
+        title = h.text(pane && air ? SportsLook.heavy() : h.fSemi, pane && air ? 3.6f : 2.6f, Color.WHITE);
+        if (pane && air) { title.setAllCaps(true); title.setLetterSpacing(.03f); } else title.setLetterSpacing(-.02f);
+        title.setSingleLine(true); title.setEllipsize(TextUtils.TruncateAt.END);
         LinearLayout.LayoutParams tl = new LinearLayout.LayoutParams(LayoutParams.WRAP_CONTENT, LayoutParams.WRAP_CONTENT); tl.topMargin = h.px(.4f);
         head.addView(title, tl);
-        LayoutParams hl = new LayoutParams(pw - lw - h.px(5.2f), LayoutParams.WRAP_CONTENT, Gravity.BOTTOM);
-        hl.leftMargin = lw + h.px(4); hl.bottomMargin = ph - h.px(ROWS_TOP - .2f);
-        hl.gravity = Gravity.TOP; hl.topMargin = h.px(3.2f);
+        about = h.text(h.fReg, Ui.TEXT_XL, Ui.WHITE_60); about.setSingleLine(true); about.setEllipsize(TextUtils.TruncateAt.END);
+        about.setVisibility(GONE);
+        head.addView(about);
+        LayoutParams hl = new LayoutParams(pw - lw - h.px(5.2f), LayoutParams.WRAP_CONTENT);
+        hl.leftMargin = lw + h.px(4); hl.topMargin = h.px(pane ? 3.4f : 3.2f);
         panel.addView(head, hl);
 
         clip = new FrameLayout(c);
@@ -109,8 +133,8 @@ final class NativeSheet extends FrameLayout {
         rows.setPadding(h.px(1), h.px(.4f), h.px(1), h.px(.4f));
         rows.setClipToPadding(false);
         clip.addView(rows, new LayoutParams(LayoutParams.MATCH_PARENT, h.px(400)));
-        LayoutParams cl = new LayoutParams(pw - lw - h.px(3.2f), ph - h.px(ROWS_TOP) - h.px(FOOT_H));
-        cl.leftMargin = lw + h.px(1.6f); cl.topMargin = h.px(ROWS_TOP);
+        LayoutParams cl = new LayoutParams(pw - lw - h.px(3.2f), ph - top - h.px(FOOT_H));
+        cl.leftMargin = lw + h.px(1.6f); cl.topMargin = top;
         panel.addView(clip, cl);
 
         foot = h.text(h.fReg, Ui.TEXT_S, Ui.WHITE_60);
@@ -118,6 +142,36 @@ final class NativeSheet extends FrameLayout {
         LayoutParams fl = new LayoutParams(pw - lw - h.px(7), LayoutParams.WRAP_CONTENT);
         fl.leftMargin = lw + h.px(4); fl.topMargin = ph - h.px(FOOT_H) + h.px(1.2f);
         panel.addView(foot, fl);
+
+        if (pane) {
+            // the detail panel (step 2): what the setting you're on does, and its choices
+            int dx = lwRail + midW;
+            detail = new LinearLayout(c); detail.setOrientation(LinearLayout.VERTICAL);
+            detail.setPadding(h.px(5f), h.px(4.4f), h.px(5.5f), h.px(2f));
+            if (air) detail.setBackgroundColor(0xFF101013);        // (the other looks' panels have round corners: no plate to poke out of them)
+            LayoutParams dtl = new LayoutParams(pw - dx, ph); dtl.leftMargin = dx;
+            panel.addView(detail, dtl);
+            dDiv = new View(c); dDiv.setBackgroundColor(air ? 0xFF1F1F25 : Ui.WHITE_12);
+            LayoutParams ddl = new LayoutParams(Math.max(1, h.px(.1f)), ph); ddl.leftMargin = dx;
+            panel.addView(dDiv, ddl);
+            dTitle = h.text(air ? SportsLook.heavy() : h.fSemi, air ? 2.75f : 2.2f, Color.WHITE);
+            if (air) { dTitle.setAllCaps(true); dTitle.setLetterSpacing(.03f); }
+            dTitle.setMaxLines(2);
+            detail.addView(dTitle);
+            dAbout = h.text(h.fReg, Ui.TEXT_XL, Ui.WHITE_75); dAbout.setLineSpacing(0, 1.4f);
+            LinearLayout.LayoutParams al = new LinearLayout.LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT); al.topMargin = h.px(.9f);
+            detail.addView(dAbout, al);
+            dPreview = new FrameLayout(c); dPreview.setVisibility(GONE);
+            LinearLayout.LayoutParams pvl = new LinearLayout.LayoutParams(LayoutParams.MATCH_PARENT, h.px(13f)); pvl.topMargin = h.px(2.2f);
+            detail.addView(dPreview, pvl);
+            dOpts = new LinearLayout(c); dOpts.setOrientation(LinearLayout.VERTICAL);
+            LinearLayout.LayoutParams ol = new LinearLayout.LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT); ol.topMargin = h.px(2.2f);
+            detail.addView(dOpts, ol);
+            dNote = h.text(h.fReg, Ui.TEXT_L, Ui.WHITE_50); dNote.setLineSpacing(0, 1.4f);
+            LinearLayout.LayoutParams nl = new LinearLayout.LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT); nl.topMargin = h.px(1.8f);
+            detail.addView(dNote, nl);
+            applyPane(false);
+        }
 
         setClipChildren(false);
         if (pane) { panel.setAlpha(0f); panel.setTranslationX(h.px(3)); }
@@ -127,26 +181,173 @@ final class NativeSheet extends FrameLayout {
 
     // ================================================================== the sections (full screen)
 
+    /** a row's place in its card: plain fill, and a hairline above it unless it's the card's first */
+    private static final class RowBg extends android.graphics.drawable.Drawable {
+        private final android.graphics.Paint p = new android.graphics.Paint();
+        private final int fill, line; private final float lineH;
+        RowBg(int fill, int line, float lineH) { this.fill = fill; this.line = line; this.lineH = lineH; }
+        @Override public void draw(android.graphics.Canvas c) {
+            android.graphics.Rect b = getBounds();
+            if (fill != 0) { p.setColor(fill); c.drawRect(b, p); }
+            if (line != 0) { p.setColor(line); c.drawRect(b.left, b.top, b.right, b.top + lineH, p); }
+        }
+        @Override public void setAlpha(int a) { }
+        @Override public void setColorFilter(android.graphics.ColorFilter cf) { }
+        @Override public int getOpacity() { return android.graphics.PixelFormat.TRANSLUCENT; }
+    }
+    private boolean firstInCard(int i) {
+        if (i <= 0) return true;
+        JSONObject d = data.optJSONObject(i), prev = data.optJSONObject(i - 1);
+        return prev == null || prev.optBoolean("head") || (d != null && d.optBoolean("gap"));
+    }
+
+    /** which of the two steps is showing: the sections in full (you're choosing one), or the strip of icons with
+        the detail panel (you're inside one). Sets every part's place for that step. */
+    private void applyPane(boolean animate) {
+        if (!pane) return;
+        final boolean rail = !focusLeft;
+        if (railNow == (rail ? 1 : 0)) { styleLeft(); drawDetail(); return; }
+        boolean first = railNow < 0;
+        railNow = rail ? 1 : 0;
+        int lw = rail ? lwRail : lwFull;
+        int padL = h.px(rail ? 4.4f : 6f), padR = h.px(rail ? 3.4f : 7f), areaW = rail ? midW : pw - lw;
+        LayoutParams cl = (LayoutParams) clip.getLayoutParams();
+        float from = cl.leftMargin;
+        cl.leftMargin = lw + padL - h.px(1); cl.width = areaW - padL - padR + h.px(2);
+        clip.setLayoutParams(cl);
+        LayoutParams hl = (LayoutParams) head.getLayoutParams(); hl.leftMargin = lw + padL; hl.width = areaW - padL - padR; head.setLayoutParams(hl);
+        LayoutParams fl = (LayoutParams) foot.getLayoutParams(); fl.leftMargin = lw + padL; fl.width = areaW - padL - padR; foot.setLayoutParams(fl);
+        LayoutParams bl = (LayoutParams) leftBg.getLayoutParams(); bl.width = lw; leftBg.setLayoutParams(bl);
+        LayoutParams dl = (LayoutParams) div.getLayoutParams(); dl.leftMargin = lw; div.setLayoutParams(dl);
+        LayoutParams ll = (LayoutParams) left.getLayoutParams(); ll.width = lw; left.setLayoutParams(ll);
+        setTitle.setVisibility(rail ? INVISIBLE : VISIBLE);
+        for (int i = 0; i < secViews.size(); i++) shapeSection(secViews.get(i), rail);
+        // (the rows are as wide as their column: made again so a value's room is right for it)
+        if (data.length() > 0) { rebuild(); for (int i = 0; i < rowViews.size(); i++) fill(i); fitHeight(); style(false); }
+        styleLeft();
+        detailSig = ""; drawDetail();
+        View[] slide = { clip, head, foot };
+        for (View v : slide) { v.animate().cancel(); v.setTranslationX(0); }
+        detail.animate().cancel(); dDiv.animate().cancel();
+        if (animate && !first && shown) {
+            float dx = from - cl.leftMargin;
+            for (View v : slide) { v.setTranslationX(dx); v.animate().translationX(0).setDuration(Ui.MOVE).setInterpolator(TileView.EASE).start(); }
+            if (rail) {
+                detail.setVisibility(VISIBLE); dDiv.setVisibility(VISIBLE);
+                detail.setAlpha(0f); detail.setTranslationX(h.px(4));
+                detail.animate().alpha(1f).translationX(0).setDuration(Ui.MOVE).setInterpolator(TileView.EASE).start();
+            } else { detail.setVisibility(GONE); dDiv.setVisibility(GONE); }
+        } else {
+            detail.setAlpha(1f); detail.setTranslationX(0);
+            detail.setVisibility(rail ? VISIBLE : GONE); dDiv.setVisibility(rail ? VISIBLE : GONE);
+        }
+    }
+
+    /** the detail panel's words for the setting you're on */
+    private void drawDetail() {
+        if (!pane || detail == null || focusLeft) return;
+        JSONObject d = sel < data.length() ? data.optJSONObject(sel) : null;
+        if (d == null || d.optBoolean("head")) return;
+        JSONArray opts = d.optJSONArray("opts");
+        String value = d.optString("value"), ab = d.optString("about"), how = d.optString("how"), pv = d.optString("pv");
+        String sg = d.optString("label") + '|' + value + '|' + ab + '|' + how + '|' + pv + '|' + (opts == null ? "" : opts.toString()) + '|' + d.optInt("cur", -1);
+        if (sg.equals(detailSig)) return;
+        detailSig = sg;
+        dTitle.setText(d.optString("label"));
+        // (a setting nobody has written up yet still says what it's set to)
+        String body = !ab.isEmpty() ? ab : value.isEmpty() ? "" : "Now: " + value;
+        dAbout.setText(body); dAbout.setVisibility(body.isEmpty() ? GONE : VISIBLE);
+        dNote.setText(how); dNote.setVisibility(how.isEmpty() ? GONE : VISIBLE);
+        boolean look = pv.equals("look");
+        dPreview.setVisibility(look ? VISIBLE : GONE);
+        if (look && dPreview.getChildCount() == 0) {
+            // a small sample of the look that's on: a title and its button
+            GradientDrawable g = new GradientDrawable(GradientDrawable.Orientation.LEFT_RIGHT, new int[] { 0xFF27323B, 0xFF12161B, 0xFF2B2320 });
+            g.setCornerRadius(GlassPanel.corner(1.2f * R)); g.setStroke(Math.max(1, h.px(.1f)), Ui.WHITE_12);
+            dPreview.setBackground(g);
+            TextView t = h.text(air ? SportsLook.heavy() : h.fSemi, 2.6f, Color.WHITE); t.setText(air ? "TITLE" : "Title");
+            LayoutParams tl = new LayoutParams(LayoutParams.WRAP_CONTENT, LayoutParams.WRAP_CONTENT, Gravity.BOTTOM | Gravity.LEFT); tl.leftMargin = h.px(1.9f); tl.bottomMargin = h.px(5.2f);
+            dPreview.addView(t, tl);
+            TextView b = h.text(h.fSemi, Ui.TEXT_M, Color.WHITE); b.setText("▶  Resume");
+            GlassPanel.onButton(b, h.px(1.3f), h.px(1.3f), h.px(.55f));
+            LayoutParams btl = new LayoutParams(LayoutParams.WRAP_CONTENT, LayoutParams.WRAP_CONTENT, Gravity.BOTTOM | Gravity.LEFT); btl.leftMargin = h.px(1.9f); btl.bottomMargin = h.px(1.7f);
+            dPreview.addView(b, btl);
+        }
+        dOpts.removeAllViews();
+        int n = opts == null ? 0 : opts.length(), cur = d.optInt("cur", -1);
+        if (n == 0) return;
+        // (a long list shows the part around the one that's chosen)
+        int max = look ? 6 : 9, from = n <= max ? 0 : Math.max(0, Math.min(cur - max / 2, n - max)), to = Math.min(n, from + max);
+        int line = air ? 0xFF1F1F25 : Ui.WHITE_12;
+        for (int i = from; i < to; i++) {
+            JSONObject o = opts.optJSONObject(i); if (o == null) continue;
+            boolean on = i == cur;
+            LinearLayout row = new LinearLayout(getContext()); row.setGravity(Gravity.CENTER_VERTICAL); row.setMinimumHeight(h.px(4.5f));
+            row.setBackground(new RowBg(0, line, Math.max(1, h.px(.1f))));
+            View mark = new View(getContext());
+            GradientDrawable mg = new GradientDrawable(); mg.setCornerRadius(GlassPanel.corner(.7f * R));
+            if (on) mg.setColor(GlassPanel.selFill()); else mg.setStroke(Math.max(1, h.px(.16f)), Ui.WHITE_50);
+            mark.setBackground(mg);
+            row.addView(mark, new LinearLayout.LayoutParams(h.px(1.4f), h.px(1.4f)));
+            TextView nm = h.text(h.fMed, Ui.TEXT_XL, on ? Color.WHITE : Ui.WHITE_85); nm.setSingleLine(true); nm.setEllipsize(TextUtils.TruncateAt.END);
+            nm.setText(o.optString("l"));
+            LinearLayout.LayoutParams nl = new LinearLayout.LayoutParams(0, LayoutParams.WRAP_CONTENT, 1); nl.leftMargin = h.px(1.4f);
+            row.addView(nm, nl);
+            String note = o.optString("n");
+            if (!note.isEmpty()) {
+                TextView nt = h.text(h.fReg, Ui.TEXT_M, Ui.WHITE_50); nt.setSingleLine(true); nt.setText(note);
+                LinearLayout.LayoutParams ntl = new LinearLayout.LayoutParams(LayoutParams.WRAP_CONTENT, LayoutParams.WRAP_CONTENT); ntl.leftMargin = h.px(1.2f);
+                row.addView(nt, ntl);
+            }
+            dOpts.addView(row, new LinearLayout.LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT));
+        }
+        if (to - from < n) {
+            TextView more = h.text(h.fReg, Ui.TEXT_M, Ui.WHITE_50); more.setText("and " + (n - (to - from)) + " more");
+            more.setPadding(0, h.px(1f), 0, 0);
+            dOpts.addView(more);
+        }
+    }
+
+    private static int iconFor(String name) {
+        String n = name.toLowerCase(java.util.Locale.US);
+        return n.startsWith("home") ? HomeIcons.HOME : n.startsWith("movies") ? HomeIcons.FILM : n.startsWith("live") ? HomeIcons.TV
+                : n.startsWith("sports") ? HomeIcons.TROPHY : n.startsWith("screen") ? HomeIcons.MOON : n.startsWith("remote") ? HomeIcons.REMOTE : HomeIcons.SETTINGS;
+    }
+    /** a section's line: its icon, name and what's in it; just its icon in the strip */
+    private void shapeSection(LinearLayout v, boolean rail) {
+        v.getChildAt(1).setVisibility(rail ? GONE : VISIBLE);
+        v.setGravity(rail ? Gravity.CENTER : Gravity.CENTER_VERTICAL);
+        v.setPadding(rail ? 0 : h.px(3.75f), 0, rail ? 0 : h.px(2.6f), 0);
+    }
     private void buildLeft(JSONArray secs) {
         if (left == null || secs == null) return;
         if (secViews.size() != secs.length()) {
             left.removeAllViews(); secViews.clear();
             for (int i = 0; i < secs.length(); i++) {
-                LinearLayout v = new LinearLayout(getContext()); v.setOrientation(LinearLayout.VERTICAL);
-                v.setPadding(h.px(1.4f), h.px(.95f), h.px(1.4f), h.px(.95f));
-                TextView n = h.text(h.fSemi, Ui.TEXT_XL, Color.WHITE); n.setSingleLine(true); n.setEllipsize(TextUtils.TruncateAt.END);
-                TextView a = h.text(h.fReg, Ui.TEXT_S, Ui.WHITE_60); a.setSingleLine(true); a.setEllipsize(TextUtils.TruncateAt.END);
-                v.addView(n); LinearLayout.LayoutParams al = new LinearLayout.LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT); al.topMargin = h.px(.15f); v.addView(a, al);
-                LinearLayout.LayoutParams vl = new LinearLayout.LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT); vl.bottomMargin = h.px(.35f);
+                JSONObject x = secs.optJSONObject(i);
+                LinearLayout v = new LinearLayout(getContext());
+                v.setMinimumHeight(h.px(6.5f));
+                View ic = new View(getContext()); ic.setBackground(new HomeIcons(iconFor(x == null ? "" : x.optString("name")), 1.8f));
+                v.addView(ic, new LinearLayout.LayoutParams(h.px(2.5f), h.px(2.5f)));
+                LinearLayout tx = new LinearLayout(getContext()); tx.setOrientation(LinearLayout.VERTICAL);
+                TextView n = h.text(air ? SportsLook.cond() : h.fSemi, air ? 1.9f : 1.5f, Color.WHITE); n.setSingleLine(true); n.setEllipsize(TextUtils.TruncateAt.END);
+                if (air) { n.setAllCaps(true); n.setLetterSpacing(.05f); }
+                TextView a = h.text(h.fReg, Ui.TEXT_M, Ui.WHITE_50); a.setSingleLine(true); a.setEllipsize(TextUtils.TruncateAt.END);
+                tx.addView(n); LinearLayout.LayoutParams al = new LinearLayout.LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT); al.topMargin = h.px(.15f); tx.addView(a, al);
+                LinearLayout.LayoutParams txl = new LinearLayout.LayoutParams(0, LayoutParams.WRAP_CONTENT, 1); txl.leftMargin = h.px(1.6f);
+                v.addView(tx, txl);
+                shapeSection(v, !focusLeft);
+                LinearLayout.LayoutParams vl = new LinearLayout.LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT);
+                if (!air) { vl.leftMargin = vl.rightMargin = h.px(1.1f); vl.bottomMargin = h.px(.3f); }       // (a rounded highlight keeps off the panel's edge)
                 left.addView(v, vl);
                 secViews.add(v);
             }
         }
         for (int i = 0; i < secs.length(); i++) {
             JSONObject x = secs.optJSONObject(i); if (x == null) continue;
-            LinearLayout v = secViews.get(i);
-            ((TextView) v.getChildAt(0)).setText(x.optString("name"));
-            ((TextView) v.getChildAt(1)).setText(x.optString("about"));
+            LinearLayout tx = (LinearLayout) secViews.get(i).getChildAt(1);
+            ((TextView) tx.getChildAt(0)).setText(x.optString("name"));
+            ((TextView) tx.getChildAt(1)).setText(x.optString("about"));
         }
         styleLeft();
     }
@@ -154,12 +355,26 @@ final class NativeSheet extends FrameLayout {
         for (int i = 0; i < secViews.size(); i++) {
             LinearLayout v = secViews.get(i);
             boolean on = i == leftSel;
-            int bg = on && focusLeft ? GlassPanel.selFill() : on ? Ui.WHITE_12 : 0, st = GlassPanel.selText();
-            if (bg == 0) v.setBackground(null);
-            else if (GlassPanel.look.equals("air")) v.setBackground(new GlassPanel.Cut(bg));
-            else { GradientDrawable g = new GradientDrawable(); g.setCornerRadius(GlassPanel.selRadius(1.5f * R)); g.setColor(bg); v.setBackground(g); }
-            ((TextView) v.getChildAt(0)).setTextColor(on && focusLeft ? st : Color.WHITE);
-            ((TextView) v.getChildAt(1)).setTextColor(on && focusLeft ? (st & 0x00FFFFFF) | Ui.BLACK_60 : Ui.WHITE_60);
+            int st = GlassPanel.selText();
+            LinearLayout tx = (LinearLayout) v.getChildAt(1);
+            HomeIcons ic = (HomeIcons) v.getChildAt(0).getBackground();
+            if (!on) v.setBackground(null);
+            else if (focusLeft) {
+                // choosing a section: the look's highlight
+                if (air) v.setBackground(new GlassPanel.Cut(GlassPanel.selFill()));
+                else { GradientDrawable g = new GradientDrawable(); g.setCornerRadius(GlassPanel.selRadius(1.5f * R)); g.setColor(GlassPanel.selFill()); v.setBackground(g); }
+            } else {
+                // inside it: a quiet plate with the highlight's colour down its edge
+                GradientDrawable plate = new GradientDrawable(); plate.setColor(air ? 0xFF17171B : Ui.WHITE_12);
+                GradientDrawable edge = new GradientDrawable(); edge.setColor(GlassPanel.selFill());
+                android.graphics.drawable.LayerDrawable ld = new android.graphics.drawable.LayerDrawable(new android.graphics.drawable.Drawable[] { plate, edge });
+                ld.setLayerWidth(1, h.px(.4f)); ld.setLayerGravity(1, Gravity.LEFT | Gravity.FILL_VERTICAL);
+                v.setBackground(ld);
+            }
+            boolean hot = on && focusLeft;
+            ic.setColor(hot ? st : on ? Color.WHITE : focusLeft ? Ui.WHITE_75 : Ui.WHITE_60);
+            ((TextView) tx.getChildAt(0)).setTextColor(hot ? st : Color.WHITE);
+            ((TextView) tx.getChildAt(1)).setTextColor(hot ? (st & 0x00FFFFFF) | 0xD9000000 : Ui.WHITE_50);
         }
     }
     /** show that section's settings on the right (asked of the page a moment after the remote settles) */
@@ -173,7 +388,7 @@ final class NativeSheet extends FrameLayout {
     private void setFocusLeft(boolean on) {
         if (focusLeft == on) return;
         focusLeft = on;
-        styleLeft();
+        applyPane(true);
         style(true);
     }
 
@@ -199,6 +414,7 @@ final class NativeSheet extends FrameLayout {
             if (shown) return;
             setVisibility(GONE);
             focusLeft = true; curSec = -1; curSub = "";          // (opening again starts on the sections)
+            applyPane(false);
         } };
         if (pane) panel.animate().translationX(h.px(3)).alpha(0f).setDuration(Ui.BASE).setInterpolator(TileView.EASE).withEndAction(gone).start();
         else panel.animate().translationX(panel.getWidth() + h.px(4)).setDuration(Ui.MOVE).setInterpolator(TileView.EASE).withEndAction(gone).start();
@@ -222,7 +438,8 @@ final class NativeSheet extends FrameLayout {
             if ((!asked && sec != curSec) || (!sub.isEmpty() && !sub.equals(curSub))) { focusLeft = false; leftSel = sec; }
             else if (!focusLeft) leftSel = sec;
             curSec = sec; curSub = sub;
-            styleLeft();
+            String ab = sub.isEmpty() ? o.optString("about") : "";
+            about.setText(ab); about.setVisibility(ab.isEmpty() ? GONE : VISIBLE);
             b = sub.isEmpty() ? "" : b;
         }
         back.setText(b.isEmpty() ? "" : "‹ " + b);
@@ -239,6 +456,7 @@ final class NativeSheet extends FrameLayout {
         if (editing >= 0 && editing < rowViews.size()) fill(editing);
         fitHeight();
         style(!rebuilt);
+        applyPane(shown);
     }
 
     private void rebuild() {
@@ -250,9 +468,16 @@ final class NativeSheet extends FrameLayout {
             if (d.optBoolean("head")) {
                 // a group's heading: small, quiet capitals; never chosen
                 LinearLayout v = new LinearLayout(getContext());
-                v.setPadding(h.px(1.4f), h.px(i == 0 ? .3f : 1.9f), h.px(1.4f), h.px(.5f));
-                TextView l = h.text(h.fSemi, Ui.TEXT_S, Ui.WHITE_60);
-                l.setLetterSpacing(.1f); l.setAllCaps(true); l.setSingleLine(true);
+                v.setPadding(h.px(pane ? .1f : 1.4f), h.px(i == 0 ? .3f : pane ? 2.2f : 1.9f), h.px(1.4f), h.px(pane ? .8f : .5f));
+                v.setGravity(Gravity.CENTER_VERTICAL);
+                if (pane) {
+                    // (the same tick the rows of posters have beside their names)
+                    View tick = new View(getContext()); tick.setBackgroundColor(GlassPanel.selFill());
+                    LinearLayout.LayoutParams tkl = new LinearLayout.LayoutParams(h.px(.4f), h.px(1.3f)); tkl.rightMargin = h.px(.9f);
+                    v.addView(tick, tkl);
+                }
+                TextView l = h.text(pane && air ? SportsLook.cond() : h.fSemi, pane ? Ui.TEXT_M : Ui.TEXT_S, pane ? Ui.WHITE_75 : Ui.WHITE_60);
+                l.setLetterSpacing(pane ? .14f : .1f); l.setAllCaps(true); l.setSingleLine(true);
                 v.addView(l, new LinearLayout.LayoutParams(0, LayoutParams.WRAP_CONTENT, 1));
                 TextView val = h.text(h.fMed, Ui.TEXT_S, 0), ch = h.text(h.fMed, Ui.TEXT_S, 0);
                 val.setVisibility(GONE); ch.setVisibility(GONE);
@@ -263,16 +488,16 @@ final class NativeSheet extends FrameLayout {
             boolean sec = d.optBoolean("chev");
             LinearLayout v = new LinearLayout(getContext());
             v.setGravity(Gravity.CENTER_VERTICAL);
-            v.setPadding(h.px(1.4f), h.px(sec ? 1.35f : 1f), h.px(1.4f), h.px(sec ? 1.35f : 1f));
-            v.setMinimumHeight(h.px(3.6f));
-            TextView l = h.text(sec ? h.fSemi : h.fMed, sec ? 1.5f : 1.35f, Color.WHITE);
+            v.setPadding(h.px(pane ? 1.75f : 1.4f), h.px(sec ? 1.35f : 1f), h.px(pane ? 1.75f : 1.4f), h.px(sec ? 1.35f : 1f));
+            v.setMinimumHeight(h.px(pane ? 3.9f : 3.6f));
+            TextView l = h.text(sec ? h.fSemi : h.fMed, sec || pane ? 1.5f : 1.35f, Color.WHITE);
             l.setSingleLine(true); l.setEllipsize(TextUtils.TruncateAt.END);
             v.addView(l, new LinearLayout.LayoutParams(0, LayoutParams.WRAP_CONTENT, 1));
-            TextView val = h.text(h.fMed, sec ? 1.05f : 1.35f, Ui.WHITE_60);
+            TextView val = h.text(h.fMed, sec ? 1.05f : pane ? 1.5f : 1.35f, Ui.WHITE_60);
             val.setGravity(Gravity.END | Gravity.CENTER_VERTICAL);
             /* a value may take up to 62% of its row (it was held to a narrow column made for the small sheet: on the
                full-screen Settings long values were cut off with half the row empty beside them) */
-            int rowW = rows.getWidth() > 0 ? rows.getWidth() : clip.getWidth() > 0 ? clip.getWidth() : h.px(34);
+            int rowW = clip.getLayoutParams().width > 0 ? clip.getLayoutParams().width - h.px(2) : h.px(34);
             int valMax = Math.max(h.px(20), Math.round(rowW * .62f));
             if (sec) { val.setMaxLines(2); val.setMaxWidth(valMax); val.setLineSpacing(0, 1.15f); }
             else { val.setSingleLine(true); val.setEllipsize(TextUtils.TruncateAt.END); val.setMaxWidth(valMax); }
@@ -315,6 +540,7 @@ final class NativeSheet extends FrameLayout {
         for (int i = 0; i < rowViews.size(); i++) styleRow(i, animate);
         styled = sel;
         reveal(animate);
+        drawDetail();
     }
     /** moving: only the row you left and the one you're on change */
     private void restyle() {
@@ -322,6 +548,7 @@ final class NativeSheet extends FrameLayout {
         styleRow(sel, true);
         styled = sel;
         reveal(true);
+        drawDetail();
     }
     private void styleRow(int i, boolean animate) {
         {
@@ -331,11 +558,12 @@ final class NativeSheet extends FrameLayout {
             int st = GlassPanel.selText(), dim = (st & 0x00FFFFFF) | Ui.BLACK_60;
             if (on && GlassPanel.look.equals("air")) r.v.setBackground(new GlassPanel.Cut(GlassPanel.selFill()));
             else if (on) { GradientDrawable g = new GradientDrawable(); g.setCornerRadius(GlassPanel.selRadius(1.5f * R)); g.setColor(GlassPanel.selFill()); r.v.setBackground(g); }
+            else if (pane) r.v.setBackground(new RowBg(air ? 0xFF141418 : Ui.WHITE_7, firstInCard(i) ? 0 : air ? 0xFF1F1F25 : Ui.WHITE_7, Math.max(1, h.px(.1f))));
             else r.v.setBackground(null);
             r.label.setTextColor(on ? st : Color.WHITE);
             r.value.setTextColor(on ? dim : Ui.WHITE_60);
             r.chev.setTextColor(on ? dim : Ui.WHITE_60);
-            float s = on ? 1.02f : 1f;
+            float s = on && !pane ? 1.02f : 1f;          // (in its card the chosen row keeps its size)
             r.v.setPivotX(r.v.getWidth() / 2f);
             if (animate && r.v.getScaleX() != s) r.v.animate().scaleX(s).scaleY(s).setDuration(Ui.FAST).setInterpolator(TileView.EASE).start();
             else { r.v.setScaleX(s); r.v.setScaleY(s); }
@@ -385,9 +613,9 @@ final class NativeSheet extends FrameLayout {
     int focusAt(float x, float y) {
         if (!h.hit(panel, x, y, 0) || (back.getVisibility() == VISIBLE && h.hit(back, x, y, .6f))) return -1;
         if (pane) for (int i = 0; i < secViews.size(); i++) if (h.hit(secViews.get(i), x, y, 0)) {
-            leftSel = i; focusLeft = true; styleLeft(); style(true); askSoon(0); return 0;
+            leftSel = i; focusLeft = true; applyPane(true); style(true); askSoon(0); return 0;
         }
-        if (pane && focusLeft) { focusLeft = false; styleLeft(); }
+        if (pane && focusLeft) { focusLeft = false; applyPane(true); }
         for (int i = 0; i < rowViews.size(); i++) {
             JSONObject d = data.optJSONObject(i);
             if (d == null || d.optBoolean("head")) continue;
@@ -410,7 +638,8 @@ final class NativeSheet extends FrameLayout {
         if (r.optJSONObject("edit") != null) { startEdit(sel); return; }
         View v = rowViews.get(sel).v;
         v.animate().scaleX(.99f).scaleY(.99f).setDuration(80).withEndAction(new Runnable() { @Override public void run() {
-            rowViews.get(Math.min(sel, rowViews.size() - 1)).v.animate().scaleX(1.02f).scaleY(1.02f).setDuration(Ui.QUICK).start();
+            float up = pane ? 1f : 1.02f;
+            rowViews.get(Math.min(sel, rowViews.size() - 1)).v.animate().scaleX(up).scaleY(up).setDuration(Ui.QUICK).start();
         } }).start();
         h.page("window.nhSheetKey && nhSheetKey(" + sel + ",'ok')");
     }

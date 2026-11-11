@@ -11,7 +11,8 @@ import android.graphics.drawable.Drawable;
 /** The line icons of the top bar, the settings tile and the "All apps" hint (drawn on a 24×24 grid, like the page's SVGs). */
 final class HomeIcons extends Drawable {
     static final int SEARCH = 0, PHOTOS = 1, SETTINGS = 2, REMOTE = 3, CHEVRON = 4, GEAR_BIG = 5, MIC = 6,
-            HOME = 7, FILM = 8, TV = 9, LIVE = 10, TROPHY = 11;      // (the side menu's tabs)
+            HOME = 7, FILM = 8, TV = 9, LIVE = 10, TROPHY = 11,      // (the side menu's tabs)
+            MOON = 12;                                                 // (Settings › Screen & sleep)
     private final int kind;
     private final Paint p = new Paint(Paint.ANTI_ALIAS_FLAG);
     private int color = 0xFFFFFFFF;
@@ -68,6 +69,7 @@ final class HomeIcons extends Drawable {
             case TV: c.drawRoundRect(TV_BOX, 2, 2, p); c.drawLine(8, 21, 16, 21, p); break;
             case LIVE: c.drawCircle(12, 12, 2, p); c.drawPath(WAVES, p); break;
             case TROPHY: c.drawPath(CUP, p); break;
+            case MOON: c.drawPath(MOON_PATH, p); break;
         }
         c.restore();
     }
@@ -77,7 +79,12 @@ final class HomeIcons extends Drawable {
     private static final Path PHOTO_HILL = new Path(), MIC_CUP = new Path(), CHEV = new Path(),
             HOUSE = new Path(), FILM_LINES = new Path(), WAVES = new Path(), CUP = new Path();
     private static final RectF TV_BOX = new RectF(3, 6, 21, 18);
+    private static final Path MOON_PATH = new Path();
     static {
+        // a crescent: a disc with a smaller one taken out of its upper right
+        Path disc = new Path(), bite = new Path();
+        disc.addCircle(11.5f, 12.5f, 8.5f, Path.Direction.CW); bite.addCircle(16.5f, 8f, 7f, Path.Direction.CW);
+        MOON_PATH.op(disc, bite, Path.Op.DIFFERENCE);
         HOUSE.moveTo(3, 11); HOUSE.lineTo(12, 4); HOUSE.lineTo(21, 11); HOUSE.lineTo(21, 20); HOUSE.quadTo(21, 21, 20, 21); HOUSE.lineTo(15, 21);
         HOUSE.lineTo(15, 15); HOUSE.lineTo(9, 15); HOUSE.lineTo(9, 21); HOUSE.lineTo(4, 21); HOUSE.quadTo(3, 21, 3, 20); HOUSE.close();
         FILM_LINES.moveTo(8, 4); FILM_LINES.lineTo(8, 20); FILM_LINES.moveTo(16, 4); FILM_LINES.lineTo(16, 20);

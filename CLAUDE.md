@@ -52,6 +52,9 @@ Quick compile check without building:
 - Colours, small text sizes and timings come from the shared steps in `Ui.java` (`Ui.WHITE_60`, `Ui.TEXT_M`, `Ui.SLIDE`…): use the
   nearest step, not a new number. `python3 tools/tokens.py <file.java>` swaps a file's literals for them. Every screen
   has been through it (1.0.386); text drawn on a canvas (Sports, Standings, parts of the title page) still has its own sizes.
+- Settings on the TV (NativeSheet) is Chad's two-step design: sections in full, then inside one they shrink to icons and a
+  detail panel says what the setting you're on does. Its words come from `assets/setinfo.js` (about, choices, how):
+  only write what the code really does. Written so far: Home. A new setting gets an entry there too.
 - Diagnostics: `Diag.ev("...")`. Lines are scrubbed of keys and logins, but don't log full stream or addon links anyway.
 
 ## Working with Chad
