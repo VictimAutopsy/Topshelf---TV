@@ -924,7 +924,7 @@ final class NativeSports extends FrameLayout {
         final JSONObject item;
         final ImageView img;
         CardView(JSONObject it) {
-            super(NativeSports.this.getContext(), 1.6f * R);
+            super(NativeSports.this.getContext(), SportsLook.card(1.6f * R));     // (the frame cuts the corners too: they stayed round)
             item = it;
             img = new ImageView(getContext());
             img.setScaleType(ImageView.ScaleType.FIT_XY);
@@ -936,7 +936,7 @@ final class NativeSports extends FrameLayout {
         }
         void paint() {
             Integer mine = playersIn.get(item.optString("k").split(":")[0]);
-            final String key = "card:" + item.optString("k") + ":" + item.optString("lg") + ":" + (mine == null ? 0 : mine);
+            final String key = "card:" + GlassPanel.look + ":" + item.optString("k") + ":" + item.optString("lg") + ":" + (mine == null ? 0 : mine);
             Bitmap b = cards.get(key);
             if (b != null) { img.setImageBitmap(b); setBackground(null); return; }
             /* first with the logos already here (it shows at once: teams, times, channel), then again with any logo
@@ -1890,7 +1890,7 @@ final class NativeSports extends FrameLayout {
     private String heroKey = "";
     private void showHero(final JSONObject it) {
         Integer mine = it == null ? null : playersIn.get(it.optString("k").split(":")[0]);
-        final String key = it == null ? "" : "hero:" + it.optString("k") + ":" + Math.round(heroWidth) + ":" + (mine == null ? 0 : mine) + ":" + placesOf(it);
+        final String key = it == null ? "" : "hero:" + GlassPanel.look + ":" + it.optString("k") + ":" + Math.round(heroWidth) + ":" + (mine == null ? 0 : mine) + ":" + placesOf(it);
         if (key.equals(heroKey)) return;
         heroKey = key;
         if (it == null || it.optBoolean("edit") && rows.size() <= 1) { for (ImageView v : hero) v.animate().alpha(0f).setDuration(Ui.BASE).start(); return; }
