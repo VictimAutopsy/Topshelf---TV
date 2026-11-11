@@ -45,6 +45,22 @@ final class Flight {
     private static final Map<String, Long> screenMs = new HashMap<>();
     private static final Map<String, long[]> frames = new HashMap<>();        // screen → {frames, late, hitches}
     private static final Map<String, long[]> watch = new HashMap<>();         // kind → {watched ms, stalled ms, stalls}
+    /* Why a frame was slow: "screen · the part that took longest" → {how many, their ms together, the worst}.
+       (The counts above said the title page and the player stutter, but not what at: without this every fix
+       was a guess.) */
+    private static final Map<String, long[]> slow = new HashMap<>();
+    private static long slowSaid;
+    /** the parts of making a frame, in the order they happen, in plain words */
+    private static final int[] PART = { FrameMetrics.UNKNOWN_DELAY_DURATION, FrameMetrics.INPUT_HANDLING_DURATION, FrameMetrics.ANIMATION_DURATION,
+            FrameMetrics.LAYOUT_MEASURE_DURATION, FrameMetrics.DRAW_DURATION, FrameMetrics.SYNC_DURATION, FrameMetrics.COMMAND_ISSUE_DURATION, FrameMetrics.SWAP_BUFFERS_DURATION };
+    private static final String[] PART_NAME = { "the app was busy with something else", "handling a button", "moving things", "laying out",
+            "drawing", "sending pictures to the graphics chip", "the graphics chip's commands", "showing the frame" };
+    private static String slowest(FrameMetrics m) {
+        int best = -1; long most = 0;
+        for (int i = 0; i < PART.length; i++) { long v = m.getMetric(PART[i]); if (v > most) { most = v; best = i; } }
+        if (Build.VERSION.SDK_INT >= 31) { long g = m.getMetric(FrameMetrics.GPU_DURATION); if (g > most) return "the graphics chip"; }
+        return best < 0 ? "unknown" : PART_NAME[best];
+    }
     private static final List<Long> memFg = new ArrayList<>(), memBg = new ArrayList<>();
     private static boolean dirty;
 
@@ -138,6 +154,16 @@ final class Flight {
                             f[0]++;
                             if (missed) f[1]++;
                             if (ns > 100_000_000L) f[2]++;
+                            if (missed || ns > 100_000_000L) {
+                                long ms = ns / 1_000_000L;
+                                String part = slowest(m);
+                                long[] s = arr(slow, sc + " · " + part, 3);
+                                s[0]++; s[1] += ms; if (ms > s[2]) s[2] = ms;
+                                // (the long ones go in the report's events too, at most one a second, so they can be
+                                // set beside what TopShelf was doing just then)
+                                long now = SystemClock.uptimeMillis();
+                                if (ms > 100 && now - slowSaid > 1000) { slowSaid = now; Diag.ev("slow frame: " + ms + " ms on " + sc + " · mostly " + part); }
+                            }
                             dirty = true;
                         }
                     }
@@ -156,7 +182,7 @@ final class Flight {
                 if (!n.equals(cur) && !n.isEmpty()) count("opened · " + n);
                 cur = n; curAt = now;
             }
-            main.postDelayed(this, 1000);
+            main.postDelayed(this, 250);
         } });
         // memory every ten minutes (on screen or not: in the background is what decides whether Android closes it)
         bg.postDelayed(new Runnable() { @Override public void run() {
@@ -187,7 +213,7 @@ final class Flight {
         if (t.equals(day)) return;
         if (!day.isEmpty() && dirty) write(day, json());
         day = t;
-        times.clear(); counts.clear(); screenMs.clear(); frames.clear(); watch.clear(); memFg.clear(); memBg.clear();
+        times.clear(); counts.clear(); screenMs.clear(); frames.clear(); slow.clear(); watch.clear(); memFg.clear(); memBg.clear();
         // (today's file so far, if TopShelf was started again today)
         if (app != null) try {
             File f = new File(dir(), t + ".json");
@@ -227,6 +253,9 @@ final class Flight {
             JSONObject fr = new JSONObject();
             for (Map.Entry<String, long[]> e : frames.entrySet()) fr.put(e.getKey(), new JSONObject().put("frames", e.getValue()[0]).put("late", e.getValue()[1]).put("hitches", e.getValue()[2]));
             o.put("frames", fr);
+            JSONObject sl = new JSONObject();
+            for (Map.Entry<String, long[]> e : slow.entrySet()) sl.put(e.getKey(), new JSONObject().put("n", e.getValue()[0]).put("ms", e.getValue()[1]).put("worst", e.getValue()[2]));
+            o.put("slowFrames", sl);
             JSONObject w = new JSONObject();
             for (Map.Entry<String, long[]> e : watch.entrySet()) w.put(e.getKey(), new JSONObject().put("watchedMs", e.getValue()[0]).put("stalledMs", e.getValue()[1]).put("stalls", e.getValue()[2]));
             o.put("watch", w);
@@ -248,6 +277,8 @@ final class Flight {
         }
         JSONObject fr = o.optJSONObject("frames");
         if (fr != null) for (java.util.Iterator<String> it = fr.keys(); it.hasNext(); ) { String k = it.next(); JSONObject x = fr.optJSONObject(k); frames.put(k, new long[] { x.optLong("frames"), x.optLong("late"), x.optLong("hitches") }); }
+        JSONObject sl = o.optJSONObject("slowFrames");
+        if (sl != null) for (java.util.Iterator<String> it = sl.keys(); it.hasNext(); ) { String k = it.next(); JSONObject x = sl.optJSONObject(k); slow.put(k, new long[] { x.optLong("n"), x.optLong("ms"), x.optLong("worst") }); }
         JSONObject w = o.optJSONObject("watch");
         if (w != null) for (java.util.Iterator<String> it = w.keys(); it.hasNext(); ) { String k = it.next(); JSONObject x = w.optJSONObject(k); watch.put(k, new long[] { x.optLong("watchedMs"), x.optLong("stalledMs"), x.optLong("stalls") }); }
         for (String[] m : new String[][] { { "memOnScreenMB" }, { "memBackgroundMB" } }) {

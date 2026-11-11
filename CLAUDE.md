@@ -34,6 +34,9 @@ GitHub is the only real copy. Several chats work on TopShelf, and an older chat 
 6. TopShelf sends a daily flight-recorder summary to `reports/flight/<day>-tv.json` in the updates repository
    (timings, buffering, smoothness, memory, crashes, which screens are used; never what's watched). Read those
    before and after a change to see what it did.
+   Since 1.0.390 it also has `slowFrames`: for each screen, which part of making a frame took longest when one was
+   slow ("title page · drawing", "… · the app was busy with something else"), and frames over 0.1 s are in a
+   report's events as "slow frame: …". Use it to find what to fix before changing draw code for speed.
 
 Before publishing, run the checks (GitHub runs them on every push too, see .github/workflows/checks.yml):
 `bash tools/checks/run-all.sh /path/to/android.jar` — compiles, every page script parses, every setting is in a
