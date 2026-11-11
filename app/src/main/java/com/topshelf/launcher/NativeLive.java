@@ -130,7 +130,7 @@ final class NativeLive extends FrameLayout {
         if (growAnim != null) growAnim.cancel();
         if (!shown || full || grow == to) { grow = to; applyGrow(); return; }
         growAnim = ValueAnimator.ofFloat(grow, to);
-        growAnim.setDuration(hidden ? 420 : 340); growAnim.setInterpolator(TileView.EASE);
+        growAnim.setDuration(hidden ? Ui.SLIDE : 340); growAnim.setInterpolator(TileView.EASE);
         growAnim.addUpdateListener(new ValueAnimator.AnimatorUpdateListener() { @Override public void onAnimationUpdate(ValueAnimator a) { grow = (Float) a.getAnimatedValue(); applyGrow(); } });
         growAnim.addListener(new android.animation.AnimatorListenerAdapter() { @Override public void onAnimationEnd(android.animation.Animator a) { place(); } });
         growAnim.start();
@@ -248,7 +248,7 @@ final class NativeLive extends FrameLayout {
         label = h.text(h.fSemi, 2.8f, Color.WHITE);
         label.setText("Live TV");
         label.setLetterSpacing(-.02f);
-        label.setShadowLayer(.8f * R, 0, .1f * R, 0x73000000);
+        label.setShadowLayer(.8f * R, 0, .1f * R, Ui.BLACK_45);
         lab.addView(label);
         addView(lab, h.at(5, 2.5f, LayoutParams.WRAP_CONTENT, LayoutParams.WRAP_CONTENT));
         if (h.portrait) lab.setVisibility(GONE);
@@ -265,27 +265,27 @@ final class NativeLive extends FrameLayout {
         // what's on the focused channel
         info = new LinearLayout(c);
         info.setOrientation(LinearLayout.VERTICAL);
-        iChan = h.text(h.fSemi, 1.05f, 0xFFFF8A80); iChan.setSingleLine(true); iChan.setEllipsize(TextUtils.TruncateAt.END); iChan.setLetterSpacing(.04f);
+        iChan = h.text(h.fSemi, Ui.TEXT_S, 0xFFFF8A80); iChan.setSingleLine(true); iChan.setEllipsize(TextUtils.TruncateAt.END); iChan.setLetterSpacing(.04f);
         info.addView(iChan);
         iTitle = h.text(h.fSemi, 3.2f, Color.WHITE); iTitle.setSingleLine(true); iTitle.setEllipsize(TextUtils.TruncateAt.END); iTitle.setLetterSpacing(-.02f);
-        iTitle.setShadowLayer(1.2f * R, 0, .2f * R, 0x80000000);
+        iTitle.setShadowLayer(1.2f * R, 0, .2f * R, Ui.BLACK_55);
         LinearLayout.LayoutParams tl = new LinearLayout.LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT); tl.topMargin = h.px(.6f);
         info.addView(iTitle, tl);
-        iWhen = h.text(h.fMed, 1.2f, 0xDBFFDCD8);
+        iWhen = h.text(h.fMed, Ui.TEXT_M, 0xDBFFDCD8);
         LinearLayout.LayoutParams wl = new LinearLayout.LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT); wl.topMargin = h.px(.4f);
         info.addView(iWhen, wl);
         FrameLayout bar = new FrameLayout(c);
-        GradientDrawable bb = new GradientDrawable(); bb.setCornerRadius(R); bb.setColor(0x33FFFFFF); bar.setBackground(bb);
+        GradientDrawable bb = new GradientDrawable(); bb.setCornerRadius(R); bb.setColor(Ui.WHITE_20); bar.setBackground(bb);
         iBarFill = new View(c);
         GradientDrawable bf = new GradientDrawable(); bf.setCornerRadius(R); bf.setColor(Color.WHITE); iBarFill.setBackground(bf);
         bar.addView(iBarFill, new LayoutParams(0, LayoutParams.MATCH_PARENT));
         iBar = bar;
         LinearLayout.LayoutParams bl = new LinearLayout.LayoutParams(h.px(22), h.px(.35f)); bl.topMargin = h.px(.7f);
         info.addView(bar, bl);
-        iDesc = h.text(h.fReg, 1.15f, 0xC7FFFFFF); iDesc.setMaxLines(2); iDesc.setEllipsize(TextUtils.TruncateAt.END); iDesc.setLineSpacing(0, 1.25f);
+        iDesc = h.text(h.fReg, Ui.TEXT_M, Ui.WHITE_75); iDesc.setMaxLines(2); iDesc.setEllipsize(TextUtils.TruncateAt.END); iDesc.setLineSpacing(0, 1.25f);
         LinearLayout.LayoutParams ddl = new LinearLayout.LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT); ddl.topMargin = h.px(.8f);
         info.addView(iDesc, ddl);
-        iHint = h.text(h.fMed, 1f, 0x99FF8A80);
+        iHint = h.text(h.fMed, Ui.TEXT_S, 0x99FF8A80);
         iHint.setLetterSpacing(.02f);
         LinearLayout.LayoutParams hl2 = new LinearLayout.LayoutParams(LayoutParams.WRAP_CONTENT, LayoutParams.WRAP_CONTENT); hl2.topMargin = h.px(.9f);
         info.addView(iHint, hl2);
@@ -298,7 +298,7 @@ final class NativeLive extends FrameLayout {
         recView = new RecView(c);
         recView.setVisibility(INVISIBLE);
         addView(recView, h.at(0, GUIDE_Y, W, h.px(GUIDE_H)));
-        empty = h.text(h.fMed, 1.25f, 0xBFFFFFFF);
+        empty = h.text(h.fMed, Ui.TEXT_M, Ui.WHITE_75);
         empty.setGravity(Gravity.CENTER);
         empty.setLineSpacing(0, 1.3f);
         empty.setPadding(h.px(8), 0, h.px(8), 0);
@@ -313,7 +313,7 @@ final class NativeLive extends FrameLayout {
            its rows like the channel tiles — no floating glass panel */
         catsPanel = new FrameLayout(c);
         catsPanel.setClipChildren(false);
-        TextView ch = h.text(h.fSemi, 1f, 0x99FFFFFF);
+        TextView ch = h.text(h.fSemi, Ui.TEXT_S, Ui.WHITE_60);
         ch.setText("CATEGORIES"); ch.setLetterSpacing(.08f);
         catsPanel.addView(ch, h.at(.4f, .75f, LayoutParams.WRAP_CONTENT, LayoutParams.WRAP_CONTENT));
         catView = new CatView(c);
@@ -328,9 +328,9 @@ final class NativeLive extends FrameLayout {
         idle.setBackground(null);
         idleLogo = new ImageView(c); idleLogo.setScaleType(ImageView.ScaleType.FIT_CENTER); idleLogo.setAlpha(.9f);
         idle.addView(idleLogo, new LayoutParams(h.px(BIG_W * .42f), h.px(BIG_H * .42f), Gravity.CENTER));
-        idleName = h.text(h.fSemi, 1.6f, 0x99FFFFFF); idleName.setGravity(Gravity.CENTER);
+        idleName = h.text(h.fSemi, 1.6f, Ui.WHITE_60); idleName.setGravity(Gravity.CENTER);
         idle.addView(idleName, new LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.MATCH_PARENT));
-        idleHint = h.text(h.fMed, .95f, 0x8CFFFFFF); idleHint.setText("OK · Preview");
+        idleHint = h.text(h.fMed, Ui.TEXT_XS, Ui.WHITE_60); idleHint.setText("OK · Preview");
         LayoutParams ihl = new LayoutParams(LayoutParams.WRAP_CONTENT, LayoutParams.WRAP_CONTENT, Gravity.BOTTOM | Gravity.CENTER_HORIZONTAL); ihl.bottomMargin = h.px(1);
         idle.addView(idleHint, ihl);
         idle.setOutlineProvider(new android.view.ViewOutlineProvider() { @Override public void getOutline(View v, android.graphics.Outline o) { o.setRoundRect(0, 0, v.getWidth(), v.getHeight(), PV_R * R); } });
@@ -344,8 +344,8 @@ final class NativeLive extends FrameLayout {
         pv.setVisibility(INVISIBLE);
         pvTune = new Tune(BIG_W / 120f);
         pv.addView(pvTune.box, new LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.MATCH_PARENT));
-        pvErr = h.text(h.fMed, .85f, 0xBFFFFFFF);
-        pvErr.setGravity(Gravity.CENTER); pvErr.setPadding(h.px(.6f), 0, h.px(.6f), 0); pvErr.setBackgroundColor(0x99000000); pvErr.setVisibility(GONE);
+        pvErr = h.text(h.fMed, Ui.TEXT_XS, Ui.WHITE_75);
+        pvErr.setGravity(Gravity.CENTER); pvErr.setPadding(h.px(.6f), 0, h.px(.6f), 0); pvErr.setBackgroundColor(Ui.BLACK_60); pvErr.setVisibility(GONE);
         pv.addView(pvErr, new LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.MATCH_PARENT));
         pv.setOutlineProvider(new android.view.ViewOutlineProvider() { @Override public void getOutline(View v, android.graphics.Outline o) { o.setRoundRect(0, 0, v.getWidth(), v.getHeight(), PV_R * R); } });
         pv.setClipToOutline(true);
@@ -357,8 +357,8 @@ final class NativeLive extends FrameLayout {
         fs.setVisibility(INVISIBLE);
         fsTune = new Tune(1f);
         fs.addView(fsTune.box, new LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.MATCH_PARENT));
-        fsErr = h.text(h.fMed, 1.1f, 0xBFFFFFFF);
-        fsErr.setGravity(Gravity.CENTER); fsErr.setBackgroundColor(0x99000000); fsErr.setLineSpacing(0, 1.3f); fsErr.setVisibility(GONE);
+        fsErr = h.text(h.fMed, Ui.TEXT_S, Ui.WHITE_75);
+        fsErr.setGravity(Gravity.CENTER); fsErr.setBackgroundColor(Ui.BLACK_60); fsErr.setLineSpacing(0, 1.3f); fsErr.setVisibility(GONE);
         fs.addView(fsErr, new LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.MATCH_PARENT));
         cues = h.text(h.fMed, 2.3f, Color.WHITE);
         cues.setGravity(Gravity.CENTER);
@@ -367,7 +367,7 @@ final class NativeLive extends FrameLayout {
         cl.bottomMargin = h.px(4.7f);
         fs.addView(cues, cl);
         osd = new FrameLayout(c);
-        osd.setBackground(new GradientDrawable(GradientDrawable.Orientation.TOP_BOTTOM, new int[] { 0x00000000, 0x8C000000, 0xE6000000 }));
+        osd.setBackground(new GradientDrawable(GradientDrawable.Orientation.TOP_BOTTOM, new int[] { 0x00000000, Ui.BLACK_55, Ui.BLACK_90 }));
         buildOsd();
         osd.setAlpha(0f);
         fs.addView(osd, new LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT, Gravity.BOTTOM));
@@ -407,7 +407,7 @@ final class NativeLive extends FrameLayout {
         shown = true;
         setVisibility(VISIBLE);
         setAlpha(0f);
-        animate().alpha(1f).setDuration(350).start();     // (no ready-made picture: see hasOverlappingRendering)
+        animate().alpha(1f).setDuration(Ui.SLIDE).start();     // (no ready-made picture: see hasOverlappingRendering)
         if (!loaded) load();
         Recorder.onChange = recChanged; recChanged.run();
         JSONObject inf = liveInfo();
@@ -537,7 +537,7 @@ final class NativeLive extends FrameLayout {
         if (full) exitFull();
         stopPlayback();
         main().removeCallbacks(pulse); main().removeCallbacks(minute);
-        animate().alpha(0f).setDuration(250).withLayer().withEndAction(new Runnable() { @Override public void run() { if (!shown) setVisibility(INVISIBLE); } }).start();
+        animate().alpha(0f).setDuration(Ui.BASE).withLayer().withEndAction(new Runnable() { @Override public void run() { if (!shown) setVisibility(INVISIBLE); } }).start();
     }
 
     /** a panel of the page (Settings…) is over this: the picture steps aside */
@@ -923,13 +923,13 @@ final class NativeLive extends FrameLayout {
         boolean open = zone.equals("cats") && shown;
         if (catsOpen == null || open != catsOpen) { catsOpen = open;
         if (open) catsPanel.setVisibility(VISIBLE);
-        catsPanel.animate().translationX(open ? 0 : -h.px(3)).alpha(open ? 1f : 0f).setDuration(open ? 380 : 260).setInterpolator(TileView.EASE)
+        catsPanel.animate().translationX(open ? 0 : -h.px(3)).alpha(open ? 1f : 0f).setDuration(open ? Ui.SLIDE : Ui.BASE).setInterpolator(TileView.EASE)
                 .withEndAction(new Runnable() { @Override public void run() { if (!Boolean.TRUE.equals(catsOpen)) catsPanel.setVisibility(INVISIBLE); } }).start();
         // the guide steps aside to the right while the list is out
         float gx = open ? h.px(GUIDE_X + CAT_W + 1.6f) : 0;
-        guide.animate().translationX(gx).setDuration(400).setInterpolator(TileView.EASE).start();
-        recView.animate().translationX(gx).setDuration(400).setInterpolator(TileView.EASE).start();
-        guideDim.animate().translationX(gx).alpha(open ? 1f : 0f).setDuration(400).setInterpolator(TileView.EASE).start();
+        guide.animate().translationX(gx).setDuration(Ui.SLIDE).setInterpolator(TileView.EASE).start();
+        recView.animate().translationX(gx).setDuration(Ui.SLIDE).setInterpolator(TileView.EASE).start();
+        guideDim.animate().translationX(gx).alpha(open ? 1f : 0f).setDuration(Ui.SLIDE).setInterpolator(TileView.EASE).start();
         guide.invalidate(); }
     }
 
@@ -978,15 +978,15 @@ final class NativeLive extends FrameLayout {
             tn.setTypeface(h.fMed); tn.setTextSize(1.25f * R);
             tc.setTypeface(h.fMed); tc.setTextSize(1f * R); tc.setTextAlign(Paint.Align.RIGHT);
             glow.setColor(0xFF34333D);
-            ring.setStyle(Paint.Style.STROKE); ring.setStrokeWidth(Math.max(2, .14f * R)); ring.setColor(0xD9FFFFFF);
+            ring.setStyle(Paint.Style.STROKE); ring.setStrokeWidth(Math.max(2, .14f * R)); ring.setColor(Ui.WHITE_85);
         }
         private int liftCat = -1; private float lift = 1f; private ValueAnimator liftAnim;
-        private final Soft shade = new Soft(1.2f * R, 1.8f * R, 0xB3000000);
+        private final Soft shade = new Soft(1.2f * R, 1.8f * R, Ui.BLACK_70);
         private void startLift() {
             lift = 0f;
             if (liftAnim != null) liftAnim.cancel();
             liftAnim = ValueAnimator.ofFloat(0f, 1f);
-            liftAnim.setDuration(200); liftAnim.setInterpolator(TileView.EASE);
+            liftAnim.setDuration(Ui.FAST); liftAnim.setInterpolator(TileView.EASE);
             liftAnim.addUpdateListener(new ValueAnimator.AnimatorUpdateListener() { @Override public void onAnimationUpdate(ValueAnimator a) { lift = (Float) a.getAnimatedValue(); invalidate(); } });
             liftAnim.start();
         }
@@ -1002,7 +1002,7 @@ final class NativeLive extends FrameLayout {
             if (anim != null) anim.cancel();
             final float from = scroll;
             anim = ValueAnimator.ofFloat(0, 1);
-            anim.setDuration(220); anim.setInterpolator(TileView.EASE);
+            anim.setDuration(Ui.FAST); anim.setInterpolator(TileView.EASE);
             anim.addUpdateListener(new ValueAnimator.AnimatorUpdateListener() { @Override public void onAnimationUpdate(ValueAnimator a) {
                 scroll = from + (target - from) * (Float) a.getAnimatedValue(); invalidate();
             } });
@@ -1029,15 +1029,15 @@ final class NativeLive extends FrameLayout {
                     shade.draw(c, rf, (.2f + .7f * lift) * R, .3f + .7f * lift);
                     float cr = rad;
                     c.drawRoundRect(rf, cr, cr, glow);
-                    ring.setColor(moving ? 0xFFFFC23D : 0xD9FFFFFF);
+                    ring.setColor(moving ? 0xFFFFC23D : Ui.WHITE_85);
                     float o = ring.getStrokeWidth() / 2; rf.inset(o, o); c.drawRoundRect(rf, Math.max(0, cr - o), Math.max(0, cr - o), ring); rf.inset(-o, -o);
                 } else {
-                    fill.setColor(cur ? 0x38FF453A : 0x14FFFFFF); c.drawRoundRect(rf, rad, rad, fill);
+                    fill.setColor(cur ? 0x38FF453A : Ui.WHITE_7); c.drawRoundRect(rf, rad, rad, fill);
                 }
                 float cy = y + rowH / 2;
                 boolean mv = f && moving;
                 String cnt = mv ? "▲▼" : String.valueOf(ct.count);
-                tc.setColor(mv ? 0xFFFFC23D : f ? 0xB3FFFFFF : 0x8CFFFFFF);
+                tc.setColor(mv ? 0xFFFFC23D : f ? Ui.WHITE_75 : Ui.WHITE_60);
                 c.drawText(cnt, w - padX - 1.2f * R, cy + tc.getTextSize() * .35f, tc);
                 float avail = w - 2 * padX - 2.4f * R - tc.measureText(cnt) - .8f * R;
                 tn.setColor(f || cur ? Color.WHITE : 0xD1FFFFFF);
@@ -1140,7 +1140,7 @@ final class NativeLive extends FrameLayout {
                     barFocus = true; barRow = 1; barSel = i; press(id); showOsd(); return "done";
                 }
             }
-            barFocus = false; barRow = 1; main().removeCallbacks(osdHide); osd.animate().alpha(0f).translationY(h.px(2)).setDuration(250).start();
+            barFocus = false; barRow = 1; main().removeCallbacks(osdHide); osd.animate().alpha(0f).translationY(h.px(2)).setDuration(Ui.BASE).start();
             return "done";
         }
         if (full || zap) return "ok";
@@ -1174,7 +1174,7 @@ final class NativeLive extends FrameLayout {
         if (full && statsView.shown) { statsView.close(); return true; }
         if (zap) { zapClose(); return true; }
         if (full && barShown() && barFocus && scrubbing) { scrubbing = false; main().removeCallbacks(scrubCommit); controls.invalidate(); return true; }   // (Back: don't jump)
-        if (full && barShown()) { barFocus = false; barRow = 1; main().removeCallbacks(osdHide); osd.animate().alpha(0f).translationY(h.px(2)).setDuration(250).start(); return true; }
+        if (full && barShown()) { barFocus = false; barRow = 1; main().removeCallbacks(osdHide); osd.animate().alpha(0f).translationY(h.px(2)).setDuration(Ui.BASE).start(); return true; }
         if (full) { exitFull(); return true; }
         if (moving) { moveDone(); return true; }
         if (zone.equals("cats")) catSettle();
@@ -1830,18 +1830,18 @@ final class NativeLive extends FrameLayout {
         oLogo = new ImageView(getContext()); oLogo.setScaleType(ImageView.ScaleType.FIT_CENTER);
         lg.addView(oLogo, new LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.MATCH_PARENT));
         oPh = h.text(h.fSemi, 1.8f, Color.WHITE); oPh.setGravity(Gravity.CENTER);
-        GradientDrawable pb = new GradientDrawable(); pb.setCornerRadius(.8f * R); pb.setColor(0x1FFFFFFF); oPh.setBackground(pb);
+        GradientDrawable pb = new GradientDrawable(); pb.setCornerRadius(.8f * R); pb.setColor(Ui.WHITE_12); oPh.setBackground(pb);
         lg.addView(oPh, new LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.MATCH_PARENT));
         LinearLayout.LayoutParams ll = new LinearLayout.LayoutParams(h.px(6.4f), h.px(4.2f)); ll.rightMargin = h.px(1.6f);
         r.addView(lg, ll);
         LinearLayout b = new LinearLayout(getContext());
         b.setOrientation(LinearLayout.VERTICAL);
-        oChan = h.text(h.fMed, 1.05f, 0xB3FFFFFF); oChan.setSingleLine(true); oChan.setEllipsize(TextUtils.TruncateAt.END); b.addView(oChan);
+        oChan = h.text(h.fMed, Ui.TEXT_S, Ui.WHITE_75); oChan.setSingleLine(true); oChan.setEllipsize(TextUtils.TruncateAt.END); b.addView(oChan);
         oTitle = h.text(h.fSemi, 2.1f, Color.WHITE); oTitle.setSingleLine(true); oTitle.setEllipsize(TextUtils.TruncateAt.END);
         LinearLayout.LayoutParams tl = new LinearLayout.LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT); tl.topMargin = h.px(.15f);
         b.addView(oTitle, tl);
         r.addView(b, new LinearLayout.LayoutParams(0, LayoutParams.WRAP_CONTENT, 1));
-        oWhen = h.text(h.fMed, 1.1f, 0xB3FFFFFF); oWhen.setGravity(Gravity.RIGHT);
+        oWhen = h.text(h.fMed, Ui.TEXT_S, Ui.WHITE_75); oWhen.setGravity(Gravity.RIGHT);
         LinearLayout.LayoutParams wl = new LinearLayout.LayoutParams(LayoutParams.WRAP_CONTENT, LayoutParams.WRAP_CONTENT); wl.leftMargin = h.px(2);
         r.addView(oWhen, wl);
         col.addView(r, new LinearLayout.LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT));
@@ -1850,7 +1850,7 @@ final class NativeLive extends FrameLayout {
         col.addView(controls, cl);
         osd.addView(col, new LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT));
         // (kept for older bits that set them; not shown)
-        oNext = h.text(h.fReg, 1f, 0); oHint = h.text(h.fReg, 1f, 0);
+        oNext = h.text(h.fReg, Ui.TEXT_S, 0); oHint = h.text(h.fReg, Ui.TEXT_S, 0);
         View bar = new FrameLayout(getContext()); oBarFill = new View(getContext()); ((FrameLayout) bar).addView(oBarFill, new LayoutParams(0, 1));
     }
 
@@ -1858,13 +1858,13 @@ final class NativeLive extends FrameLayout {
         if (paused && barFocus) return;                       // (paused: the toolbar stays until you hide it)
         if (scrubbing) commitScrub();
         barFocus = false; barRow = 1;
-        osd.animate().alpha(0f).translationY(h.px(2)).setDuration(300).start();
+        osd.animate().alpha(0f).translationY(h.px(2)).setDuration(Ui.MOVE).start();
     } };
     private void toggleOsd() { if (osd.getAlpha() > .5f) { main().removeCallbacks(osdHide); osdHide.run(); } else showOsd(); }
     private void showOsd() {
         if (playing == null || zap) return;
         drawOsd();
-        osd.animate().alpha(1f).translationY(0).setDuration(300).setInterpolator(TileView.EASE).start();
+        osd.animate().alpha(1f).translationY(0).setDuration(Ui.MOVE).setInterpolator(TileView.EASE).start();
         main().removeCallbacks(osdHide); main().postDelayed(osdHide, barFocus ? 7000 : 5000);
         main().removeCallbacks(barTick); main().postDelayed(barTick, 500);
     }
@@ -2011,14 +2011,14 @@ final class NativeLive extends FrameLayout {
         private final TextPaint tT = new TextPaint(Paint.ANTI_ALIAS_FLAG), tS = new TextPaint(Paint.ANTI_ALIAS_FLAG), tH = new TextPaint(Paint.ANTI_ALIAS_FLAG), tC = new TextPaint(Paint.ANTI_ALIAS_FLAG);
         private final Paint fill = new Paint(Paint.ANTI_ALIAS_FLAG), ring = new Paint(Paint.ANTI_ALIAS_FLAG), raise = new Paint(Paint.ANTI_ALIAS_FLAG);
         private final RectF rf = new RectF();
-        private final Soft shade = new Soft(1.2f * R, 1.8f * R, 0xB3000000);
+        private final Soft shade = new Soft(1.2f * R, 1.8f * R, Ui.BLACK_70);
         RecView(android.content.Context c) {
             super(c);
             tT.setTypeface(h.fSemi); tT.setTextSize(1.35f * R); tT.setColor(Color.WHITE);
-            tS.setTypeface(h.fReg); tS.setTextSize(1.02f * R); tS.setColor(0x99FFFFFF);
-            tH.setTypeface(h.fSemi); tH.setTextSize(.95f * R); tH.setColor(0x99FFFFFF); tH.setLetterSpacing(.08f);
+            tS.setTypeface(h.fReg); tS.setTextSize(1.02f * R); tS.setColor(Ui.WHITE_60);
+            tH.setTypeface(h.fSemi); tH.setTextSize(.95f * R); tH.setColor(Ui.WHITE_60); tH.setLetterSpacing(.08f);
             tC.setTypeface(h.fSemi); tC.setTextSize(.92f * R); tC.setTextAlign(Paint.Align.CENTER);
-            ring.setStyle(Paint.Style.STROKE); ring.setStrokeWidth(Math.max(2, .14f * R)); ring.setColor(0xD9FFFFFF);
+            ring.setStyle(Paint.Style.STROKE); ring.setStrokeWidth(Math.max(2, .14f * R)); ring.setColor(Ui.WHITE_85);
             raise.setColor(0xFF34333D);
         }
         JSONObject focused() { return sel < items.size() && zone.equals("guide") ? items.get(sel) : null; }
@@ -2055,7 +2055,7 @@ final class NativeLive extends FrameLayout {
             if (anim != null) anim.cancel();
             if (!animate) { scroll = to; return; }
             final float from = scroll;
-            anim = ValueAnimator.ofFloat(0, 1); anim.setDuration(200); anim.setInterpolator(TileView.EASE);
+            anim = ValueAnimator.ofFloat(0, 1); anim.setDuration(Ui.FAST); anim.setInterpolator(TileView.EASE);
             anim.addUpdateListener(new ValueAnimator.AnimatorUpdateListener() { @Override public void onAnimationUpdate(ValueAnimator a) { scroll = from + (target - from) * (Float) a.getAnimatedValue(); invalidate(); } });
             anim.start();
         }
@@ -2132,7 +2132,7 @@ final class NativeLive extends FrameLayout {
                     float cr = R;
                     c.drawRoundRect(rf, cr, cr, raise);
                     float o = ring.getStrokeWidth() / 2; rf.inset(o, o); c.drawRoundRect(rf, Math.max(0, cr - o), Math.max(0, cr - o), ring); rf.inset(-o, -o);
-                } else { fill.setColor(0x14FFFFFF); c.drawRoundRect(rf, R, R, fill); }
+                } else { fill.setColor(Ui.WHITE_7); c.drawRoundRect(rf, R, R, fill); }
                 // the status chip on the right
                 String chip; int chipC;
                 boolean rule = r.has("mode");
@@ -2140,8 +2140,8 @@ final class NativeLive extends FrameLayout {
                 if (rule) { chip = r.optString("mode").equals("new") ? "NEW EPISODES" : "EVERY AIRING"; chipC = 0xFF8E7BFF; }
                 else if (st.equals("recording")) { chip = "● REC"; chipC = 0xFFFF453A; }
                 else if (st.equals("scheduled")) { chip = day(r.optLong("start")).toUpperCase(Locale.US) + " " + fmt(r.optLong("start")); chipC = 0xFFFFD60A; }
-                else if (!Recorder.hasData(r)) { chip = st.equals("failed") ? "FAILED" : "NOT HERE"; chipC = 0x80FFFFFF; }
-                else { chip = Math.max(1, r.optLong("secs") / 60) + " MIN"; chipC = 0xB3FFFFFF; }
+                else if (!Recorder.hasData(r)) { chip = st.equals("failed") ? "FAILED" : "NOT HERE"; chipC = Ui.WHITE_50; }
+                else { chip = Math.max(1, r.optLong("secs") / 60) + " MIN"; chipC = Ui.WHITE_75; }
                 float cw = tC.measureText(chip) + 1.6f * R, ch2 = 1.9f * R;
                 RectF cr = new RectF(rf.right - 1.2f * R - cw, rf.centerY() - ch2 / 2, rf.right - 1.2f * R, rf.centerY() + ch2 / 2);
                 fill.setColor((chipC & 0x00FFFFFF) | 0x2E000000); c.drawRoundRect(cr, ch2 / 2, ch2 / 2, fill);
@@ -2160,13 +2160,13 @@ final class NativeLive extends FrameLayout {
                     if (Recorder.hasData(r) && r.optLong("pos") > r.optLong("from") + 30000 && r.optLong("to") > r.optLong("from")) {
                         // how far you've watched
                         float pr = Math.min(1, (r.optLong("pos") - r.optLong("from")) / (float) (r.optLong("to") - r.optLong("from")));
-                        fill.setColor(0x33FFFFFF); c.drawRect(tx, rf.bottom - .55f * R, cr.left - 1.2f * R, rf.bottom - .35f * R, fill);
+                        fill.setColor(Ui.WHITE_20); c.drawRect(tx, rf.bottom - .55f * R, cr.left - 1.2f * R, rf.bottom - .35f * R, fill);
                         fill.setColor(0xFFFF8A80); c.drawRect(tx, rf.bottom - .55f * R, tx + (cr.left - 1.2f * R - tx) * pr, rf.bottom - .35f * R, fill);
                     }
                 }
-                tT.setColor(f || st.equals("recording") || rule || Recorder.hasData(r) || st.equals("scheduled") ? Color.WHITE : 0x99FFFFFF);
+                tT.setColor(f || st.equals("recording") || rule || Recorder.hasData(r) || st.equals("scheduled") ? Color.WHITE : Ui.WHITE_60);
                 c.drawText(TextUtils.ellipsize(title, tT, Math.max(1, avail), TextUtils.TruncateAt.END).toString(), tx, rf.centerY() - .15f * R, tT);
-                tS.setTextAlign(Paint.Align.LEFT); tS.setColor(f ? 0xD9FFD9D6 : 0x99FFFFFF);
+                tS.setTextAlign(Paint.Align.LEFT); tS.setColor(f ? 0xD9FFD9D6 : Ui.WHITE_60);
                 c.drawText(TextUtils.ellipsize(sub, tS, Math.max(1, avail), TextUtils.TruncateAt.END).toString(), tx, rf.centerY() + 1.45f * R, tS);
                 y += rowH;
             }
@@ -2482,7 +2482,7 @@ final class NativeLive extends FrameLayout {
         private final Path path = new Path();
         Controls(android.content.Context c) {
             super(c);
-            tTime.setTypeface(h.fMed); tTime.setTextSize(1.05f * R); tTime.setColor(0xD9FFFFFF);
+            tTime.setTypeface(h.fMed); tTime.setTextSize(1.05f * R); tTime.setColor(Ui.WHITE_85);
             tNum.setTypeface(h.fSemi); tNum.setTextSize(.78f * R); tNum.setTextAlign(Paint.Align.CENTER);
             tPill.setTypeface(h.fSemi); tPill.setTextSize(1f * R); tPill.setTextAlign(Paint.Align.CENTER);
             st.setStyle(Paint.Style.STROKE); st.setStrokeCap(Paint.Cap.ROUND); st.setStrokeJoin(Paint.Join.ROUND);
@@ -2499,24 +2499,24 @@ final class NativeLive extends FrameLayout {
             // the timeline: a thin line; what's been on is lighter, where you are is white
             boolean seekRow = barFocus && barRow == 0;
             float ty = 3f * R, th = (seekRow ? .62f : barFocus ? .42f : .3f) * R;      // (room above for the seek bubble)
-            p.setColor(0x33FFFFFF); r.set(x0, ty, x1, ty + th); c.drawRoundRect(r, th, th, p);
+            p.setColor(Ui.WHITE_20); r.set(x0, ty, x1, ty + th); c.drawRoundRect(r, th, th, p);
             float liveX = x0 + (x1 - x0) * Math.min(1, (live - a) / span);
             float sx = recPlay != null ? x0 : shift != null && shift.hasData() ? x0 + (x1 - x0) * Math.max(0, (shift.startWall() - a) / span) : liveX;
-            p.setColor(0x59FFFFFF); r.set(sx, ty, liveX, ty + th); c.drawRoundRect(r, th, th, p);
+            p.setColor(Ui.WHITE_40); r.set(sx, ty, liveX, ty + th); c.drawRoundRect(r, th, th, p);
             float posX = x0 + (x1 - x0) * Math.max(0, Math.min(1, (pos - a) / span));
             p.setColor(Color.WHITE); r.set(x0, ty, posX, ty + th); c.drawRoundRect(r, th, th, p);
             if (seekRow) {
                 long tw = scrubbing ? scrubWall : pos;
                 float kx = x0 + (x1 - x0) * Math.max(0, Math.min(1, (tw - a) / span));
-                if (scrubbing) { p.setColor(0x80FFFFFF); r.set(Math.min(kx, posX), ty, Math.max(kx, posX), ty + th); c.drawRect(r, p); }
-                p.setColor(0x40FFFFFF); c.drawCircle(kx, ty + th / 2, 1.25f * R, p);
+                if (scrubbing) { p.setColor(Ui.WHITE_50); r.set(Math.min(kx, posX), ty, Math.max(kx, posX), ty + th); c.drawRect(r, p); }
+                p.setColor(Ui.WHITE_25); c.drawCircle(kx, ty + th / 2, 1.25f * R, p);
                 p.setColor(Color.WHITE); c.drawCircle(kx, ty + th / 2, .8f * R, p);
                 // the time you'd jump to, in a bubble above the knob
                 String lab = recPlay != null ? clock(Math.max(0, tw - a)) : (live - tw < 5000 ? "LIVE" : fmt(tw) + "  ·  −" + clock(live - tw));
                 float lw = tTime.measureText(lab) + 1.4f * R, lx = Math.max(x0, Math.min(x1 - lw, kx - lw / 2));
                 // (the bubble sits over the info row's bottom edge: drawn into the space above the line)
-                p.setColor(0xF2FFFFFF); r.set(lx, ty - 2.9f * R, lx + lw, ty - 1.05f * R); c.drawRoundRect(r, .5f * R, .5f * R, p);
-                tTime.setColor(0xFF111111); tTime.setTextAlign(Paint.Align.CENTER); c.drawText(lab, lx + lw / 2, ty - 1.55f * R, tTime); tTime.setColor(0xD9FFFFFF);
+                p.setColor(Ui.WHITE_95); r.set(lx, ty - 2.9f * R, lx + lw, ty - 1.05f * R); c.drawRoundRect(r, .5f * R, .5f * R, p);
+                tTime.setColor(0xFF111111); tTime.setTextAlign(Paint.Align.CENTER); c.drawText(lab, lx + lw / 2, ty - 1.55f * R, tTime); tTime.setColor(Ui.WHITE_85);
             } else if (barFocus) c.drawCircle(posX, ty + th / 2, .62f * R, p);
             // under it: where you are, and the end (or LIVE / how far behind)
             long lag = Math.max(0, live - pos);
@@ -2549,7 +2549,7 @@ final class NativeLive extends FrameLayout {
                 else {                                                     // Go live: a text button left of More
                     float bw = tPill.measureText("Go live") + 2.6f * R, bh = 2.8f * R, rx = x1 - 3.8f * R - 1.2f * R;
                     r.set(rx - bw, cy - bh / 2, rx, cy + bh / 2);
-                    p.setColor(f ? Color.WHITE : 0x26FFFFFF); c.drawRoundRect(r, bh / 2, bh / 2, p);
+                    p.setColor(f ? Color.WHITE : Ui.WHITE_12); c.drawRoundRect(r, bh / 2, bh / 2, p);
                     tPill.setColor(f ? 0xFF111111 : Color.WHITE); c.drawText("Go live", r.centerX(), r.centerY() + tPill.getTextSize() * .36f, tPill);
                     continue;
                 }
@@ -2708,7 +2708,7 @@ final class NativeLive extends FrameLayout {
         cuesText = s == null ? "" : s;
         if (cuesText.isEmpty()) { cues.setVisibility(GONE); return; }
         android.text.SpannableString sp = new android.text.SpannableString(cuesText);
-        sp.setSpan(new android.text.style.BackgroundColorSpan(0xB8000000), 0, cuesText.length(), 0);
+        sp.setSpan(new android.text.style.BackgroundColorSpan(Ui.BLACK_70), 0, cuesText.length(), 0);
         cues.setText(sp);
         cues.setVisibility(VISIBLE);
     }
@@ -2905,7 +2905,7 @@ final class NativeLive extends FrameLayout {
     private void drawStats() {
         statsBox.removeAllViews();
         if (playing == null) return;
-        TextView hd = h.text(h.fSemi, 1.15f, 0x99FFFFFF); hd.setText("STREAM INFO"); hd.setLetterSpacing(.08f);
+        TextView hd = h.text(h.fSemi, Ui.TEXT_M, Ui.WHITE_60); hd.setText("STREAM INFO"); hd.setLetterSpacing(.08f);
         statsBox.addView(hd);
         JSONObject s; NativePlayer np = h.act.nativePlayer();
         try { s = np == null ? new JSONObject() : new JSONObject(np.stats()); } catch (Exception e) { s = new JSONObject(); }
@@ -2930,15 +2930,15 @@ final class NativeLive extends FrameLayout {
         if (!lastErr.isEmpty()) statLine("Last error: " + lastErr);
     }
     private void statLine(String v) {
-        TextView t = h.text(h.fReg, 1f, 0xB3FFFFFF); t.setText(v); t.setMaxLines(7);
+        TextView t = h.text(h.fReg, Ui.TEXT_S, Ui.WHITE_75); t.setText(v); t.setMaxLines(7);
         LinearLayout.LayoutParams l = new LinearLayout.LayoutParams(h.px(28.8f), LayoutParams.WRAP_CONTENT); l.topMargin = h.px(.4f);
         statsBox.addView(t, l);
     }
     private void statRow(String k, String v) {
         LinearLayout r = new LinearLayout(getContext());
-        TextView a = h.text(h.fReg, 1.15f, 0x99FFFFFF); a.setText(k);
+        TextView a = h.text(h.fReg, Ui.TEXT_M, Ui.WHITE_60); a.setText(k);
         r.addView(a, new LinearLayout.LayoutParams(0, LayoutParams.WRAP_CONTENT, 1));
-        TextView b = h.text(h.fSemi, 1.15f, Color.WHITE); b.setText(v); b.setSingleLine(true); b.setEllipsize(TextUtils.TruncateAt.END); b.setMaxWidth(h.px(19)); b.setGravity(Gravity.RIGHT);
+        TextView b = h.text(h.fSemi, Ui.TEXT_M, Color.WHITE); b.setText(v); b.setSingleLine(true); b.setEllipsize(TextUtils.TruncateAt.END); b.setMaxWidth(h.px(19)); b.setGravity(Gravity.RIGHT);
         LinearLayout.LayoutParams bl = new LinearLayout.LayoutParams(LayoutParams.WRAP_CONTENT, LayoutParams.WRAP_CONTENT); bl.leftMargin = h.px(2.4f);
         r.addView(b, bl);
         LinearLayout.LayoutParams rl = new LinearLayout.LayoutParams(h.px(28.8f), LayoutParams.WRAP_CONTENT); rl.topMargin = h.px(.2f);
@@ -2991,17 +2991,17 @@ final class NativeLive extends FrameLayout {
         zap = true;
         zapSel = 0;
         if (playing != null) for (int i = 0; i < list.size(); i++) if (list.get(i).u.equals(playing.u)) zapSel = i;
-        main().removeCallbacks(osdHide); osd.animate().alpha(0f).setDuration(150).start();
+        main().removeCallbacks(osdHide); osd.animate().alpha(0f).setDuration(Ui.QUICK).start();
         zapView.setVisibility(VISIBLE);
         zapView.setTranslationX(-h.px(45.6f));
-        zapView.animate().translationX(0).setDuration(400).setInterpolator(TileView.EASE).start();
+        zapView.animate().translationX(0).setDuration(Ui.SLIDE).setInterpolator(TileView.EASE).start();
         zapView.invalidate();
         main().removeCallbacks(zapIdle); main().postDelayed(zapIdle, 9000);
     }
     private void zapClose() {
         zap = false;
         main().removeCallbacks(zapIdle);
-        zapView.animate().translationX(-h.px(45.6f)).setDuration(300).withEndAction(new Runnable() { @Override public void run() { if (!zap) zapView.setVisibility(INVISIBLE); } }).start();
+        zapView.animate().translationX(-h.px(45.6f)).setDuration(Ui.MOVE).withEndAction(new Runnable() { @Override public void run() { if (!zap) zapView.setVisibility(INVISIBLE); } }).start();
     }
     private void zapKey(char d) {
         main().removeCallbacks(zapIdle); main().postDelayed(zapIdle, 9000);
@@ -3035,20 +3035,20 @@ final class NativeLive extends FrameLayout {
             logo = new ImageView(getContext()); logo.setScaleType(ImageView.ScaleType.FIT_CENTER);
             lb.addView(logo, new LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.MATCH_PARENT));
             ph = h.text(h.fSemi, 7.2f * k, Color.WHITE); ph.setGravity(Gravity.CENTER);
-            GradientDrawable pb = new GradientDrawable(); pb.setCornerRadius(3.1f * k * R); pb.setColor(0x1FFFFFFF); ph.setBackground(pb);
+            GradientDrawable pb = new GradientDrawable(); pb.setCornerRadius(3.1f * k * R); pb.setColor(Ui.WHITE_12); ph.setBackground(pb);
             lb.addView(ph, new LayoutParams(h.px(15.6f * k), h.px(15.6f * k), Gravity.CENTER));
             box.addView(lb, new LinearLayout.LayoutParams(h.px(31.2f * k), h.px(15.6f * k)));
-            chan = h.text(h.fSemi, 2.52f * k, 0xB3FFFFFF);
+            chan = h.text(h.fSemi, 2.52f * k, Ui.WHITE_75);
             LinearLayout.LayoutParams cl = new LinearLayout.LayoutParams(LayoutParams.WRAP_CONTENT, LayoutParams.WRAP_CONTENT); cl.topMargin = h.px(2f * k);
             box.addView(chan, cl);
             title = h.text(h.fSemi, 3.84f * k, Color.WHITE); title.setSingleLine(true); title.setEllipsize(TextUtils.TruncateAt.END); title.setMaxWidth(h.px(96 * k));
             LinearLayout.LayoutParams tl = new LinearLayout.LayoutParams(LayoutParams.WRAP_CONTENT, LayoutParams.WRAP_CONTENT); tl.topMargin = h.px(.8f * k);
             box.addView(title, tl);
             FrameLayout bar = new FrameLayout(getContext());
-            GradientDrawable bb = new GradientDrawable(); bb.setCornerRadius(R); bb.setColor(0x26FFFFFF); bar.setBackground(bb);
+            GradientDrawable bb = new GradientDrawable(); bb.setCornerRadius(R); bb.setColor(Ui.WHITE_12); bar.setBackground(bb);
             bar.setClipChildren(true);
             dash = new View(getContext());
-            GradientDrawable dd = new GradientDrawable(); dd.setCornerRadius(R); dd.setColor(0xD9FFFFFF); dash.setBackground(dd);
+            GradientDrawable dd = new GradientDrawable(); dd.setCornerRadius(R); dd.setColor(Ui.WHITE_85); dash.setBackground(dd);
             bar.addView(dash, new LayoutParams(h.px(6.5f * k), LayoutParams.MATCH_PARENT));
             LinearLayout.LayoutParams bl = new LinearLayout.LayoutParams(h.px(21.6f * k), Math.max(2, h.px(.54f * k))); bl.topMargin = h.px(2.2f * k);
             box.addView(bar, bl);
@@ -3120,9 +3120,9 @@ final class NativeLive extends FrameLayout {
             if (shFor != bgBmp || x != ex || y != ey || x1 != ex1 || y1 != ey1) {
                 if (shFor != bgBmp) { shFor = bgBmp; bgSh = new BitmapShader(bgBmp, Shader.TileMode.CLAMP, Shader.TileMode.CLAMP); }
                 ex = x; ey = y; ex1 = x1; ey1 = y1;
-                eL = new ComposeShader(bgSh, new LinearGradient(x, 0, x + 11 * R * k, 0, new int[] { 0xFF000000, 0x8C000000, 0 }, new float[] { 0, .45f, 1 }, Shader.TileMode.CLAMP), PorterDuff.Mode.DST_IN);
-                eB = new ComposeShader(bgSh, new LinearGradient(0, y1, 0, y1 - 6.5f * R * k, new int[] { 0xFF000000, 0x8C000000, 0 }, new float[] { 0, .45f, 1 }, Shader.TileMode.CLAMP), PorterDuff.Mode.DST_IN);
-                eT = new ComposeShader(bgSh, new LinearGradient(0, y, 0, y + 2.2f * R * k, 0x99000000, 0, Shader.TileMode.CLAMP), PorterDuff.Mode.DST_IN);
+                eL = new ComposeShader(bgSh, new LinearGradient(x, 0, x + 11 * R * k, 0, new int[] { 0xFF000000, Ui.BLACK_55, 0 }, new float[] { 0, .45f, 1 }, Shader.TileMode.CLAMP), PorterDuff.Mode.DST_IN);
+                eB = new ComposeShader(bgSh, new LinearGradient(0, y1, 0, y1 - 6.5f * R * k, new int[] { 0xFF000000, Ui.BLACK_55, 0 }, new float[] { 0, .45f, 1 }, Shader.TileMode.CLAMP), PorterDuff.Mode.DST_IN);
+                eT = new ComposeShader(bgSh, new LinearGradient(0, y, 0, y + 2.2f * R * k, Ui.BLACK_60, 0, Shader.TileMode.CLAMP), PorterDuff.Mode.DST_IN);
             }
             if (!h.portrait) edge(c, x, y, x + 11 * R * k, y1, eL);
             edge(c, x, y1 - 6.5f * R * k, x1, y1, eB);
@@ -3153,7 +3153,7 @@ final class NativeLive extends FrameLayout {
         private final Set<String> asked = new HashSet<>();
         private final float rowPx, head, chw, cellH, perMs, padL;
         private Shader liveShader;
-        private final Soft raiseSh = new Soft(1f * R, 1.8f * R, 0xB3000000), barGlow = new Soft(.11f * R, .5f * R, 0x8CE0352B), nowGlow = new Soft(.8f * R, .8f * R, 0x80E0352B);
+        private final Soft raiseSh = new Soft(1f * R, 1.8f * R, Ui.BLACK_70), barGlow = new Soft(.11f * R, .5f * R, 0x8CE0352B), nowGlow = new Soft(.8f * R, .8f * R, 0x80E0352B);
 
         GuideView(android.content.Context c) {
             super(c);
@@ -3161,18 +3161,18 @@ final class NativeLive extends FrameLayout {
             padL = GUIDE_X * R;
             rowPx = ROWH * R; head = HEAD * R; chw = padL + CHW * R; cellH = (ROWH - .4f) * R; perMs = PER_HOUR * R / 3600000f;
             tTitle.setTypeface(h.fSemi); tTitle.setTextSize(1.12f * R); tTitle.setColor(Color.WHITE);
-            tSmall.setTypeface(h.fReg); tSmall.setTextSize(.92f * R); tSmall.setColor(0x99FFFFFF);
-            tNum.setTypeface(h.fReg); tNum.setTextSize(.92f * R); tNum.setColor(0x99FFFFFF); tNum.setTextAlign(Paint.Align.RIGHT);
+            tSmall.setTypeface(h.fReg); tSmall.setTextSize(.92f * R); tSmall.setColor(Ui.WHITE_60);
+            tNum.setTypeface(h.fReg); tNum.setTextSize(.92f * R); tNum.setColor(Ui.WHITE_60); tNum.setTextAlign(Paint.Align.RIGHT);
             tName.setTypeface(h.fMed); tName.setTextSize(1.05f * R); tName.setColor(Color.WHITE);
-            tSlot.setTypeface(h.fReg); tSlot.setTextSize(1.05f * R); tSlot.setColor(0x99FFFFFF);
-            tSlot.setColor(0x80FFFFFF); tSlot.setTextSize(1f * R);
+            tSlot.setTypeface(h.fReg); tSlot.setTextSize(1.05f * R); tSlot.setColor(Ui.WHITE_60);
+            tSlot.setColor(Ui.WHITE_50); tSlot.setTextSize(1f * R);
             tNow.setTypeface(h.fSemi); tNow.setTextSize(.85f * R); tNow.setColor(Color.WHITE); tNow.setTextAlign(Paint.Align.CENTER); tNow.setLetterSpacing(.04f);
             nowP.setColor(ACCENT);
             barP.setColor(ACCENT);
             tCat.setTypeface(h.fSemi); tCat.setTextSize(1f * R); tCat.setColor(Color.WHITE);
             focusP.setColor(0xFFFF453A);
-            focusFill.setColor(0x33FFFFFF);
-            ringP.setStyle(Paint.Style.STROKE); ringP.setStrokeWidth(Math.max(2, .14f * R)); ringP.setColor(0xD9FFFFFF);
+            focusFill.setColor(Ui.WHITE_20);
+            ringP.setStyle(Paint.Style.STROKE); ringP.setStrokeWidth(Math.max(2, .14f * R)); ringP.setColor(Ui.WHITE_85);
             raiseP.setColor(0xFF34333D);
             setLayerType(LAYER_TYPE_NONE, null);
         }
@@ -3212,7 +3212,7 @@ final class NativeLive extends FrameLayout {
             if (!smooth) { sx = x; sy = y; invalidate(); return; }
             final float x0 = sx, y0 = sy, x1 = x, y1 = y;
             anim = ValueAnimator.ofFloat(0, 1);
-            anim.setDuration(260);
+            anim.setDuration(Ui.BASE);
             anim.setInterpolator(TileView.EASE);
             anim.addUpdateListener(new ValueAnimator.AnimatorUpdateListener() { @Override public void onAnimationUpdate(ValueAnimator a) {
                 float f = (Float) a.getAnimatedValue();
@@ -3306,8 +3306,8 @@ final class NativeLive extends FrameLayout {
                 Ch ch = list.get(i);
                 float y = head + i * rowPx - sy;
                 boolean cur = i == row, on = playing != null && playing.u.equals(ch.u);
-                if (cur) { fill.setColor(0x1AFFFFFF); rf.set(-2 * R, y, chw - .6f * R, y + cellH); c.drawRoundRect(rf, 1.2f * R, 1.2f * R, fill); }
-                tNum.setColor(on ? 0xFFFF8A80 : 0x99FFFFFF); tName.setColor(on ? 0xFFFF8A80 : Color.WHITE);
+                if (cur) { fill.setColor(Ui.WHITE_12); rf.set(-2 * R, y, chw - .6f * R, y + cellH); c.drawRoundRect(rf, 1.2f * R, 1.2f * R, fill); }
+                tNum.setColor(on ? 0xFFFF8A80 : Ui.WHITE_60); tName.setColor(on ? 0xFFFF8A80 : Color.WHITE);
                 float cx = padL + .9f * R, cy = y + cellH / 2f;
                 String num = chNum(ch);
                 // the whole number (long ones shrink a little to fit rather than losing digits)
@@ -3323,7 +3323,7 @@ final class NativeLive extends FrameLayout {
                     rf.set(lx + (bw - dw) / 2, cy - dh / 2, lx + (bw + dw) / 2, cy + dh / 2);
                     c.drawBitmap(lg, null, rf, LOGO_P);
                 } else {
-                    fill.setColor(0x1FFFFFFF); rf.set(lx, cy - 1.25f * R, lx + 3.4f * R, cy + 1.25f * R); c.drawRoundRect(rf, .6f * R, .6f * R, fill);
+                    fill.setColor(Ui.WHITE_12); rf.set(lx, cy - 1.25f * R, lx + 3.4f * R, cy + 1.25f * R); c.drawRoundRect(rf, .6f * R, .6f * R, fill);
                     tTitle.setTextAlign(Paint.Align.CENTER); c.drawText(ch.n.isEmpty() ? "" : ch.n.substring(0, 1), lx + 1.7f * R, cy + tTitle.getTextSize() * .35f, tTitle); tTitle.setTextAlign(Paint.Align.LEFT);
                 }
                 float tx = lx + 3.4f * R + .7f * R;
@@ -3341,7 +3341,7 @@ final class NativeLive extends FrameLayout {
                     names.put(ch.u + "|" + (int) tw, sl);
                 }
                 c.save(); c.translate(tx, cy - sl.getHeight() / 2f); sl.draw(c); c.restore();
-                if (fav) { tSmall.setColor(0xFFFFD60A); c.drawText("★", chw - .6f * R - 1.9f * R, cy + tSmall.getTextSize() * .35f, tSmall); tSmall.setColor(0x99FFFFFF); }
+                if (fav) { tSmall.setColor(0xFFFFD60A); c.drawText("★", chw - .6f * R - 1.9f * R, cy + tSmall.getTextSize() * .35f, tSmall); tSmall.setColor(Ui.WHITE_60); }
             }
             c.restore();
             // the times along the top
@@ -3431,7 +3431,7 @@ final class NativeLive extends FrameLayout {
                 focusKey = key; lift = 0f;
                 if (liftAnim != null) liftAnim.cancel();
                 liftAnim = ValueAnimator.ofFloat(0f, 1f);
-                liftAnim.setDuration(200); liftAnim.setInterpolator(TileView.EASE);
+                liftAnim.setDuration(Ui.FAST); liftAnim.setInterpolator(TileView.EASE);
                 liftAnim.addUpdateListener(new ValueAnimator.AnimatorUpdateListener() { @Override public void onAnimationUpdate(ValueAnimator a) { lift = (Float) a.getAnimatedValue(); invalidate(); } });
                 liftAnim.start();
             }
@@ -3476,7 +3476,7 @@ final class NativeLive extends FrameLayout {
                 rf.inset(o, o); c.drawRoundRect(rf, Math.max(0, cr - o), Math.max(0, cr - o), ringP); rf.inset(-o, -o);
                 x0 -= grow; x1 += grow;
             } else if (state == 2) {
-                fill.setColor(0x1FFFFFFF);
+                fill.setColor(Ui.WHITE_12);
                 c.drawRoundRect(rf, r, r, fill);
                 liveBar(c, x0, x1, y, s, e, now);
             } else {
@@ -3492,7 +3492,7 @@ final class NativeLive extends FrameLayout {
             float tx = x0 + 1f * R + shift, avail = x1 - tx - 1f * R;
             if (avail <= R) return;
             tTitle.setColor(Color.WHITE); tTitle.setAlpha(f ? 255 : alpha);
-            tSmall.setColor(f ? 0xD9FFD9D6 : 0x99FFFFFF); if (!f && state == 0) tSmall.setAlpha(77);
+            tSmall.setColor(f ? 0xD9FFD9D6 : Ui.WHITE_60); if (!f && state == 0) tSmall.setAlpha(77);
             c.save(); c.clipRect(x0, y, x1, y + cellH);
             float ty = y + .75f * R + tTitle.getTextSize();
             float bx = tx;
@@ -3503,7 +3503,7 @@ final class NativeLive extends FrameLayout {
                 c.drawText(fit(sub, tSmall, Math.max(1, avail)), tx, ty + .25f * R + tSmall.getTextSize(), tSmall);
             }
             c.restore();
-            tTitle.setAlpha(255); tSmall.setColor(0x99FFFFFF);
+            tTitle.setAlpha(255); tSmall.setColor(Ui.WHITE_60);
         }
     }
 
@@ -3519,7 +3519,7 @@ final class NativeLive extends FrameLayout {
             tName.setTypeface(h.fSemi); tName.setTextSize(1.62f * R);
             tProg.setTypeface(h.fReg); tProg.setTextSize(1.32f * R);
             tNum.setTypeface(h.fReg); tNum.setTextSize(1.32f * R); tNum.setTextAlign(Paint.Align.RIGHT);
-            tHead.setTypeface(h.fSemi); tHead.setTextSize(1.8f * R); tHead.setColor(0x99FFFFFF); tHead.setLetterSpacing(.08f);
+            tHead.setTypeface(h.fSemi); tHead.setTextSize(1.8f * R); tHead.setColor(Ui.WHITE_60); tHead.setLetterSpacing(.08f);
         }
         @Override protected void onDraw(Canvas c) {
             int w = getWidth(), hh = getHeight();
@@ -3546,7 +3546,7 @@ final class NativeLive extends FrameLayout {
                 if (f) { fill.setColor(Color.WHITE); c.drawRoundRect(rf, 1.2f * R, 1.2f * R, fill); }
                 if (on) { fill.setColor(0xFFFF453A); c.drawRect(rf.left, rf.top + .3f * R, rf.left + .3f * R, rf.bottom - .3f * R, fill); }
                 float cy = y + (rowH - .4f * R) / 2;
-                tNum.setColor(f ? 0x8C000000 : 0x99FFFFFF);
+                tNum.setColor(f ? Ui.BLACK_55 : Ui.WHITE_60);
                 c.drawText(chNum(ch), padL + 4.6f * R, cy + tNum.getTextSize() * .35f, tNum);
                 float lx = padL + 5.6f * R;
                 Bitmap lg = chLogo(ch.l, this);
@@ -3562,7 +3562,7 @@ final class NativeLive extends FrameLayout {
                 String nm = ch.n + (favs.contains(ch.u) ? " ★" : "");
                 c.drawText(TextUtils.ellipsize(nm, tName, tw, TextUtils.TruncateAt.END).toString(), tx, cy - (pt.isEmpty() ? -tName.getTextSize() * .35f : .3f * R), tName);
                 if (!pt.isEmpty()) {
-                    tProg.setColor(f ? 0x99000000 : 0x99FFFFFF);
+                    tProg.setColor(f ? Ui.BLACK_60 : Ui.WHITE_60);
                     c.drawText(TextUtils.ellipsize(pt, tProg, tw, TextUtils.TruncateAt.END).toString(), tx, cy + tProg.getTextSize() * .95f, tProg);
                     float pr = (now - p[0]) / (float) (p[1] - p[0]);
                     float by = cy + tProg.getTextSize() * 1.45f;
@@ -3571,7 +3571,7 @@ final class NativeLive extends FrameLayout {
                 }
             }
             c.restore();
-            tProg.setColor(0x99FFFFFF);
+            tProg.setColor(Ui.WHITE_60);
             c.drawText("▲▼ choose · OK watch · ◀ close", padL + .7f * R, hh - 1.5f * R, tProg);
         }
     }

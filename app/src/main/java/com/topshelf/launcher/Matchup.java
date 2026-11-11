@@ -106,7 +106,7 @@ final class Matchup {
         p.setShader(new RadialGradient(W * 1.02f, H * .95f, W * .55f, new int[] { alpha(cb, .38f), alpha(cb, .1f), 0 }, new float[] { 0, .5f, 1 }, Shader.TileMode.CLAMP));
         c.drawRect(0, 0, W, H, p);
         p.setShader(null);
-        stripes(c, new RectF(0, 0, W, H), 0x0DFFFFFF, 26);
+        stripes(c, new RectF(0, 0, W, H), Ui.WHITE_7, 26);
         // the away team's logo, huge and faint, tipped, half off the left edge
         if (logoA != null) {
             c.save(); c.rotate(-9, W * .12f, H * .55f);
@@ -131,7 +131,7 @@ final class Matchup {
             float x = W * (.44f + r.nextFloat() * .5f), len = H * (.3f + r.nextFloat() * .35f), y = H * (.08f + r.nextFloat() * .55f);
             float dx = slant / H * len;
             ls.setStrokeWidth(2 + r.nextFloat() * 3);
-            ls.setShader(new LinearGradient(x + dx, y, x, y + len, new int[] { 0x00FFFFFF, 0x47FFFFFF, 0x00FFFFFF }, null, Shader.TileMode.CLAMP));
+            ls.setShader(new LinearGradient(x + dx, y, x, y + len, new int[] { 0x00FFFFFF, Ui.WHITE_25, 0x00FFFFFF }, null, Shader.TileMode.CLAMP));
             c.drawLine(x + dx, y, x, y + len, ls);
         }
 
@@ -150,11 +150,11 @@ final class Matchup {
         Path plate = new Path();
         float pw = tw * .8f + H * .05f, ph = H * .075f, sk = ph * .45f;
         plate.moveTo(vx - pw + sk, vy - ph); plate.lineTo(vx + pw + sk, vy - ph); plate.lineTo(vx + pw - sk, vy + ph); plate.lineTo(vx - pw - sk, vy + ph); plate.close();
-        Paint glow = new Paint(Paint.ANTI_ALIAS_FLAG); glow.setColor(0x66FFFFFF); glow.setMaskFilter(new BlurMaskFilter(H * .03f, BlurMaskFilter.Blur.NORMAL));
+        Paint glow = new Paint(Paint.ANTI_ALIAS_FLAG); glow.setColor(Ui.WHITE_40); glow.setMaskFilter(new BlurMaskFilter(H * .03f, BlurMaskFilter.Blur.NORMAL));
         c.drawPath(plate, glow);
         Paint pl = new Paint(Paint.ANTI_ALIAS_FLAG); pl.setColor(0xFF07080B); c.drawPath(plate, pl);
-        pl.setStyle(Paint.Style.STROKE); pl.setStrokeWidth(3); pl.setColor(0xE6FFFFFF); c.drawPath(plate, pl);
-        vp.setColor(0xFFFFFFFF); vp.setShadowLayer(H * .012f, 0, 0, 0xB3FFFFFF);
+        pl.setStyle(Paint.Style.STROKE); pl.setStrokeWidth(3); pl.setColor(Ui.WHITE_95); c.drawPath(plate, pl);
+        vp.setColor(0xFFFFFFFF); vp.setShadowLayer(H * .012f, 0, 0, Ui.WHITE_75);
         c.drawText(mid, vx, vy + vp.getTextSize() * .36f, vp);
         if (!per.isEmpty()) {
             // the period (or FINAL) on a small tab above the plate: red while it's on
@@ -179,7 +179,7 @@ final class Matchup {
         }
         Paint vg = new Paint();
         vg.setShader(new LinearGradient(0, H * .62f, 0, H, 0x00000000, 0x9E000000, Shader.TileMode.CLAMP)); c.drawRect(0, H * .62f, W, H, vg);
-        vg.setShader(new LinearGradient(0, 0, 0, H * .2f, 0x73000000, 0x00000000, Shader.TileMode.CLAMP)); c.drawRect(0, 0, W, H * .2f, vg);
+        vg.setShader(new LinearGradient(0, 0, 0, H * .2f, Ui.BLACK_45, 0x00000000, Shader.TileMode.CLAMP)); c.drawRect(0, 0, W, H * .2f, vg);
     }
 
     private static float lum(int c) { return (.2126f * ((c >> 16) & 255) + .7152f * ((c >> 8) & 255) + .0722f * (c & 255)) / 255f; }
@@ -228,7 +228,7 @@ final class Matchup {
         Paint up = new Paint();
         up.setShader(new LinearGradient(0, H, 0, H * .3f, new int[] { alpha(team, .9f), alpha(team, .38f), alpha(team, 0) }, new float[] { 0, .45f, 1 }, Shader.TileMode.CLAMP));
         c.drawRect(box, up);
-        Paint top = new Paint(); top.setShader(new LinearGradient(0, 0, 0, H * .35f, 0x8C000000, 0x00000000, Shader.TileMode.CLAMP));
+        Paint top = new Paint(); top.setShader(new LinearGradient(0, 0, 0, H * .35f, Ui.BLACK_55, 0x00000000, Shader.TileMode.CLAMP));
         c.drawRect(box, top);
         stripes(c, box, 0x0BFFFFFF, 14);
         c.restore();
@@ -253,7 +253,7 @@ final class Matchup {
             Bitmap sh = logo.extractAlpha(bp, off);
             float k = d.width() / logo.getWidth();
             RectF ds = new RectF(d.left + off[0] * k, d.top + off[1] * k + H * .014f, d.left + (off[0] + sh.getWidth()) * k, d.top + (off[1] + sh.getHeight()) * k + H * .014f);
-            Paint shp = new Paint(Paint.FILTER_BITMAP_FLAG); shp.setColor(0xCC000000);
+            Paint shp = new Paint(Paint.FILTER_BITMAP_FLAG); shp.setColor(Ui.BLACK_85);
             c.drawBitmap(sh, null, ds, shp);
             sh.recycle();
             c.drawBitmap(logo, null, d, new Paint(Paint.FILTER_BITMAP_FLAG | Paint.ANTI_ALIAS_FLAG));
@@ -268,7 +268,7 @@ final class Matchup {
             String t = name.toUpperCase(java.util.Locale.US);
             float max = (right - box.left) * .8f;
             while (np.measureText(t) > max && np.getTextSize() > H * .03f) np.setTextSize(np.getTextSize() * .92f);
-            np.setColor(0xF2FFFFFF); np.setShadowLayer(H * .012f, 0, H * .004f, 0xB3000000);
+            np.setColor(Ui.WHITE_95); np.setShadowLayer(H * .012f, 0, H * .004f, Ui.BLACK_70);
             c.drawText(t, nx, ny, np);
         }
     }

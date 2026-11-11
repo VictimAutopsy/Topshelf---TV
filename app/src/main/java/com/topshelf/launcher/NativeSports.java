@@ -169,7 +169,7 @@ final class NativeSports extends FrameLayout {
         liveChip.setVisibility(GONE);
         LinearLayout.LayoutParams ll = new LinearLayout.LayoutParams(LayoutParams.WRAP_CONTENT, LayoutParams.WRAP_CONTENT); ll.leftMargin = h.px(1.2f);
         tline.addView(liveChip, ll);
-        updated = h.text(h.fReg, 1.15f, TER);
+        updated = h.text(h.fReg, Ui.TEXT_M, TER);
         LinearLayout.LayoutParams ul = new LinearLayout.LayoutParams(LayoutParams.WRAP_CONTENT, LayoutParams.WRAP_CONTENT); ul.leftMargin = h.px(1.4f);
         tline.addView(updated, ul);
         chrome.addView(tline, h.at(PAD, TABS_Y, LayoutParams.WRAP_CONTENT, LayoutParams.WRAP_CONTENT));
@@ -193,7 +193,7 @@ final class NativeSports extends FrameLayout {
         setupTitle = h.text(heavy, 3.2f, Color.WHITE);
         setupTitle.setText("FOLLOW YOUR TEAMS"); setupTitle.setPadding(0, 0, h.px(.7f), 0); setupTitle.setVisibility(GONE);
         addView(setupTitle, h.at(PAD, 14, LayoutParams.WRAP_CONTENT, LayoutParams.WRAP_CONTENT));
-        setupSub = h.text(h.fReg, 1.3f, 0xBFFFFFFF);
+        setupSub = h.text(h.fReg, Ui.TEXT_L, Ui.WHITE_75);
         setupSub.setText("Pick the sports and teams you follow. TopShelf shows their games, live scores, and which of your Live TV channels is showing each one.");
         setupSub.setLineSpacing(0, 1.3f); setupSub.setVisibility(GONE);
         addView(setupSub, h.at(PAD, 18.6f, h.px(60), LayoutParams.WRAP_CONTENT));
@@ -238,7 +238,7 @@ final class NativeSports extends FrameLayout {
         shown = true;
         setVisibility(VISIBLE);
         setAlpha(0f);
-        animate().alpha(1f).setDuration(350).start();     // (no ready-made picture: see hasOverlappingRendering)
+        animate().alpha(1f).setDuration(Ui.SLIDE).start();     // (no ready-made picture: see hasOverlappingRendering)
         chrome.animate().cancel();
         chromeOn = h.barsHiddenNow() || h.portrait;
         chrome.setAlpha(chromeOn ? 1f : 0f);
@@ -255,7 +255,7 @@ final class NativeSports extends FrameLayout {
         removeCallbacks(fyTick);
         ribStop();
         h.sportsData().setOn(false);
-        animate().alpha(0f).setDuration(250).withLayer().withEndAction(new Runnable() { @Override public void run() { if (!shown) setVisibility(INVISIBLE); } }).start();
+        animate().alpha(0f).setDuration(Ui.BASE).withLayer().withEndAction(new Runnable() { @Override public void run() { if (!shown) setVisibility(INVISIBLE); } }).start();
     }
     boolean shownNow() { return shown; }
     /** the self-check: the Standings tab, as choosing it with the remote does */
@@ -265,7 +265,7 @@ final class NativeSports extends FrameLayout {
     void barsHidden(boolean hide) {
         if (h.portrait) return;            // (upright, the tab bar is at the bottom: the strip and tabs stay)
         chrome.animate().cancel();
-        chrome.animate().alpha(hide ? 1f : 0f).setDuration(hide ? 400 : 180).start();
+        chrome.animate().alpha(hide ? 1f : 0f).setDuration(hide ? Ui.SLIDE : Ui.FAST).start();
         chromeOn = hide;
         placeRing(true);
     }
@@ -536,7 +536,7 @@ final class NativeSports extends FrameLayout {
             v.setText(t);
             v.setGravity(Gravity.CENTER);
             v.setPadding(h.px(SportsLook.CTRL_PAD), 0, h.px(SportsLook.CTRL_PAD), 0);
-            GradientDrawable g = new GradientDrawable(); g.setCornerRadius(SportsLook.ctrlRadius(hh)); g.setColor(sel ? GlassPanel.selFill() : 0x14FFFFFF);
+            GradientDrawable g = new GradientDrawable(); g.setCornerRadius(SportsLook.ctrlRadius(hh)); g.setColor(sel ? GlassPanel.selFill() : Ui.WHITE_7);
             if (!sel) g.setStroke(Math.max(1, h.px(.08f)), SportsLook.CHIP_EDGE);
             v.setBackground(g);
             LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(LayoutParams.WRAP_CONTENT, hh); lp.rightMargin = h.px(.8f);
@@ -569,7 +569,7 @@ final class NativeSports extends FrameLayout {
             main().post(new Runnable() { @Override public void run() {
                 if (!key.equals(bgFor)) return;
                 bg.setImageBitmap(out);
-                bg.setAlpha(.0f); bg.animate().alpha(1f).setDuration(500).start();
+                bg.setAlpha(.0f); bg.animate().alpha(1f).setDuration(Ui.SLOW).start();
             } });
         } });
     }
@@ -642,7 +642,7 @@ final class NativeSports extends FrameLayout {
                 row.addView(t, h.at(PAD, .4f, LayoutParams.WRAP_CONTENT, LayoutParams.WRAP_CONTENT));
             }
             if (rows.get(i).length() == 0) {
-                TextView n = h.text(h.fMed, 1.1f, 0x99FFFFFF); n.setText(notes.get(i));
+                TextView n = h.text(h.fMed, Ui.TEXT_S, Ui.WHITE_60); n.setText(notes.get(i));
                 row.addView(n, h.at(PAD, 3.2f, LayoutParams.WRAP_CONTENT, LayoutParams.WRAP_CONTENT));
                 continue;
             }
@@ -686,14 +686,14 @@ final class NativeSports extends FrameLayout {
         if (zone.equals("side") && sideSel < sideItems.size() && sideItems.get(sideSel).game != null) featured = sideItems.get(sideSel).game;
         if (rows.isEmpty()) { showHero(featured); paintBg(featured); placeRing(smooth); return; }
         float ty = -h.px(r * ROW_H);
-        if (smooth) rowsIn.animate().translationY(ty).setDuration(360).setInterpolator(TileView.EASE).start(); else rowsIn.setTranslationY(ty);
+        if (smooth) rowsIn.animate().translationY(ty).setDuration(Ui.SLIDE).setInterpolator(TileView.EASE).start(); else rowsIn.setTranslationY(ty);
         int c = col(r);
         float left = PAD + c * (CW + GAP);
         if (left < scroll(r) + PAD || left + CW > scroll(r) + SW - PAD) {
             float s = Math.max(0, left - PAD);
             scrolls.put(r, s);
             FrameLayout strip = stripOf.get(r);
-            if (strip != null) { if (smooth) strip.animate().translationX(-h.px(s)).setDuration(360).setInterpolator(TileView.EASE).start(); else strip.setTranslationX(-h.px(s)); }
+            if (strip != null) { if (smooth) strip.animate().translationX(-h.px(s)).setDuration(Ui.SLIDE).setInterpolator(TileView.EASE).start(); else strip.setTranslationX(-h.px(s)); }
         }
         syncCards();
         CardView v = zone.equals("grid") ? cardViews.get(r + ":" + c) : null;
@@ -863,7 +863,7 @@ final class NativeSports extends FrameLayout {
         if (zone.equals("hero")) { openPage(featured); return; }
         if (zone.equals("side")) { sideOk(); return; }
         if (focused != null) focused.animate().scaleX(1.02f).scaleY(1.02f).setDuration(90).withEndAction(new Runnable() { @Override public void run() {
-            if (focused != null) focused.animate().scaleX(1.06f).scaleY(1.06f).setDuration(180).setInterpolator(TileView.EASE).start();
+            if (focused != null) focused.animate().scaleX(1.06f).scaleY(1.06f).setDuration(Ui.FAST).setInterpolator(TileView.EASE).start();
         } }).start();
         if (allRows.isEmpty() || data.optBoolean("setup")) { h.page("spPickOpen()"); return; }
         JSONObject cur = curItem();
@@ -962,7 +962,7 @@ final class NativeSports extends FrameLayout {
         }
         void setFocus(boolean f, boolean smooth) {
             float s = f ? 1.06f : 1f;
-            if (smooth) animate().scaleX(s).scaleY(s).setDuration(220).setInterpolator(TileView.EASE).start(); else { setScaleX(s); setScaleY(s); }
+            if (smooth) animate().scaleX(s).scaleY(s).setDuration(Ui.FAST).setInterpolator(TileView.EASE).start(); else { setScaleX(s); setScaleY(s); }
             setZ(f ? 3 : 0);
             setElevation(f ? 1.4f * R : 0);
             setOutlineProvider(new android.view.ViewOutlineProvider() { @Override public void getOutline(View v, android.graphics.Outline o) { o.setRoundRect(0, 0, v.getWidth(), v.getHeight(), 1.6f * R); } });
@@ -1236,7 +1236,7 @@ final class NativeSports extends FrameLayout {
             p.setAlpha(34); c.drawBitmap(lgB, null, new RectF(lx, ly, lx + dw, ly + dh), p); p.setAlpha(255);
         }
         p.setColor(0x6B04070A); c.drawRect(0, 0, w, hh, p);
-        p.setShader(new RadialGradient(w / 2f, hh * .4f, w * .2f, 0x66000000, 0x00000000, Shader.TileMode.CLAMP)); c.drawRect(0, 0, w, hh, p); p.setShader(null);
+        p.setShader(new RadialGradient(w / 2f, hh * .4f, w * .2f, Ui.BLACK_45, 0x00000000, Shader.TileMode.CLAMP)); c.drawRect(0, 0, w, hh, p); p.setShader(null);
         float px = 2.6f * R, cx = w / 2f;
         // top: LIVE · league · week · note · venue, and where to watch
         float tx = px;
@@ -1255,7 +1255,7 @@ final class NativeSports extends FrameLayout {
             lab = ellip(lab, cond, 1.25f, w * .34f);
             ww = measure(lab, cond, 1.25f, .05f) + (on ? 4.4f : 2.8f) * R;
             RectF b = new RectF(w - px - ww, 1.2f * R, w - px, 4f * R);
-            p.setColor(on ? Color.WHITE : 0x40000000); c.drawRoundRect(b, 1.4f * R, 1.4f * R, p);
+            p.setColor(on ? Color.WHITE : Ui.BLACK_25); c.drawRoundRect(b, 1.4f * R, 1.4f * R, p);
             if (on) {
                 Path tri = new Path(); float tl = b.left + 1.4f * R, tc = b.centerY();
                 tri.moveTo(tl, tc - .55f * R); tri.lineTo(tl + .95f * R, tc); tri.lineTo(tl, tc + .55f * R); tri.close();
@@ -1283,7 +1283,7 @@ final class NativeSports extends FrameLayout {
             boolean left = i == 0;
             boolean dim = post && !t.optBoolean("winner") && !fight;
             float lx = left ? px : w - px - ld;
-            if (fight) { p.setColor(0x33FFFFFF); c.drawCircle(lx + ld / 2, ly + ld / 2, ld / 2, p); Bitmap fl = logo(t.optString("logo"), Math.round(ld)); if (fl != null) { float s = Math.min(ld * .6f / fl.getWidth(), ld * .6f / fl.getHeight()); c.drawBitmap(fl, null, new RectF(lx + ld / 2 - fl.getWidth() * s / 2, ly + ld / 2 - fl.getHeight() * s / 2, lx + ld / 2 + fl.getWidth() * s / 2, ly + ld / 2 + fl.getHeight() * s / 2), p); } }
+            if (fight) { p.setColor(Ui.WHITE_20); c.drawCircle(lx + ld / 2, ly + ld / 2, ld / 2, p); Bitmap fl = logo(t.optString("logo"), Math.round(ld)); if (fl != null) { float s = Math.min(ld * .6f / fl.getWidth(), ld * .6f / fl.getHeight()); c.drawBitmap(fl, null, new RectF(lx + ld / 2 - fl.getWidth() * s / 2, ly + ld / 2 - fl.getHeight() * s / 2, lx + ld / 2 + fl.getWidth() * s / 2, ly + ld / 2 + fl.getHeight() * s / 2), p); } }
             else {
                 p.setColor(Color.WHITE); c.drawCircle(lx + ld / 2, ly + ld / 2, ld / 2, p);
                 Bitmap lgB = logo(t.optString("logo"), Math.round(ld), false);
@@ -1458,7 +1458,7 @@ final class NativeSports extends FrameLayout {
             JSONObject t = ts.optJSONObject(i);
             float cy = (i == 0 ? 7.9f : 15.4f) * R, d = 5.4f * R;
             boolean dim = (post && !t.optBoolean("winner") && !fight) || (live && !lead(ts, i));
-            p.setColor(fight ? 0x33FFFFFF : Color.WHITE); c.drawCircle(px + d / 2, cy, d / 2, p);
+            p.setColor(fight ? Ui.WHITE_20 : Color.WHITE); c.drawCircle(px + d / 2, cy, d / 2, p);
             Bitmap lgB = logo(t.optString("logo"), Math.round(d), fight);
             if (lgB != null) {
                 float s = Math.min(d * .7f / lgB.getWidth(), d * .7f / lgB.getHeight()), dw = lgB.getWidth() * s, dh = lgB.getHeight() * s;
@@ -1576,7 +1576,7 @@ final class NativeSports extends FrameLayout {
         p.setColor(0xFF2A6B3F); c.drawRect(f, p);
         p.setColor(cs[0]); c.drawRect(x, y, x + ez, y + fh, p);
         p.setColor(cs[1]); c.drawRect(x + w - ez, y, x + w, y + fh, p);
-        for (int yd = 10; yd < 100; yd += 10) { p.setColor(yd == 50 ? 0x80FFFFFF : 0x40FFFFFF); float lx = x + ez + play * yd / 100f; c.drawRect(lx - Math.max(1, .05f * R), y, lx + Math.max(1, .05f * R), y + fh, p); }
+        for (int yd = 10; yd < 100; yd += 10) { p.setColor(yd == 50 ? Ui.WHITE_50 : Ui.WHITE_25); float lx = x + ez + play * yd / 100f; c.drawRect(lx - Math.max(1, .05f * R), y, lx + Math.max(1, .05f * R), y + fh, p); }
         float ball = (float) it.optDouble("ball", -1), first = (float) it.optDouble("first", -1);
         if (ball >= 0) {
             float bx = x + ez + play * ball / 100f;
@@ -1776,7 +1776,7 @@ final class NativeSports extends FrameLayout {
                 int st = SportsLook.ctrlText(lit);
                 text(c, label(i), h.fSemi, SportsLook.T_CTRL, st, tx, dcy + .46f * R, Paint.Align.LEFT, sp());
                 // (how many games; while some are on, how many of those: orange, or the chosen words' own colour on a chosen chip)
-                int cc = lit ? (st & 0x00FFFFFF) | 0xB3000000 : n[1] > 0 ? LIVE_C : DIMTXT;
+                int cc = lit ? (st & 0x00FFFFFF) | Ui.BLACK_70 : n[1] > 0 ? LIVE_C : DIMTXT;
                 text(c, cnt, cond, SportsLook.T_LABEL, cc, tx + nws[i] + .8f * R, dcy + .42f * R, Paint.Align.LEFT, .04f);
             }
         }
@@ -1811,34 +1811,34 @@ final class NativeSports extends FrameLayout {
         float cw = measure(pos, h.fSemi, .85f, .04f) + 1.1f * R;
         p.setColor(alpha(pc, .3f)); c.drawRoundRect(new RectF(px, 1.1f * R, px + cw, 2.6f * R), .4f * R, .4f * R, p);
         text(c, pos, h.fSemi, .85f, pc, px + cw / 2, 2.15f * R, Paint.Align.CENTER, .04f);
-        text(c, abbr + (it.optBoolean("bench") ? " · BENCH" : ""), h.fSemi, .9f, 0x99FFFFFF, px + cw + .7f * R, 2.15f * R, Paint.Align.LEFT, .06f);
+        text(c, abbr + (it.optBoolean("bench") ? " · BENCH" : ""), h.fSemi, .9f, Ui.WHITE_60, px + cw + .7f * R, 2.15f * R, Paint.Align.LEFT, .06f);
         // fantasy points (and the projection) at the top right
         String pts = it.optString("pts"), pj = it.optString("proj");
         if (!pts.isEmpty() || !pj.isEmpty()) {
             float rx = w - px;
             if (!pts.isEmpty()) {
-                p.setColor(0xB3000000); float tw = measure(pts, Typeface.create(h.fSemi, Typeface.BOLD), 1.9f, 0) + 1.2f * R;
+                p.setColor(Ui.BLACK_70); float tw = measure(pts, Typeface.create(h.fSemi, Typeface.BOLD), 1.9f, 0) + 1.2f * R;
                 c.drawRoundRect(new RectF(rx - tw, .9f * R, rx, 3.4f * R), .6f * R, .6f * R, p);
                 text(c, pts, Typeface.create(h.fSemi, Typeface.BOLD), 1.9f, live ? GOLD : Color.WHITE, rx - .6f * R, 2.85f * R, Paint.Align.RIGHT, 0);
-                if (!pj.isEmpty()) text(c, "proj " + pj, h.fMed, .85f, 0xCCFFFFFF, rx - .2f * R, 4.5f * R, Paint.Align.RIGHT, 0);
+                if (!pj.isEmpty()) text(c, "proj " + pj, h.fMed, .85f, Ui.WHITE_85, rx - .2f * R, 4.5f * R, Paint.Align.RIGHT, 0);
             } else {
-                p.setColor(0x99000000); float tw = measure("proj " + pj, h.fSemi, 1f, 0) + 1.2f * R;
+                p.setColor(Ui.BLACK_60); float tw = measure("proj " + pj, h.fSemi, 1f, 0) + 1.2f * R;
                 c.drawRoundRect(new RectF(rx - tw, .9f * R, rx, 2.9f * R), .6f * R, .6f * R, p);
-                text(c, "proj " + pj, h.fSemi, 1f, 0xE6FFFFFF, rx - .6f * R, 2.3f * R, Paint.Align.RIGHT, 0);
+                text(c, "proj " + pj, h.fSemi, 1f, Ui.WHITE_95, rx - .6f * R, 2.3f * R, Paint.Align.RIGHT, 0);
             }
         }
         // the name
         float nameMax = w - 2 * px - (ph != null ? 5 * R : 0) - (!pts.isEmpty() || !pj.isEmpty() ? 2 * R : 0);
-        text(c, ellip(it.optString("name"), h.fSemi, 1.55f, nameMax), h.fSemi, 1.55f, it.optBoolean("bench") ? 0xB3FFFFFF : Color.WHITE, px, 4.9f * R, Paint.Align.LEFT, 0);
+        text(c, ellip(it.optString("name"), h.fSemi, 1.55f, nameMax), h.fSemi, 1.55f, it.optBoolean("bench") ? Ui.WHITE_75 : Color.WHITE, px, 4.9f * R, Paint.Align.LEFT, 0);
         // the game
         String game = it.optString("opp") + (it.optString("score").isEmpty() ? "" : "   " + it.optString("score"));
         String when = it.optString("when");
         if (!it.optString("opp").isEmpty()) {
-            text(c, ellip(game, h.fMed, 1.05f, nameMax), h.fMed, 1.05f, 0xD9FFFFFF, px, 6.9f * R, Paint.Align.LEFT, 0);
+            text(c, ellip(game, h.fMed, 1.05f, nameMax), h.fMed, 1.05f, Ui.WHITE_85, px, 6.9f * R, Paint.Align.LEFT, 0);
             if (live) { float tw = measure(when.replaceFirst("^LIVE · ", ""), h.fSemi, .95f, 0); p.setColor(LIVE_C); c.drawCircle(px + .27f * R, 8.5f * R, .27f * R, p);
                 text(c, ellip(when.replaceFirst("^LIVE · ", ""), h.fSemi, .95f, nameMax - R), h.fSemi, .95f, LIVE_C, px + .8f * R, 8.85f * R, Paint.Align.LEFT, 0); }
-            else text(c, ellip(when + (it.optString("tv").isEmpty() || post ? "" : " · " + it.optString("tv")), h.fSemi, .95f, nameMax), h.fSemi, .95f, post ? 0x99FFFFFF : GREEN, px, 8.85f * R, Paint.Align.LEFT, 0);
-        } else text(c, "No game this week", h.fMed, 1.05f, 0x99FFFFFF, px, 6.9f * R, Paint.Align.LEFT, 0);
+            else text(c, ellip(when + (it.optString("tv").isEmpty() || post ? "" : " · " + it.optString("tv")), h.fSemi, .95f, nameMax), h.fSemi, .95f, post ? Ui.WHITE_60 : GREEN, px, 8.85f * R, Paint.Align.LEFT, 0);
+        } else text(c, "No game this week", h.fMed, 1.05f, Ui.WHITE_60, px, 6.9f * R, Paint.Align.LEFT, 0);
         // the line so far, an injury, or the last alert
         String st = it.optString("status");
         float by = hh - 1.1f * R;
@@ -1851,27 +1851,27 @@ final class NativeSports extends FrameLayout {
         } else if (!it.optString("line").isEmpty()) {
             text(c, ellip(it.optString("line"), h.fSemi, 1f, w - 2 * px), h.fSemi, 1f, Color.WHITE, px, by, Paint.Align.LEFT, 0);
         } else if (!it.optString("last").isEmpty()) {
-            text(c, ellip("Last: " + it.optString("last"), h.fReg, .95f, w - 2 * px), h.fReg, .95f, 0xB3FFFFFF, px, by, Paint.Align.LEFT, 0);
+            text(c, ellip("Last: " + it.optString("last"), h.fReg, .95f, w - 2 * px), h.fReg, .95f, Ui.WHITE_75, px, by, Paint.Align.LEFT, 0);
         }
     }
 
     /** your team: points so far, the projection, who's still to play */
     private void paintTeam(Canvas c, JSONObject it, int w, int hh, Paint p) {
         p.setShader(new LinearGradient(0, 0, w, hh, 0xFF2A1F4D, 0xFF0E0B1E, Shader.TileMode.CLAMP)); c.drawRect(0, 0, w, hh, p); p.setShader(null);
-        p.setColor(0x14FFFFFF); for (float x = -hh; x < w; x += .7f * R) c.drawLine(x, hh, x + hh, 0, p);
+        p.setColor(Ui.WHITE_7); for (float x = -hh; x < w; x += .7f * R) c.drawLine(x, hh, x + hh, 0, p);
         boolean live = it.optInt("playing") > 0;
         p.setColor(live ? LIVE_C : 0xFF8E7BFF); c.drawRect(0, 0, w, live ? .22f * R : .14f * R, p);
         float px = 1.3f * R;
-        text(c, ellip(it.optString("name").toUpperCase(java.util.Locale.US), h.fSemi, .95f, w - 2 * px - 6 * R), h.fSemi, .95f, 0xB3FFFFFF, px, 2.1f * R, Paint.Align.LEFT, .06f);
-        if (it.optInt("week") > 0) text(c, "WEEK " + it.optInt("week"), h.fSemi, .95f, 0x8CFFFFFF, w - px, 2.1f * R, Paint.Align.RIGHT, .06f);
+        text(c, ellip(it.optString("name").toUpperCase(java.util.Locale.US), h.fSemi, .95f, w - 2 * px - 6 * R), h.fSemi, .95f, Ui.WHITE_75, px, 2.1f * R, Paint.Align.LEFT, .06f);
+        if (it.optInt("week") > 0) text(c, "WEEK " + it.optInt("week"), h.fSemi, .95f, Ui.WHITE_60, w - px, 2.1f * R, Paint.Align.RIGHT, .06f);
         text(c, it.optString("pts"), Typeface.create(h.fSemi, Typeface.BOLD_ITALIC), 4.2f, Color.WHITE, px, 7.2f * R, Paint.Align.LEFT, 0);
         float pw = measure(it.optString("pts"), Typeface.create(h.fSemi, Typeface.BOLD_ITALIC), 4.2f, 0);
-        text(c, "pts", h.fSemi, 1.2f, 0xB3FFFFFF, px + pw + .6f * R, 7.2f * R, Paint.Align.LEFT, 0);
+        text(c, "pts", h.fSemi, 1.2f, Ui.WHITE_75, px + pw + .6f * R, 7.2f * R, Paint.Align.LEFT, 0);
         if (!it.optString("proj").isEmpty()) text(c, "Projected " + it.optString("proj"), h.fSemi, 1.15f, 0xFFB9A8FF, px, 9.4f * R, Paint.Align.LEFT, 0);
         int left = it.optInt("left"), pl = it.optInt("playing");
         String st = (pl > 0 ? pl + " playing now" : "") + (pl > 0 && left > 0 ? " · " : "") + (left > 0 ? left + " yet to play" : "") + (pl == 0 && left == 0 ? "All done this week" : "");
         if (pl > 0) { p.setColor(LIVE_C); c.drawCircle(px + .27f * R, hh - 1.45f * R, .27f * R, p); }
-        text(c, st + "  ·  " + it.optString("scoring"), h.fMed, .95f, 0xCCFFFFFF, px + (pl > 0 ? .8f * R : 0), hh - 1.1f * R, Paint.Align.LEFT, 0);
+        text(c, st + "  ·  " + it.optString("scoring"), h.fMed, .95f, Ui.WHITE_85, px + (pl > 0 ? .8f * R : 0), hh - 1.1f * R, Paint.Align.LEFT, 0);
     }
 
     private void text(Canvas c, String s, Typeface tf, float sizeRem, int color, float x, float y, Paint.Align a, float spacing) {
@@ -1893,7 +1893,7 @@ final class NativeSports extends FrameLayout {
         final String key = it == null ? "" : "hero:" + it.optString("k") + ":" + Math.round(heroWidth) + ":" + (mine == null ? 0 : mine) + ":" + placesOf(it);
         if (key.equals(heroKey)) return;
         heroKey = key;
-        if (it == null || it.optBoolean("edit") && rows.size() <= 1) { for (ImageView v : hero) v.animate().alpha(0f).setDuration(250).start(); return; }
+        if (it == null || it.optBoolean("edit") && rows.size() <= 1) { for (ImageView v : hero) v.animate().alpha(0f).setDuration(Ui.BASE).start(); return; }
         Bitmap have = cards.get(key);
         if (have != null) { swapHero(have); return; }
         painter.execute(new Runnable() { @Override public void run() {
@@ -1917,7 +1917,7 @@ final class NativeSports extends FrameLayout {
         heroTop = next;
         // (Standings covers the scoreboard: a new scoreboard brought forward went over the tables)
         order();
-        nv.animate().alpha(1f).translationY(0).setDuration(300).setInterpolator(TileView.EASE).withEndAction(new Runnable() { @Override public void run() {
+        nv.animate().alpha(1f).translationY(0).setDuration(Ui.MOVE).setInterpolator(TileView.EASE).withEndAction(new Runnable() { @Override public void run() {
             if (heroTop == 1 - under || under < 0) { } if (under >= 0 && heroTop != under) hero[under].setAlpha(0f);
         } }).start();
     }
@@ -1939,28 +1939,28 @@ final class NativeSports extends FrameLayout {
         if (it.optBoolean("fyEdit")) {
             p.setShader(new LinearGradient(0, 0, w, 0, 0xE61A1430, 0xB30E0A1C, Shader.TileMode.CLAMP)); c.drawRect(0, 0, w, hh, p); p.setShader(null);
             text(c, "YOUR FANTASY TEAM", Typeface.create(h.fSemi, Typeface.BOLD_ITALIC), 2.6f, Color.WHITE, 3 * R, 6.5f * R, Paint.Align.LEFT, .03f);
-            text(c, "Pick your players on your phone: their games, live stat lines and injury news show here, and alerts pop up during games.", h.fReg, 1.3f, 0xBFFFFFFF, 3 * R, 9.5f * R, Paint.Align.LEFT, 0);
+            text(c, "Pick your players on your phone: their games, live stat lines and injury news show here, and alerts pop up during games.", h.fReg, 1.3f, Ui.WHITE_75, 3 * R, 9.5f * R, Paint.Align.LEFT, 0);
             text(c, "OK · Pick my players", h.fSemi, 1.1f, 0xFFB9A8FF, 3 * R, 12.6f * R, Paint.Align.LEFT, .04f);
             return out;
         }
         if (it.optBoolean("fyTeam")) {
             p.setShader(new LinearGradient(0, 0, w, 0, 0xE62A1F4D, 0xB30E0B1E, Shader.TileMode.CLAMP)); c.drawRect(0, 0, w, hh, p); p.setShader(null);
-            text(c, (it.optString("name") + (it.optInt("week") > 0 ? " · WEEK " + it.optInt("week") : "")).toUpperCase(java.util.Locale.US), h.fSemi, 1.1f, 0xB3FFFFFF, 3 * R, 4 * R, Paint.Align.LEFT, .08f);
+            text(c, (it.optString("name") + (it.optInt("week") > 0 ? " · WEEK " + it.optInt("week") : "")).toUpperCase(java.util.Locale.US), h.fSemi, 1.1f, Ui.WHITE_75, 3 * R, 4 * R, Paint.Align.LEFT, .08f);
             text(c, it.optString("pts") + " pts", Typeface.create(h.fSemi, Typeface.BOLD_ITALIC), 4.6f, Color.WHITE, 3 * R, 9.4f * R, Paint.Align.LEFT, 0);
             if (!it.optString("proj").isEmpty()) text(c, "Projected " + it.optString("proj"), h.fSemi, 1.5f, 0xFFB9A8FF, 3 * R, 12.2f * R, Paint.Align.LEFT, 0);
-            text(c, "Points worked out with " + it.optString("scoring") + " scoring (Settings › Sports › Fantasy scoring) · projections from ESPN", h.fReg, 1f, 0x99FFFFFF, 3 * R, 14.6f * R, Paint.Align.LEFT, 0);
+            text(c, "Points worked out with " + it.optString("scoring") + " scoring (Settings › Sports › Fantasy scoring) · projections from ESPN", h.fReg, 1f, Ui.WHITE_60, 3 * R, 14.6f * R, Paint.Align.LEFT, 0);
             return out;
         }
         if (it.optBoolean("fy") && (it.optJSONArray("teams") == null || it.optJSONArray("teams").length() < 2)) {
             p.setShader(new LinearGradient(0, 0, w, 0, 0xE6141C2B, 0xB30B111C, Shader.TileMode.CLAMP)); c.drawRect(0, 0, w, hh, p); p.setShader(null);
             text(c, it.optString("name").toUpperCase(java.util.Locale.US), Typeface.create(h.fSemi, Typeface.BOLD_ITALIC), 2.6f, Color.WHITE, 3 * R, 7 * R, Paint.Align.LEFT, .03f);
-            text(c, it.optString("pos") + " · " + it.optString("abbr") + " · no game on this week's schedule", h.fReg, 1.3f, 0xBFFFFFFF, 3 * R, 10 * R, Paint.Align.LEFT, 0);
+            text(c, it.optString("pos") + " · " + it.optString("abbr") + " · no game on this week's schedule", h.fReg, 1.3f, Ui.WHITE_75, 3 * R, 10 * R, Paint.Align.LEFT, 0);
             return out;
         }
         if (it.optBoolean("edit")) {
             p.setShader(new LinearGradient(0, 0, w, 0, 0xE6102018, 0xB30A1410, Shader.TileMode.CLAMP)); c.drawRect(0, 0, w, hh, p); p.setShader(null);
             text(c, "YOUR TEAMS, EVERYWHERE", Typeface.create(h.fSemi, Typeface.BOLD_ITALIC), 2.6f, Color.WHITE, 3 * R, 6.5f * R, Paint.Align.LEFT, .03f);
-            text(c, "Pick the sports and teams you follow: their games, live scores and the channel each one is on.", h.fReg, 1.3f, 0xBFFFFFFF, 3 * R, 9.5f * R, Paint.Align.LEFT, 0);
+            text(c, "Pick the sports and teams you follow: their games, live scores and the channel each one is on.", h.fReg, 1.3f, Ui.WHITE_75, 3 * R, 9.5f * R, Paint.Align.LEFT, 0);
             text(c, "OK · Edit sports & teams", h.fSemi, 1.1f, GREEN, 3 * R, 12.6f * R, Paint.Align.LEFT, .04f);
             return out;
         }
@@ -1979,8 +1979,8 @@ final class NativeSports extends FrameLayout {
         // floodlights
         glowAt(c, W * .12f, -H * .08f, W * .42f, H * .5f, 0x52DCEBFF);
         glowAt(c, W * .88f, -H * .08f, W * .42f, H * .5f, 0x52DCEBFF);
-        glowAt(c, W * .12f, -H * .02f, W * .06f, H * .05f, 0x99FFFFFF);
-        glowAt(c, W * .88f, -H * .02f, W * .06f, H * .05f, 0x99FFFFFF);
+        glowAt(c, W * .12f, -H * .02f, W * .06f, H * .05f, Ui.WHITE_60);
+        glowAt(c, W * .88f, -H * .02f, W * .06f, H * .05f, Ui.WHITE_60);
         // the field glowing up from below
         glowAt(c, W * .5f, H * 1.12f, W * .9f, H * .55f, 0x6628A050);
         // a perspective grid running across the turf (the "high tech" part)
@@ -2010,7 +2010,7 @@ final class NativeSports extends FrameLayout {
         }
         // shade behind the title and rows, so text reads on top of it
         Paint sh = new Paint();
-        sh.setShader(new LinearGradient(0, 0, 0, H, new int[] { 0x66000000, 0x00000000, 0x00000000, 0x8C000000 }, new float[] { 0, .2f, .5f, 1 }, Shader.TileMode.CLAMP));
+        sh.setShader(new LinearGradient(0, 0, 0, H, new int[] { Ui.BLACK_45, 0x00000000, 0x00000000, Ui.BLACK_55 }, new float[] { 0, .2f, .5f, 1 }, Shader.TileMode.CLAMP));
         c.drawRect(0, 0, W, H, sh);
         out.setHasAlpha(false);
         return out;

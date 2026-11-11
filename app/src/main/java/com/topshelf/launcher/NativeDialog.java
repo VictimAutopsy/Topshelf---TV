@@ -41,7 +41,7 @@ final class NativeDialog extends FrameLayout {
         h = host; R = host.R;
         Context c = getContext();
         scrim = new View(c);
-        scrim.setBackgroundColor(0x80000000);
+        scrim.setBackgroundColor(Ui.BLACK_55);
         addView(scrim, new LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.MATCH_PARENT));
         panel = glass;
         panel.setLiquidAllowed(false);
@@ -56,7 +56,7 @@ final class NativeDialog extends FrameLayout {
         bodyClip.setClipChildren(true);
         bodyCol = new LinearLayout(c);
         bodyCol.setOrientation(LinearLayout.VERTICAL);
-        body = h.text(h.fReg, 1.2f, 0xD9FFFFFF);
+        body = h.text(h.fReg, Ui.TEXT_M, Ui.WHITE_85);
         body.setLineSpacing(0, 1.35f);
         bodyCol.addView(body, new LinearLayout.LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT));
         table = new LinearLayout(c);
@@ -96,7 +96,7 @@ final class NativeDialog extends FrameLayout {
         btns.removeAllViews(); buttons.clear();
         JSONArray bs = o.optJSONArray("buttons");
         if (bs != null) for (int i = 0; i < bs.length(); i++) {
-            TextView b = h.text(h.fSemi, 1.25f, Color.WHITE);
+            TextView b = h.text(h.fSemi, Ui.TEXT_M, Color.WHITE);
             b.setText(bs.optString(i));
             b.setPadding(h.px(1.8f), h.px(.85f), h.px(1.8f), h.px(.85f));
             LinearLayout.LayoutParams l = new LinearLayout.LayoutParams(LayoutParams.WRAP_CONTENT, LayoutParams.WRAP_CONTENT);
@@ -127,7 +127,7 @@ final class NativeDialog extends FrameLayout {
         int toneCol = "good".equals(tone) ? 0xFF30D158 : "ok".equals(tone) ? 0xFFFF9F0A : "slow".equals(tone) ? 0xFFFF453A : 0;
         if (!head) {
             View dot = new View(getContext());
-            GradientDrawable d = new GradientDrawable(); d.setShape(GradientDrawable.OVAL); d.setColor(toneCol == 0 ? 0x33FFFFFF : toneCol); dot.setBackground(d);
+            GradientDrawable d = new GradientDrawable(); d.setShape(GradientDrawable.OVAL); d.setColor(toneCol == 0 ? Ui.WHITE_20 : toneCol); dot.setBackground(d);
             LinearLayout.LayoutParams dl = new LinearLayout.LayoutParams(h.px(.6f), h.px(.6f)); dl.rightMargin = h.px(.7f);
             r.addView(dot, dl);
         } else {
@@ -135,7 +135,7 @@ final class NativeDialog extends FrameLayout {
             r.addView(sp, new LinearLayout.LayoutParams(h.px(1.3f), 1));
         }
         for (int i = 0; cells != null && i < cells.length(); i++) {
-            TextView c = h.text(head ? h.fSemi : (i == 0 ? h.fMed : h.fReg), head ? .9f : 1f, head ? 0x99FFFFFF : i == 0 ? 0xE6FFFFFF : 0xCCFFFFFF);
+            TextView c = h.text(head ? h.fSemi : (i == 0 ? h.fMed : h.fReg), head ? .9f : 1f, head ? Ui.WHITE_60 : i == 0 ? Ui.WHITE_95 : Ui.WHITE_85);
             c.setText(cells.optString(i));
             c.setSingleLine(true); c.setEllipsize(android.text.TextUtils.TruncateAt.END);
             c.setGravity(i == 0 ? Gravity.START : Gravity.END);
@@ -153,26 +153,26 @@ final class NativeDialog extends FrameLayout {
         for (int i = 0; i < buttons.size(); i++) {
             TextView b = buttons.get(i);
             boolean on = i == sel;
-            b.setBackground(GlassPanel.buttonBg(on, 2 * R, 0x1FFFFFFF));
+            b.setBackground(GlassPanel.buttonBg(on, 2 * R, Ui.WHITE_12));
             b.setTextColor(GlassPanel.buttonText(on));
             float s = on && !GlassPanel.look.equals("air") ? 1.05f : 1f;
-            b.animate().scaleX(s).scaleY(s).setDuration(180).setInterpolator(TileView.EASE).start();
+            b.animate().scaleX(s).scaleY(s).setDuration(Ui.FAST).setInterpolator(TileView.EASE).start();
         }
     }
 
     void show() {
         shown = true;
         setVisibility(VISIBLE);
-        scrim.setAlpha(0f); scrim.animate().alpha(1f).setDuration(250).start();
+        scrim.setAlpha(0f); scrim.animate().alpha(1f).setDuration(Ui.BASE).start();
         panel.setAlpha(0f); panel.setScaleX(.94f); panel.setScaleY(.94f);
-        panel.animate().alpha(1f).scaleX(1f).scaleY(1f).setDuration(320).setInterpolator(TileView.SPRING).start();
+        panel.animate().alpha(1f).scaleX(1f).scaleY(1f).setDuration(Ui.MOVE).setInterpolator(TileView.SPRING).start();
         panel.refreshTint();
     }
     void hide() {
         if (!shown) return;
         shown = false;
-        scrim.animate().alpha(0f).setDuration(200).start();
-        panel.animate().alpha(0f).scaleX(.96f).scaleY(.96f).setDuration(200)
+        scrim.animate().alpha(0f).setDuration(Ui.FAST).start();
+        panel.animate().alpha(0f).scaleX(.96f).scaleY(.96f).setDuration(Ui.FAST)
                 .withEndAction(new Runnable() { @Override public void run() { if (!shown) setVisibility(GONE); } }).start();
     }
 
@@ -182,7 +182,7 @@ final class NativeDialog extends FrameLayout {
         else if (d == 'u' || d == 'd') {
             float max = Math.max(0, bodyCol.getHeight() - bodyClip.getHeight());
             float to = Math.max(-max, Math.min(0, bodyCol.getTranslationY() + (d == 'u' ? 1 : -1) * 6 * R));
-            bodyCol.animate().translationY(to).setDuration(220).setInterpolator(TileView.EASE).start();
+            bodyCol.animate().translationY(to).setDuration(Ui.FAST).setInterpolator(TileView.EASE).start();
         }
     }
     /** a finger (phones): a button tapped is chosen (OK then presses it) */

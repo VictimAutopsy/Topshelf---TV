@@ -47,8 +47,8 @@ final class NativeStats extends View {
     NativeStats(NativeHome host) {
         super(host.getContext());
         h = host; R = host.R;
-        tTiny.setTypeface(h.fMed); tTiny.setTextSize(.88f * R); tTiny.setColor(0x99FFFFFF); tTiny.setLetterSpacing(.06f);
-        tSmall.setTypeface(h.fReg); tSmall.setTextSize(.95f * R); tSmall.setColor(0xA6FFFFFF);
+        tTiny.setTypeface(h.fMed); tTiny.setTextSize(.88f * R); tTiny.setColor(Ui.WHITE_60); tTiny.setLetterSpacing(.06f);
+        tSmall.setTypeface(h.fReg); tSmall.setTextSize(.95f * R); tSmall.setColor(Ui.WHITE_60);
         tBody.setTypeface(h.fMed); tBody.setTextSize(1.08f * R); tBody.setColor(Color.WHITE);
         tBold.setTypeface(h.fSemi); tBold.setTextSize(1.3f * R); tBold.setColor(Color.WHITE);
         tBig.setTypeface(h.fSemi); tBig.setTextSize(1.75f * R); tBig.setColor(Color.WHITE);
@@ -69,7 +69,7 @@ final class NativeStats extends View {
             shown = true;
             setVisibility(VISIBLE);
             setAlpha(0f); setTranslationX(3 * R);
-            animate().alpha(1f).translationX(0).setDuration(260).setInterpolator(TileView.EASE).start();
+            animate().alpha(1f).translationX(0).setDuration(Ui.BASE).setInterpolator(TileView.EASE).start();
         }
         gen++;
         refresh(gen);
@@ -78,7 +78,7 @@ final class NativeStats extends View {
     void close() {
         if (!shown) return;
         shown = false; gen++;
-        animate().alpha(0f).translationX(3 * R).setDuration(200).withEndAction(new Runnable() { @Override public void run() { if (!shown) setVisibility(GONE); } }).start();
+        animate().alpha(0f).translationX(3 * R).setDuration(Ui.FAST).withEndAction(new Runnable() { @Override public void run() { if (!shown) setVisibility(GONE); } }).start();
     }
     /** the page found (or didn't find) the game while the panel is open */
     void gameFound(JSONObject g) { if (shown) open(g, false); }
@@ -104,7 +104,7 @@ final class NativeStats extends View {
         scrollTo = Math.max(0, Math.min(max, scrollTo + dir * 6.9f * R));
         final float from = scroll;
         android.animation.ValueAnimator a = android.animation.ValueAnimator.ofFloat(0, 1);
-        a.setDuration(200); a.setInterpolator(TileView.EASE);
+        a.setDuration(Ui.FAST); a.setInterpolator(TileView.EASE);
         a.addUpdateListener(new android.animation.ValueAnimator.AnimatorUpdateListener() { @Override public void onAnimationUpdate(android.animation.ValueAnimator v) { scroll = from + (scrollTo - from) * (Float) v.getAnimatedValue(); invalidate(); } });
         a.start();
     }
@@ -328,14 +328,14 @@ final class NativeStats extends View {
         if (w == 0) return;
         rf.set(0, 0, w, hh);
         fill.setColor(0xEB0D0E13); c.drawRoundRect(rf, 2 * R, 2 * R, fill);
-        fill.setStyle(Paint.Style.STROKE); fill.setStrokeWidth(Math.max(1, .1f * R)); fill.setColor(0x24FFFFFF);
+        fill.setStyle(Paint.Style.STROKE); fill.setStrokeWidth(Math.max(1, .1f * R)); fill.setColor(Ui.WHITE_12);
         rf.inset(.05f * R, .05f * R); c.drawRoundRect(rf, 2 * R, 2 * R, fill); fill.setStyle(Paint.Style.FILL);
         float pad = 2.2f * R, x0 = pad, x1 = w - pad;
         float y = pad;
         // the title line
         tTiny.setColor(SportsLook.LIVE);
         c.drawText("LIVE STATS", x0, y + tTiny.getTextSize(), tTiny);
-        tTiny.setColor(0x99FFFFFF);
+        tTiny.setColor(Ui.WHITE_60);
         y += 1.9f * R;
         if (game != null && game.optBoolean("card")) { drawCard(c, x0, x1, y, hh, pad); return; }
         Model m = model;
@@ -355,9 +355,9 @@ final class NativeStats extends View {
             rf.set(x0, y + .35f * R, x0 + .4f * R, y + 2.7f * R); c.drawRoundRect(rf, .2f * R, .2f * R, fill);
             c.drawText(abbr, x0 + 1.2f * R, y + 1.9f * R, tBig);
             float aw = tBig.measureText(abbr) + 1.9f * R;
-            tSmall.setColor(0x99FFFFFF);
+            tSmall.setColor(Ui.WHITE_60);
             c.drawText(ell(name, tSmall, x1 - x0 - aw - 6 * R), x0 + aw, y + 1.85f * R, tSmall);
-            tSmall.setColor(0xA6FFFFFF);
+            tSmall.setColor(Ui.WHITE_60);
             c.drawText(score == null ? "" : score, x1, y + 2.2f * R, tScore);
             y += 3.2f * R;
         }
@@ -369,8 +369,8 @@ final class NativeStats extends View {
             Model.Side s = m.sides[i];
             rf.set(x0 + i * (tabW + R), y, x0 + i * (tabW + R) + tabW, y + 2.6f * R);
             boolean on = i == side;
-            fill.setColor(on ? Color.WHITE : 0x14FFFFFF); c.drawRoundRect(rf, 1.3f * R, 1.3f * R, fill);
-            tBody.setColor(on ? 0xFF111111 : 0xCCFFFFFF);
+            fill.setColor(on ? Color.WHITE : Ui.WHITE_7); c.drawRoundRect(rf, 1.3f * R, 1.3f * R, fill);
+            tBody.setColor(on ? 0xFF111111 : Ui.WHITE_85);
             String lab = (i == 0 ? "◀  " : "") + (s.abbr.isEmpty() ? (i == 0 ? "Away" : "Home") : s.abbr) + " players" + (i == 1 ? "  ▶" : "");
             tBody.setTextAlign(Paint.Align.CENTER);
             c.drawText(lab, rf.centerX(), rf.centerY() + tBody.getTextSize() * .36f, tBody);
@@ -383,31 +383,31 @@ final class NativeStats extends View {
         c.save(); c.clipRect(0, top, w, bottom);
         float cy = top - scroll;
         Model.Side s = m.sides[side];
-        if (s.groups.isEmpty()) { tSmall.setColor(0x99FFFFFF); c.drawText("No player stats yet — they appear once the game starts.", x0, cy + 1.2f * R, tSmall); tSmall.setColor(0xA6FFFFFF); }
+        if (s.groups.isEmpty()) { tSmall.setColor(Ui.WHITE_60); c.drawText("No player stats yet — they appear once the game starts.", x0, cy + 1.2f * R, tSmall); tSmall.setColor(Ui.WHITE_60); }
         float colW = 4.3f * R;
         for (Model.Group g : s.groups) {
             int nc = g.cols.length;
             float valX0 = x1 - nc * colW;
             // the group's title and column names
-            tTiny.setColor(0xB3FFFFFF);
+            tTiny.setColor(Ui.WHITE_75);
             c.drawText(g.title.toUpperCase(Locale.US), x0, cy + 1.5f * R, tTiny);
             tTiny.setTextAlign(Paint.Align.RIGHT);
             for (int k = 0; k < nc; k++) c.drawText(g.cols[k], valX0 + (k + 1) * colW, cy + 1.5f * R, tTiny);
-            tTiny.setTextAlign(Paint.Align.LEFT); tTiny.setColor(0x99FFFFFF);
+            tTiny.setTextAlign(Paint.Align.LEFT); tTiny.setColor(Ui.WHITE_60);
             cy += 2.3f * R;
-            fill.setColor(0x1FFFFFFF); c.drawRect(x0, cy - .45f * R, x1, cy - .45f * R + Math.max(1, .08f * R), fill);
+            fill.setColor(Ui.WHITE_12); c.drawRect(x0, cy - .45f * R, x1, cy - .45f * R + Math.max(1, .08f * R), fill);
             for (Model.Row r : g.rows) {
                 float rh = 2.3f * R;
                 if (cy + rh > top - rh && cy < bottom + rh) {
                     if (r.active) { fill.setColor(SportsLook.LIVE); c.drawCircle(x0 + .3f * R, cy + 1.05f * R, .26f * R, fill); }
-                    tBody.setColor(r.out ? 0x66FFFFFF : Color.WHITE);
+                    tBody.setColor(r.out ? Ui.WHITE_40 : Color.WHITE);
                     float nameW = valX0 - x0 - 1.2f * R - 4.2f * R;
                     c.drawText(ell(r.name, tBody, nameW), x0 + 1.1f * R, cy + 1.35f * R, tBody);
                     tSmall.setColor(0x73FFFFFF);
                     c.drawText(ell(r.sub, tSmall, 4.2f * R), x0 + 1.1f * R + Math.min(nameW, tBody.measureText(ell(r.name, tBody, nameW))) + .7f * R, cy + 1.35f * R, tSmall);
-                    tSmall.setColor(0xA6FFFFFF);
+                    tSmall.setColor(Ui.WHITE_60);
                     tBody.setTextAlign(Paint.Align.RIGHT);
-                    if (r.out) { tBody.setColor(0x66FFFFFF); c.drawText("DNP", x1, cy + 1.35f * R, tBody); }
+                    if (r.out) { tBody.setColor(Ui.WHITE_40); c.drawText("DNP", x1, cy + 1.35f * R, tBody); }
                     else for (int k = 0; k < nc; k++) c.drawText(r.vals[k] == null ? "" : r.vals[k], valX0 + (k + 1) * colW, cy + 1.35f * R, tBody);
                     tBody.setTextAlign(Paint.Align.LEFT); tBody.setColor(Color.WHITE);
                 }
@@ -424,16 +424,16 @@ final class NativeStats extends View {
 
     private void drawCard(Canvas c, float x0, float x1, float y, int hh, float pad) {
         JSONArray bs = game.optJSONArray("bouts");
-        tSmall.setColor(0xA6FFFFFF);
+        tSmall.setColor(Ui.WHITE_60);
         c.drawText(ell(game.optString("name", game.optString("short")), tSmall, x1 - x0), x0, y + tSmall.getTextSize(), tSmall);
         y += 2.2f * R;
         JSONObject b = bs != null && bout < bs.length() ? bs.optJSONObject(bout) : null;
         if (b == null) { drawStatus(c, x0, x1, y + R); return; }
         JSONArray fs = b.optJSONArray("fighters");
         String st = b.optString("state");
-        tTiny.setColor(st.equals("in") ? SportsLook.LIVE : 0x99FFFFFF);
+        tTiny.setColor(st.equals("in") ? SportsLook.LIVE : Ui.WHITE_60);
         c.drawText((st.equals("in") ? "● ON NOW" : st.equals("post") ? "RESULT" : "UP NEXT") + "  ·  " + b.optString("cls") + (b.optString("detail").isEmpty() ? "" : "  ·  " + b.optString("detail")), x0, y + tTiny.getTextSize(), tTiny);
-        tTiny.setColor(0x99FFFFFF);
+        tTiny.setColor(Ui.WHITE_60);
         y += 2 * R;
         // the two fighters, side by side
         float colW = (x1 - x0) / 2;
@@ -445,10 +445,10 @@ final class NativeStats extends View {
             tBold.setTextAlign(al); tSmall.setTextAlign(al);
             String nm = f.optString("name");
             int sp = nm.lastIndexOf(' ');
-            tSmall.setColor(0x99FFFFFF);
+            tSmall.setColor(Ui.WHITE_60);
             c.drawText(ell(sp > 0 ? nm.substring(0, sp) : "", tSmall, colW - R), cx, y + tSmall.getTextSize(), tSmall);
             c.drawText(ell(sp > 0 ? nm.substring(sp + 1) : nm, tBig, colW - R), cx, y + 3.2f * R, setAlign(tBig, al));
-            tSmall.setColor(f.optBoolean("winner") ? SportsLook.GREEN : 0xA6FFFFFF);
+            tSmall.setColor(f.optBoolean("winner") ? SportsLook.GREEN : Ui.WHITE_60);
             c.drawText((f.optBoolean("winner") ? "Winner · " : "") + f.optString("rec"), cx, y + 4.8f * R, tSmall);
             tBold.setTextAlign(Paint.Align.LEFT); tSmall.setTextAlign(Paint.Align.LEFT); tBig.setTextAlign(Paint.Align.LEFT);
             List<String[]> p = profiles.get(f.optString("id"));
@@ -460,7 +460,7 @@ final class NativeStats extends View {
         for (List<String[]> p : new List[] { pa, pb }) if (p != null) for (String[] r : p) if (!labels.contains(r[0])) labels.add(r[0]);
         float cardTop = hh - 3.2f * R - Math.min(bs.length(), 6) * 2.2f * R - 2.4f * R;
         if (labels.isEmpty()) {
-            tSmall.setColor(0x99FFFFFF); c.drawText(pa == null && pb == null ? "" : "Loading the fighters' profiles…", x0, y + R, tSmall);
+            tSmall.setColor(Ui.WHITE_60); c.drawText(pa == null && pb == null ? "" : "Loading the fighters' profiles…", x0, y + R, tSmall);
         }
         for (String lab : labels) {
             if (y + 2.2f * R > cardTop) break;
@@ -473,7 +473,7 @@ final class NativeStats extends View {
         }
         // the card (▲▼ picks a bout)
         float cy = cardTop;
-        tTiny.setColor(0x99FFFFFF); c.drawText("THE CARD", x0, cy + 1.2f * R, tTiny);
+        tTiny.setColor(Ui.WHITE_60); c.drawText("THE CARD", x0, cy + 1.2f * R, tTiny);
         cy += 2.2f * R;
         int first = Math.max(0, Math.min(bout - 2, bs.length() - 6));
         for (int i = first; i < Math.min(bs.length(), first + 6); i++) {
@@ -481,13 +481,13 @@ final class NativeStats extends View {
             JSONArray ff = bb.optJSONArray("fighters");
             String vs = ff != null && ff.length() == 2 ? last(ff.optJSONObject(0).optString("name")) + " vs " + last(ff.optJSONObject(1).optString("name")) : "?";
             boolean on = i == bout;
-            if (on) { fill.setColor(0x1FFFFFFF); rf.set(x0 - .6f * R, cy, x1 + .6f * R, cy + 2f * R); c.drawRoundRect(rf, .6f * R, .6f * R, fill); }
+            if (on) { fill.setColor(Ui.WHITE_12); rf.set(x0 - .6f * R, cy, x1 + .6f * R, cy + 2f * R); c.drawRoundRect(rf, .6f * R, .6f * R, fill); }
             String s2 = bb.optString("state");
-            tBody.setColor(on ? Color.WHITE : 0xB3FFFFFF);
+            tBody.setColor(on ? Color.WHITE : Ui.WHITE_75);
             c.drawText(ell(vs, tBody, (x1 - x0) * .62f), x0 + .2f * R, cy + 1.4f * R, tBody);
-            tSmall.setTextAlign(Paint.Align.RIGHT); tSmall.setColor(s2.equals("in") ? SportsLook.LIVE : 0x80FFFFFF);
+            tSmall.setTextAlign(Paint.Align.RIGHT); tSmall.setColor(s2.equals("in") ? SportsLook.LIVE : Ui.WHITE_50);
             c.drawText(s2.equals("in") ? "● Live" : s2.equals("post") ? "Final" : bb.optString("cls"), x1 - .2f * R, cy + 1.4f * R, tSmall);
-            tSmall.setTextAlign(Paint.Align.LEFT); tSmall.setColor(0xA6FFFFFF);
+            tSmall.setTextAlign(Paint.Align.LEFT); tSmall.setColor(Ui.WHITE_60);
             cy += 2.2f * R;
         }
         tBody.setColor(Color.WHITE);
@@ -499,7 +499,7 @@ final class NativeStats extends View {
 
     private void drawStatus(Canvas c, float x0, float x1, float y) {
         if (status.isEmpty()) return;
-        tBody.setColor(0xCCFFFFFF);
+        tBody.setColor(Ui.WHITE_85);
         for (String line : status.split("\n")) {
             android.text.StaticLayout sl = new android.text.StaticLayout(line, tBody, (int) (x1 - x0), android.text.Layout.Alignment.ALIGN_NORMAL, 1.15f, 0, false);
             c.save(); c.translate(x0, y); sl.draw(c); c.restore();
@@ -508,7 +508,7 @@ final class NativeStats extends View {
         tBody.setColor(Color.WHITE);
     }
     private void drawFoot(Canvas c, float x0, float x1, int hh, String hint) {
-        tTiny.setColor(0x80FFFFFF);
+        tTiny.setColor(Ui.WHITE_50);
         c.drawText(hint, x0, hh - 1.4f * R, tTiny);
         if (updatedAt > 0) {
             tTiny.setTextAlign(Paint.Align.RIGHT);
@@ -516,7 +516,7 @@ final class NativeStats extends View {
             c.drawText(s < 5 ? "Updated just now" : "Updated " + s + " s ago", x1, hh - 1.4f * R, tTiny);
             tTiny.setTextAlign(Paint.Align.LEFT);
         }
-        tTiny.setColor(0x99FFFFFF);
+        tTiny.setColor(Ui.WHITE_60);
     }
     private static String ell(String s, TextPaint p, float w) { return s == null ? "" : TextUtils.ellipsize(s, p, Math.max(1, w), TextUtils.TruncateAt.END).toString(); }
     private static int parse(String hex, int def) { try { return hex == null || hex.length() != 6 ? def : 0xFF000000 | Integer.parseInt(hex, 16); } catch (Exception e) { return def; } }

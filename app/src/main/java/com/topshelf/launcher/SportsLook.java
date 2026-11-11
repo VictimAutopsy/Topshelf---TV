@@ -33,7 +33,7 @@ final class SportsLook {
     static final int INK = 0xFFF2F5F8, SOFT = 0xFFDCE3EA, SUB = 0xFFAEB8C4, TER = 0xFF8E99A8, FAINT = 0xFF6B7787;
     static final int GOLD = 0xFFFFC23D, LIVE = 0xFFFF7A59, ON_LIVE = 0xFF160400, GREEN = 0xFF3DDC84, RED = 0xFFFF6B6B;
     /** the ring round what the remote is on */
-    static final int RING = 0xE6FFFFFF;
+    static final int RING = Ui.WHITE_95;
     static final float RING_W = .16f;
 
     // ------------------------------------------------------------------ type
@@ -59,7 +59,7 @@ final class SportsLook {
     static void ctrl(Canvas c, Paint p, RectF r, float R, boolean chosen) {
         float rad = ctrlRadius(r.height());
         p.setStyle(Paint.Style.FILL);
-        p.setColor(chosen ? GlassPanel.selFill() : 0x14FFFFFF);
+        p.setColor(chosen ? GlassPanel.selFill() : Ui.WHITE_7);
         c.drawRoundRect(r, rad, rad, p);
         if (!chosen) {
             p.setStyle(Paint.Style.STROKE); p.setStrokeWidth(Math.max(1, .08f * R)); p.setColor(CHIP_EDGE);

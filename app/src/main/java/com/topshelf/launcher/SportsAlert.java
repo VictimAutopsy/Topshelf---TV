@@ -60,11 +60,11 @@ final class SportsAlert extends FrameLayout {
         mid.setOrientation(LinearLayout.VERTICAL);
         mid.setGravity(Gravity.CENTER_HORIZONTAL);
         mid.setPadding(h.px(2), h.px(1.2f), h.px(2), h.px(1.3f));
-        kicker = h.text(h.fSemi, 1.05f, SportsLook.GOLD); kicker.setLetterSpacing(.14f); kicker.setGravity(Gravity.CENTER);
+        kicker = h.text(h.fSemi, Ui.TEXT_S, SportsLook.GOLD); kicker.setLetterSpacing(.14f); kicker.setGravity(Gravity.CENTER);
         headline = h.text(cond, 2.6f, Color.WHITE); headline.setGravity(Gravity.CENTER); headline.setSingleLine(true); headline.setEllipsize(android.text.TextUtils.TruncateAt.END);
         headline.setFontFeatureSettings("tnum");
-        line = h.text(h.fMed, 1.3f, 0xE6FFFFFF); line.setGravity(Gravity.CENTER); line.setMaxLines(2); line.setEllipsize(android.text.TextUtils.TruncateAt.END);
-        hint = h.text(h.fSemi, 1.15f, 0xFF111418); hint.setGravity(Gravity.CENTER);
+        line = h.text(h.fMed, Ui.TEXT_L, Ui.WHITE_95); line.setGravity(Gravity.CENTER); line.setMaxLines(2); line.setEllipsize(android.text.TextUtils.TruncateAt.END);
+        hint = h.text(h.fSemi, Ui.TEXT_M, 0xFF111418); hint.setGravity(Gravity.CENTER);
         GradientDrawable hb = new GradientDrawable(); hb.setColor(Color.WHITE); hb.setCornerRadius(1.2f * h.R);
         hint.setBackground(hb); hint.setPadding(h.px(1.4f), h.px(.35f), h.px(1.4f), h.px(.35f));
         mid.addView(kicker, new LinearLayout.LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT));
@@ -102,7 +102,7 @@ final class SportsAlert extends FrameLayout {
         bringToFront();
         up = true;
         card.animate().cancel();
-        card.animate().translationY(0).alpha(1f).setDuration(420).setInterpolator(TileView.SPRING).start();
+        card.animate().translationY(0).alpha(1f).setDuration(Ui.SLIDE).setInterpolator(TileView.SPRING).start();
         removeCallbacks(autoHide);
         postDelayed(autoHide, ms);
         h.act.haptic();
@@ -141,7 +141,7 @@ final class SportsAlert extends FrameLayout {
         up = false; onOk = null;
         removeCallbacks(autoHide);
         card.animate().cancel();
-        card.animate().translationY(-h.px(14)).alpha(0f).setDuration(260).setInterpolator(TileView.EASE).withEndAction(new Runnable() { @Override public void run() {
+        card.animate().translationY(-h.px(14)).alpha(0f).setDuration(Ui.BASE).setInterpolator(TileView.EASE).withEndAction(new Runnable() { @Override public void run() {
             if (up) return;
             setVisibility(GONE);
             Runnable a = after; after = null;

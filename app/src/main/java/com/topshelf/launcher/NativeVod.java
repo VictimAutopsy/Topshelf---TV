@@ -216,7 +216,7 @@ final class NativeVod extends FrameLayout {
         label.setTextSize(android.util.TypedValue.COMPLEX_UNIT_PX, 3.2f * R);
         label.setIncludeFontPadding(false);
         label.setLetterSpacing(-.02f);
-        label.setShadowLayer(.8f * R, 0, .1f * R, 0x73000000);
+        label.setShadowLayer(.8f * R, 0, .1f * R, Ui.BLACK_45);
         addView(label, h.at(PAD, 2.5f, LayoutParams.WRAP_CONTENT, LayoutParams.WRAP_CONTENT));
 
         hero = new LinearLayout(getContext());
@@ -229,11 +229,11 @@ final class NativeVod extends FrameLayout {
         heroTitle = h.text(h.fSemi, 4.6f, Color.WHITE);
         heroTitle.setLetterSpacing(-.02f);
         heroTitle.setMaxLines(2); heroTitle.setEllipsize(TextUtils.TruncateAt.END);
-        heroTitle.setShadowLayer(1.2f * R, 0, .2f * R, 0x80000000);
+        heroTitle.setShadowLayer(1.2f * R, 0, .2f * R, Ui.BLACK_55);
         hero.addView(heroTitle);
         LinearLayout metaRow = new LinearLayout(getContext());
         metaRow.setGravity(Gravity.CENTER_VERTICAL);
-        heroChip = h.text(h.fSemi, 1.25f, Color.WHITE);
+        heroChip = h.text(h.fSemi, Ui.TEXT_M, Color.WHITE);
         heroChip.setText("✓ My List");
         heroChip.setPadding(h.px(.8f), h.px(.25f), h.px(.8f), h.px(.25f));
         LinearLayout.LayoutParams chl = new LinearLayout.LayoutParams(LayoutParams.WRAP_CONTENT, LayoutParams.WRAP_CONTENT); chl.rightMargin = h.px(1);
@@ -243,13 +243,13 @@ final class NativeVod extends FrameLayout {
         metaRow.addView(heroMeta);
         LinearLayout.LayoutParams ml = new LinearLayout.LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT); ml.topMargin = h.px(1.1f);
         hero.addView(metaRow, ml);
-        heroDesc = h.text(h.fReg, 1.6f, 0xC7FFFFFF);
+        heroDesc = h.text(h.fReg, 1.6f, Ui.WHITE_75);
         heroDesc.setMaxLines(3); heroDesc.setEllipsize(TextUtils.TruncateAt.END);
         heroDesc.setLineSpacing(0, 1.22f);
-        heroDesc.setShadowLayer(.6f * R, 0, .1f * R, 0x80000000);
+        heroDesc.setShadowLayer(.6f * R, 0, .1f * R, Ui.BLACK_55);
         LinearLayout.LayoutParams dl = new LinearLayout.LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT); dl.topMargin = h.px(.8f);
         hero.addView(heroDesc, dl);
-        heroHint = h.text(h.fMed, 1.3f, 0x8CFFFFFF);
+        heroHint = h.text(h.fMed, Ui.TEXT_L, Ui.WHITE_60);
         heroHint.setLetterSpacing(.02f);
         heroHint.setText("OK · Open in Nuvio  ·  hold OK · More");
         LinearLayout.LayoutParams hl = new LinearLayout.LayoutParams(LayoutParams.WRAP_CONTENT, LayoutParams.WRAP_CONTENT); hl.topMargin = h.px(1);
@@ -284,7 +284,7 @@ final class NativeVod extends FrameLayout {
         else cwChanged();
         refreshUpcoming(false);
         setAlpha(0f);
-        animate().alpha(1f).setDuration(350).start();     // (no ready-made picture: see hasOverlappingRendering)
+        animate().alpha(1f).setDuration(Ui.SLIDE).start();     // (no ready-made picture: see hasOverlappingRendering)
     }
 
     /* Backdrops have a worker of their own (they waited behind dozens of posters before). */
@@ -331,7 +331,7 @@ final class NativeVod extends FrameLayout {
         // Live TV then has to fall back to Android's slow software decoder
         if (trailer != null) { trailer.release(); trailer = null; }
         main().removeCallbacks(bgLater); main().removeCallbacks(heroLater);
-        animate().alpha(0f).setDuration(250).withLayer().withEndAction(new Runnable() { @Override public void run() { if (!shown) { setVisibility(INVISIBLE); release(); } } }).start();
+        animate().alpha(0f).setDuration(Ui.BASE).withLayer().withEndAction(new Runnable() { @Override public void run() { if (!shown) { setVisibility(INVISIBLE); release(); } } }).start();
     }
     /* Off screen, Movies & TV let go of their posters and backdrops (each tab visited kept ~20 MB of pictures in graphics
        memory, the whole session); the rows' lists stay, so coming back rebuilds the pictures near you in a moment. */
@@ -366,13 +366,13 @@ final class NativeVod extends FrameLayout {
         chipBg = mv ? 0x40FFB340 : 0x3864D2FF;
         chipFg = mv ? 0xFFFFD99C : 0xFFC2EFFF;
         rad = (mv ? .7f : 1.4f) * R;
-        if (shelves()) { rad = 1.1f * R; ring = 0xE6FFFFFF; glowCol = 0x40FFFFFF; }
+        if (shelves()) { rad = 1.1f * R; ring = Ui.WHITE_95; glowCol = Ui.WHITE_25; }
         // the card you're on, in each look: On Air's square cards with the red outline, the shelf's light,
         // Photo Ink's pale paper, Spotlight's bright white glow
         String lk = GlassPanel.look;
         if (lk.equals("air")) { rad = 0; ring = GlassPanel.airColor; glowCol = 0x59E8412F; }
-        else if (lk.equals("shelf")) { rad = Math.min(rad, .5f * R); ring = GlassPanel.shelfLight(); glowCol = (GlassPanel.shelfLight() & 0x00FFFFFF) | 0x73000000; }
-        else if (lk.equals("ink")) { rad = Math.min(rad, .6f * R); ring = GlassPanel.inkPaper(); glowCol = (GlassPanel.inkColor & 0x00FFFFFF) | 0x8C000000; }
+        else if (lk.equals("shelf")) { rad = Math.min(rad, .5f * R); ring = GlassPanel.shelfLight(); glowCol = (GlassPanel.shelfLight() & 0x00FFFFFF) | Ui.BLACK_45; }
+        else if (lk.equals("ink")) { rad = Math.min(rad, .6f * R); ring = GlassPanel.inkPaper(); glowCol = (GlassPanel.inkColor & 0x00FFFFFF) | Ui.BLACK_55; }
         else if (lk.equals("spot")) { ring = 0xFFFFFFFF; glowCol = 0x73FFFFFF; }
         label.setText(mv ? "Movies" : "TV Shows");
         if (lk.equals("air")) { label.setAllCaps(true); label.setLetterSpacing(.04f); }
@@ -391,7 +391,7 @@ final class NativeVod extends FrameLayout {
     private void shadeLabel() {
         int w = label.getWidth();
         if (w == 0) return;
-        if (shelves()) { label.getPaint().setShader(null); label.setTextColor(0xF2FFFFFF); label.invalidate(); return; }
+        if (shelves()) { label.getPaint().setShader(null); label.setTextColor(Ui.WHITE_95); label.invalidate(); return; }
         boolean mv = type.equals("movie");
         int[] c = mv ? new int[] { 0xFFFFE0A8, 0xFFFFB340, 0xFFFF7A3D } : new int[] { 0xFFA6ECFF, 0xFF64D2FF, 0xFF8E8CFF };
         label.getPaint().setShader(new LinearGradient(0, 0, w, 0, c, new float[] { 0, .55f, 1 }, Shader.TileMode.CLAMP));
@@ -501,7 +501,7 @@ final class NativeVod extends FrameLayout {
         x.titleV = h.text(h.fSemi, mv ? 1.4f : 1.8f, mv ? 0xFFFFCF8A : 0xEBFFFFFF);
         x.titleV.setText(mv ? x.title.toUpperCase(Locale.US) : x.title);
         if (mv) x.titleV.setLetterSpacing(.16f);
-        x.titleV.setShadowLayer(.6f * R, 0, .1f * R, 0x99000000);
+        x.titleV.setShadowLayer(.6f * R, 0, .1f * R, Ui.BLACK_60);
         if (!mv) {
             GradientDrawable bar = new GradientDrawable(GradientDrawable.Orientation.TOP_BOTTOM, new int[] { 0xFF64D2FF, 0xFF8E8CFF });
             bar.setCornerRadius(.3f * R); bar.setBounds(0, 0, h.px(.45f), h.px(1.65f));
@@ -514,7 +514,7 @@ final class NativeVod extends FrameLayout {
             x.titleV.setCompoundDrawables(null, null, null, null);
             x.titleV.setTextSize(android.util.TypedValue.COMPLEX_UNIT_PX, 1.7f * R);
             x.titleV.setTypeface(h.fSemi);
-            x.titleV.setTextColor(0xF2FFFFFF);
+            x.titleV.setTextColor(Ui.WHITE_95);
         }
         if (GlassPanel.look.equals("air")) {
             // On Air: the row's name as a lower-third label: capitals beside a red tab
@@ -539,7 +539,7 @@ final class NativeVod extends FrameLayout {
         x.view.addView(x.strip, h.at(0, 3.2f, h.px(Math.max(h.SW, PAD * 2 + 200 * pitch(x))), h.px(rowH(x) - 3.2f)));
         x.strip.setTranslationX(-h.px(x.scroll));
         if (x.items != null && x.items.isEmpty()) {
-            TextView e = h.text(h.fMed, 1.4f, 0x8CFFFFFF);
+            TextView e = h.text(h.fMed, Ui.TEXT_L, Ui.WHITE_60);
             e.setText(x.err.isEmpty() ? "Nothing here yet" : "Couldn't load this row right now");
             x.strip.addView(e, h.at(PAD + .2f, 8, LayoutParams.WRAP_CONTENT, LayoutParams.WRAP_CONTENT));
         }
@@ -565,7 +565,7 @@ final class NativeVod extends FrameLayout {
                 // the number, big and quiet, to the poster's left
                 // (the box is taller than the digits and runs a little behind the poster: nothing is cut off, "10" included)
                 boolean two = c + 1 >= 10;
-                TextView num = h.text(h.fSemi, 11f, 0x40FFFFFF);
+                TextView num = h.text(h.fSemi, 11f, Ui.WHITE_25);
                 num.setText(String.valueOf(c + 1)); num.setGravity(Gravity.RIGHT | Gravity.BOTTOM); num.setIncludeFontPadding(false);
                 num.setLetterSpacing(two ? -.07f : -.04f); num.setSingleLine(true);
                 // (it ends just at the poster's edge, a sliver under it: the whole number shows)
@@ -575,7 +575,7 @@ final class NativeVod extends FrameLayout {
             } else if (x.kind.equals("wide")) {
                 // its name (and where you are / when it's on) underneath
                 LinearLayout cap = new LinearLayout(getContext()); cap.setOrientation(LinearLayout.VERTICAL);
-                TextView t1 = h.text(h.fSemi, 1.35f, 0xF2FFFFFF), t2 = h.text(h.fMed, 1.1f, 0x99FFFFFF);
+                TextView t1 = h.text(h.fSemi, Ui.TEXT_L, Ui.WHITE_95), t2 = h.text(h.fMed, Ui.TEXT_S, Ui.WHITE_60);
                 t1.setSingleLine(true); t1.setEllipsize(TextUtils.TruncateAt.END); t2.setSingleLine(true); t2.setEllipsize(TextUtils.TruncateAt.END);
                 cap.addView(t1); cap.addView(t2);
                 x.strip.addView(cap, h.at(px0, 1.55f + WH + 1.1f, h.px(WW), LayoutParams.WRAP_CONTENT));
@@ -687,7 +687,7 @@ final class NativeVod extends FrameLayout {
         syncRows();
         // the focused row sits at the top of the rows
         float ty = -h.px(rowY(r) - .4f);
-        if (smooth) rowsIn.animate().translationY(ty).setDuration(380).setInterpolator(TileView.EASE).start();
+        if (smooth) rowsIn.animate().translationY(ty).setDuration(Ui.SLIDE).setInterpolator(TileView.EASE).start();
         else { rowsIn.animate().cancel(); rowsIn.setTranslationY(ty); }
         // and the focused poster within its row
         float left = cellX(x, x.col);
@@ -723,13 +723,13 @@ final class NativeVod extends FrameLayout {
            where they are. (It was a 16:9 box above the rows, hard-edged over the picture.) */
         if (trFit()) { if (!on) untuck(); return; }
         hero.animate().cancel();
-        hero.animate().alpha(on ? 0f : 1f).translationY(0).setDuration(on ? 600 : 300).setInterpolator(TileView.EASE).start();
+        hero.animate().alpha(on ? 0f : 1f).translationY(0).setDuration(on ? Ui.SLOWER : Ui.MOVE).setInterpolator(TileView.EASE).start();
         // Settings → Header trailer: "slide" — the rows slide right off the bottom and the tab's name fades, so
         // only the trailer is on screen (any key brings them back; a slim strip of rows used to stay showing)
         if (on && !trFit()) {
             tucked = true;
             rowsBox.animate().cancel(); rowsBox.animate().translationY(H - h.px(ROWS_Y) + h.px(2)).setDuration(800).setInterpolator(TileView.EASE).start();
-            label.animate().cancel(); label.animate().alpha(0f).setDuration(500).start();
+            label.animate().cancel(); label.animate().alpha(0f).setDuration(Ui.SLOW).start();
             trBgShade.animate().cancel(); trBgShade.animate().alpha(.3f).setDuration(800).start();     // (the shading for the title's text isn't needed then)
         }
         else if (!on) untuck();
@@ -740,10 +740,10 @@ final class NativeVod extends FrameLayout {
         if (!tucked && rowsBox.getTranslationY() == 0) return false;
         boolean was = tucked;
         tucked = false;
-        trBgShade.animate().cancel(); trBgShade.animate().alpha(1f).setDuration(350).start();
-        label.animate().cancel(); label.animate().alpha(1f).setDuration(300).start();
+        trBgShade.animate().cancel(); trBgShade.animate().alpha(1f).setDuration(Ui.SLIDE).start();
+        label.animate().cancel(); label.animate().alpha(1f).setDuration(Ui.MOVE).start();
         rowsBox.animate().cancel();
-        rowsBox.animate().translationY(0).setDuration(350).setInterpolator(TileView.EASE).start();
+        rowsBox.animate().translationY(0).setDuration(Ui.SLIDE).setInterpolator(TileView.EASE).start();
         return was;
     }
     private boolean trFit() { return h.S.optString("trailerFit", "slide").equals("fit"); }
@@ -758,7 +758,7 @@ final class NativeVod extends FrameLayout {
         x.scroll = s;
         syncPosters(x);
         if (x.strip == null) return;
-        if (smooth) x.strip.animate().translationX(-h.px(s)).setDuration(380).setInterpolator(TileView.EASE).start();
+        if (smooth) x.strip.animate().translationX(-h.px(s)).setDuration(Ui.SLIDE).setInterpolator(TileView.EASE).start();
         else x.strip.setTranslationX(-h.px(s));
     }
 
@@ -792,7 +792,7 @@ final class NativeVod extends FrameLayout {
         float gs = focusScale(fr);
         glowView.setScaleX(gs); glowView.setScaleY(gs);
         glowView.setAlpha(0f);
-        glowView.animate().alpha(1f).setDuration(250).start();
+        glowView.animate().alpha(1f).setDuration(Ui.BASE).start();
     }
 
     private final Map<String, Bitmap> glows = new HashMap<>();
@@ -805,7 +805,7 @@ final class NativeVod extends FrameLayout {
         Canvas c = new Canvas(b);
         Paint p = new Paint(Paint.ANTI_ALIAS_FLAG);
         p.setMaskFilter(new BlurMaskFilter(1.3f * R, BlurMaskFilter.Blur.NORMAL));
-        p.setColor(0xA6000000);
+        p.setColor(Ui.BLACK_60);
         c.drawRoundRect(new RectF(m, m + 1.6f * R * .6f, m + w, m + hh + 1.6f * R * .6f), rad, rad, p);
         p.setMaskFilter(new BlurMaskFilter(1.3f * R, BlurMaskFilter.Blur.OUTER));
         p.setColor(glowCol);
@@ -860,7 +860,7 @@ final class NativeVod extends FrameLayout {
             return;
         }
         if (focused != null) focused.animate().scaleX(1.06f).scaleY(1.06f).setDuration(100).withEndAction(new Runnable() { @Override public void run() {
-            if (focused != null) { float s = focusScale(focused.row); focused.animate().scaleX(s).scaleY(s).setDuration(200).setInterpolator(TileView.EASE).start(); }
+            if (focused != null) { float s = focusScale(focused.row); focused.animate().scaleX(s).scaleY(s).setDuration(Ui.FAST).setInterpolator(TileView.EASE).start(); }
         } }).start();
         open(m);
     }
@@ -1030,7 +1030,7 @@ final class NativeVod extends FrameLayout {
         heroDesc.setText(m.optString("desc"));
         hero.animate().cancel();
         hero.setAlpha(.7f); hero.setTranslationY(.35f * R);
-        hero.animate().alpha(1f).translationY(0).setDuration(320).setInterpolator(TileView.EASE).start();
+        hero.animate().alpha(1f).translationY(0).setDuration(Ui.MOVE).setInterpolator(TileView.EASE).start();
     }
 
     // ================================================================== backdrop
@@ -1231,8 +1231,8 @@ final class NativeVod extends FrameLayout {
             trBgShade.setVisibility(VISIBLE); trBgShade.setAlpha(1f);
             placeTrBg();
             player().play(trBg, m.optString("yt"), muted, trMax(), new TrailerPlayer.Listener() {
-                @Override public void playing() { if (key.equals(wideKey)) { trBg.animate().alpha(1f).setDuration(400).start(); trFade.animate().alpha(1f).setDuration(400).start(); trBgShowing(true); } }
-                @Override public void ended() { trBg.animate().alpha(0f).setDuration(500).start(); trFade.animate().alpha(0f).setDuration(500).start(); trBgShowing(false); }
+                @Override public void playing() { if (key.equals(wideKey)) { trBg.animate().alpha(1f).setDuration(Ui.SLIDE).start(); trFade.animate().alpha(1f).setDuration(Ui.SLIDE).start(); trBgShowing(true); } }
+                @Override public void ended() { trBg.animate().alpha(0f).setDuration(Ui.SLOW).start(); trFade.animate().alpha(0f).setDuration(Ui.SLOW).start(); trBgShowing(false); }
             });
             return;
         }
@@ -1269,12 +1269,12 @@ final class NativeVod extends FrameLayout {
         wideTr.setAlpha(0f);
         wide.addView(wideTr, new LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.MATCH_PARENT));
         View shade = new View(getContext());
-        shade.setBackground(new GradientDrawable(GradientDrawable.Orientation.BOTTOM_TOP, new int[] { 0xB8000000, 0x00000000, 0x00000000 }));
+        shade.setBackground(new GradientDrawable(GradientDrawable.Orientation.BOTTOM_TOP, new int[] { Ui.BLACK_70, 0x00000000, 0x00000000 }));
         wide.addView(shade, new LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.MATCH_PARENT));
         final TextView name = h.text(h.fSemi, 1.9f, Color.WHITE);
         name.setText(m.optString("name"));
         name.setSingleLine(true); name.setEllipsize(TextUtils.TruncateAt.END);
-        name.setShadowLayer(.6f * R, 0, .1f * R, 0x99000000);
+        name.setShadowLayer(.6f * R, 0, .1f * R, Ui.BLACK_60);
         LayoutParams nl = new LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT, Gravity.BOTTOM);
         nl.leftMargin = h.px(1.1f); nl.rightMargin = h.px(1.1f); nl.bottomMargin = h.px(1);
         wide.addView(name, nl);
@@ -1303,12 +1303,12 @@ final class NativeVod extends FrameLayout {
         float fsc = focusScale(x);
         wide.setScaleX(fsc); wide.setScaleY(fsc);
         wide.setAlpha(0f);
-        wide.animate().alpha(1f).setDuration(450).start();
+        wide.animate().alpha(1f).setDuration(Ui.SLOW).start();
         // the posters after it move along to make room
         for (Map.Entry<Integer, PosterView> e : x.posters.entrySet())
             if (e.getKey() > x.col && trShift() > 0) {
-                e.getValue().animate().translationX(h.px(trShift())).setDuration(400).setInterpolator(TileView.EASE).start();
-                if (e.getValue().extra != null) e.getValue().extra.animate().translationX(h.px(trShift())).setDuration(400).setInterpolator(TileView.EASE).start();     // (Top 10's numbers too)
+                e.getValue().animate().translationX(h.px(trShift())).setDuration(Ui.SLIDE).setInterpolator(TileView.EASE).start();
+                if (e.getValue().extra != null) e.getValue().extra.animate().translationX(h.px(trShift())).setDuration(Ui.SLIDE).setInterpolator(TileView.EASE).start();     // (Top 10's numbers too)
             }
         // keep the whole card on screen
         float left = cellX(x, x.col);
@@ -1320,8 +1320,8 @@ final class NativeVod extends FrameLayout {
             if (!key.equals(wideKey) || wideTr == null) return;
             final FrameLayout host = wideTr;
             player().play(host, yt, muted, trMax(), new TrailerPlayer.Listener() {
-                @Override public void playing() { if (key.equals(wideKey)) host.animate().alpha(1f).setDuration(400).start(); }
-                @Override public void ended() { host.animate().alpha(0f).setDuration(500).start(); }
+                @Override public void playing() { if (key.equals(wideKey)) host.animate().alpha(1f).setDuration(Ui.SLIDE).start(); }
+                @Override public void ended() { host.animate().alpha(0f).setDuration(Ui.SLOW).start(); }
             });
         } }, 600);
     }
@@ -1345,12 +1345,12 @@ final class NativeVod extends FrameLayout {
         for (Row x : rows) for (PosterView p : x.posters.values()) p.setVisibility(VISIBLE);
         final FrameLayout w = wide;
         wide = null; wideTr = null;
-        if (animate) w.animate().alpha(0f).setDuration(250).withEndAction(new Runnable() { @Override public void run() { if (w.getParent() != null) ((FrameLayout) w.getParent()).removeView(w); } }).start();
+        if (animate) w.animate().alpha(0f).setDuration(Ui.BASE).withEndAction(new Runnable() { @Override public void run() { if (w.getParent() != null) ((FrameLayout) w.getParent()).removeView(w); } }).start();
         else if (w.getParent() != null) ((FrameLayout) w.getParent()).removeView(w);
         for (Row x : rows) for (PosterView p : x.posters.values()) {
-            if (p.extra != null && p.extra.getTranslationX() != 0) { if (animate) p.extra.animate().translationX(0).setDuration(400).setInterpolator(TileView.EASE).start(); else p.extra.setTranslationX(0); }
+            if (p.extra != null && p.extra.getTranslationX() != 0) { if (animate) p.extra.animate().translationX(0).setDuration(Ui.SLIDE).setInterpolator(TileView.EASE).start(); else p.extra.setTranslationX(0); }
             if (p.getTranslationX() == 0) continue;
-            if (animate) p.animate().translationX(0).setDuration(400).setInterpolator(TileView.EASE).start(); else p.setTranslationX(0);
+            if (animate) p.animate().translationX(0).setDuration(Ui.SLIDE).setInterpolator(TileView.EASE).start(); else p.setTranslationX(0);
         }
         if (animate) placeGlow();
     }
@@ -1392,7 +1392,7 @@ final class NativeVod extends FrameLayout {
             GradientDrawable b = new GradientDrawable(GradientDrawable.Orientation.TL_BR, new int[] { 0xFF34343C, 0xFF1C1C22 });
             b.setCornerRadius(rad);
             setBackground(b);
-            name = h.text(h.fSemi, 1.25f, Color.WHITE);
+            name = h.text(h.fSemi, Ui.TEXT_M, Color.WHITE);
             name.setMaxLines(3); name.setEllipsize(TextUtils.TruncateAt.END);
             LayoutParams nl = new LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT, Gravity.BOTTOM);
             nl.leftMargin = h.px(.7f); nl.rightMargin = h.px(.7f); nl.bottomMargin = h.px(.7f);
@@ -1446,7 +1446,7 @@ final class NativeVod extends FrameLayout {
             name.setTextSize(android.util.TypedValue.COMPLEX_UNIT_PX, 1.9f * R); name.setMaxLines(2);
             LayoutParams nl = (LayoutParams) name.getLayoutParams(); nl.gravity = Gravity.TOP | Gravity.LEFT; nl.leftMargin = h.px(1.3f); nl.topMargin = h.px(1.1f); name.setLayoutParams(nl);
             if (capSub == null) {
-                capSub = h.text(h.fMed, 1.1f, 0xBFFFFFFF);
+                capSub = h.text(h.fMed, Ui.TEXT_S, Ui.WHITE_75);
                 LayoutParams sl = new LayoutParams(LayoutParams.WRAP_CONTENT, LayoutParams.WRAP_CONTENT, Gravity.BOTTOM | Gravity.LEFT);
                 sl.leftMargin = h.px(1.3f); sl.bottomMargin = h.px(1f);
                 addView(capSub, sl);
@@ -1486,7 +1486,7 @@ final class NativeVod extends FrameLayout {
                 Bitmap lg = null;
                 try { byte[] ld = logo.isEmpty() ? null : HomeImages.http(logo, null); if (ld != null) lg = HomeImages.decode(ld, Math.round(w * .5f), Math.round(hh * .32f)); } catch (Throwable ignored) { }
                 Canvas c = new Canvas(out);
-                Paint sh = new Paint(); sh.setShader(new LinearGradient(0, hh * .45f, 0, hh, 0x00000000, 0xA6000000, Shader.TileMode.CLAMP));
+                Paint sh = new Paint(); sh.setShader(new LinearGradient(0, hh * .45f, 0, hh, 0x00000000, Ui.BLACK_60, Shader.TileMode.CLAMP));
                 c.drawRect(0, hh * .45f, w, hh, sh);
                 if (lg != null) {
                     float s = Math.min(w * .48f / lg.getWidth(), hh * .3f / lg.getHeight());
@@ -1507,12 +1507,12 @@ final class NativeVod extends FrameLayout {
             boolean cw = m.has("cwPct"), cal = m.has("calLabel");
             if (!cw && !cal) { if (cwBar != null) { cwBar.setVisibility(GONE); cwFill.setVisibility(GONE); cwLab.setVisibility(GONE); } return; }
             if (cwBar == null) {
-                cwBar = new View(getContext()); cwBar.setBackgroundColor(0x66000000);
+                cwBar = new View(getContext()); cwBar.setBackgroundColor(Ui.BLACK_45);
                 addView(cwBar, new LayoutParams(LayoutParams.MATCH_PARENT, h.px(.45f), Gravity.BOTTOM));
                 cwFill = new View(getContext()); cwFill.setBackgroundColor(0xFFFF453A);
                 addView(cwFill, new LayoutParams(0, h.px(.45f), Gravity.BOTTOM));
-                cwLab = h.text(h.fSemi, 1.0f, Color.WHITE);
-                GradientDrawable lb = new GradientDrawable(); lb.setCornerRadius(.4f * R); lb.setColor(0xD9000000); cwLab.setBackground(lb);
+                cwLab = h.text(h.fSemi, Ui.TEXT_S, Color.WHITE);
+                GradientDrawable lb = new GradientDrawable(); lb.setCornerRadius(.4f * R); lb.setColor(Ui.BLACK_85); cwLab.setBackground(lb);
                 cwLab.setPadding(h.px(.5f), h.px(.2f), h.px(.5f), h.px(.2f)); cwLab.setSingleLine(true); cwLab.setEllipsize(TextUtils.TruncateAt.END);
                 LayoutParams ll = new LayoutParams(LayoutParams.WRAP_CONTENT, LayoutParams.WRAP_CONTENT, Gravity.BOTTOM | Gravity.LEFT);
                 ll.leftMargin = h.px(.5f); ll.rightMargin = h.px(.5f); ll.bottomMargin = h.px(1f);
@@ -1523,7 +1523,7 @@ final class NativeVod extends FrameLayout {
                 cwBar.setVisibility(GONE); cwFill.setVisibility(GONE);
                 String lab = m.optString("calLabel");
                 cwLab.setText(lab);
-                GradientDrawable lb = new GradientDrawable(); lb.setCornerRadius(.4f * R); lb.setColor(lab.startsWith("New") || lab.startsWith("Today") ? 0xE6FF453A : 0xD9000000); cwLab.setBackground(lb);
+                GradientDrawable lb = new GradientDrawable(); lb.setCornerRadius(.4f * R); lb.setColor(lab.startsWith("New") || lab.startsWith("Today") ? 0xE6FF453A : Ui.BLACK_85); cwLab.setBackground(lb);
                 // (a wide card has the show's logo along its bottom: the label goes at the top)
                 LayoutParams ll = (LayoutParams) cwLab.getLayoutParams();
                 ll.gravity = (capTitle != null ? Gravity.TOP : Gravity.BOTTOM) | Gravity.LEFT; ll.topMargin = capTitle != null ? h.px(.8f) : 0; ll.leftMargin = h.px(capTitle != null ? .8f : .5f);
@@ -1532,7 +1532,7 @@ final class NativeVod extends FrameLayout {
                 cwLab.bringToFront();
                 return;
             }
-            GradientDrawable lb0 = new GradientDrawable(); lb0.setCornerRadius(.4f * R); lb0.setColor(0xD9000000); cwLab.setBackground(lb0);
+            GradientDrawable lb0 = new GradientDrawable(); lb0.setCornerRadius(.4f * R); lb0.setColor(Ui.BLACK_85); cwLab.setBackground(lb0);
             cwBar.setVisibility(VISIBLE); cwFill.setVisibility(VISIBLE);
             LayoutParams fl = (LayoutParams) cwFill.getLayoutParams(); fl.width = Math.round(h.px(PosterView.this.cw) * (float) m.optDouble("cwPct", 0)); cwFill.setLayoutParams(fl);
             String lab = m.optString("cwLabel");
@@ -1544,15 +1544,15 @@ final class NativeVod extends FrameLayout {
         void setFocus(boolean f, boolean animate) {
             focusedNow = f;
             float s = f ? focusScale(row) : 1f;
-            if (animate) animate().scaleX(s).scaleY(s).setDuration(250).setInterpolator(TileView.EASE).start();
+            if (animate) animate().scaleX(s).scaleY(s).setDuration(Ui.BASE).setInterpolator(TileView.EASE).start();
             else { animate().cancel(); setScaleX(s); setScaleY(s); }
             // the name underneath steps down as the card lifts (and brightens)
             if (capTitle != null) {
                 float dy = f ? h.px(ch) * (s - 1) / 2f : 0;
-                if (animate) extra.animate().translationY(dy).setDuration(250).setInterpolator(TileView.EASE).start(); else extra.setTranslationY(dy);
-                capTitle.setTextColor(f ? Color.WHITE : 0xD9FFFFFF);
+                if (animate) extra.animate().translationY(dy).setDuration(Ui.BASE).setInterpolator(TileView.EASE).start(); else extra.setTranslationY(dy);
+                capTitle.setTextColor(f ? Color.WHITE : Ui.WHITE_85);
             }
-            if (row.kind.equals("top") && extra != null) ((TextView) extra).setTextColor(f ? 0x80FFFFFF : 0x40FFFFFF);
+            if (row.kind.equals("top") && extra != null) ((TextView) extra).setTextColor(f ? Ui.WHITE_50 : Ui.WHITE_25);
             if (f) { GradientDrawable rg = new GradientDrawable(); rg.setCornerRadius(rad); rg.setStroke(Math.max(2, h.px(.16f)), ring); setForeground(rg); }
             else setForeground(GlassPanel.look.equals("spot") ? dimmed() : null);     // (Spotlight: the cards you're not on sit back in the dark)
             setZ(f ? 2 : 0);
@@ -1602,19 +1602,19 @@ final class NativeVod extends FrameLayout {
             Matrix mx = new Matrix(); mx.setScale(s, s); mx.postTranslate((w - src.getWidth() * s) / 2f, (hh - src.getHeight() * s) * .35f);
             c.drawBitmap(src, mx, p);
             src.recycle();
-            p.setShader(new LinearGradient(0, 0, w, 0, new int[] { 0xE6000000, 0x99000000, 0x14000000 }, new float[] { 0, .45f, 1 }, Shader.TileMode.CLAMP)); c.drawRect(all, p);
-            p.setShader(new LinearGradient(0, hh * .4f, 0, hh, 0x00000000, 0x80000000, Shader.TileMode.CLAMP)); c.drawRect(all, p); p.setShader(null);
+            p.setShader(new LinearGradient(0, 0, w, 0, new int[] { Ui.BLACK_90, Ui.BLACK_60, 0x14000000 }, new float[] { 0, .45f, 1 }, Shader.TileMode.CLAMP)); c.drawRect(all, p);
+            p.setShader(new LinearGradient(0, hh * .4f, 0, hh, 0x00000000, Ui.BLACK_55, Shader.TileMode.CLAMP)); c.drawRect(all, p); p.setShader(null);
             // the name: as big as fits, over two lines if it must (never cut off)
             tp.setTypeface(h.fSemi); tp.setColor(Color.WHITE);
-            tp.setShadowLayer(.5f * R, 0, .1f * R, 0x99000000);
+            tp.setShadowLayer(.5f * R, 0, .1f * R, Ui.BLACK_60);
             android.text.StaticLayout nl = fitText(m.optString("name"), tp, w - 2.6f * R, 2.1f * R, 1.3f * R, 2);
             float bottom = top.isEmpty() ? hh - 1.1f * R : hh - 2.6f * R;
             c.save(); c.translate(1.3f * R, bottom - nl.getHeight()); nl.draw(c); c.restore();
-            tp.setTypeface(h.fMed); tp.setTextSize(1.1f * R); tp.setColor(0xCCFFFFFF);
+            tp.setTypeface(h.fMed); tp.setTextSize(1.1f * R); tp.setColor(Ui.WHITE_85);
             if (!top.isEmpty()) c.drawText(TextUtils.ellipsize("Top: " + top, tp, w - 2.6f * R, TextUtils.TruncateAt.END).toString(), 1.3f * R, hh - 1.05f * R, tp);
         }
         // the glass edge, as on the posters
-        Paint e = new Paint(Paint.ANTI_ALIAS_FLAG); e.setStyle(Paint.Style.STROKE); e.setStrokeWidth(.14f * R); e.setColor(0x2EFFFFFF);
+        Paint e = new Paint(Paint.ANTI_ALIAS_FLAG); e.setStyle(Paint.Style.STROKE); e.setStrokeWidth(.14f * R); e.setColor(Ui.WHITE_20);
         c.drawRoundRect(all, rad, rad, e);
         // rounded corners (the card's own clip only rounds its top and bottom strips)
         Bitmap round = Bitmap.createBitmap(w, hh, Bitmap.Config.ARGB_8888);
@@ -1673,8 +1673,8 @@ final class NativeVod extends FrameLayout {
         RectF r0 = new RectF(0, 0, w, hh);
         Path clip = new Path(); clip.addRoundRect(r0, rad, rad, Path.Direction.CW);
         c.save(); c.clipPath(clip);
-        p.setColor(0x59FFFFFF); c.drawRect(0, 0, w, .1f * R, p);                    // light along the top
-        p.setStyle(Paint.Style.STROKE); p.setStrokeWidth(.07f * R * 2); p.setColor(0x24FFFFFF);
+        p.setColor(Ui.WHITE_40); c.drawRect(0, 0, w, .1f * R, p);                    // light along the top
+        p.setStyle(Paint.Style.STROKE); p.setStrokeWidth(.07f * R * 2); p.setColor(Ui.WHITE_12);
         c.drawRoundRect(r0, rad, rad, p);                                         // faint edge
         c.restore();
         out.setHasAlpha(false);

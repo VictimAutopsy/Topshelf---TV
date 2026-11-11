@@ -1225,13 +1225,13 @@ final class StandingsView extends View {
         double d = numOf(v);
         float bw = 3f * R, cxm = right - colW + 1.5f * R + bw / 2;     // (clear of the column before it)
         rf.set(cxm - bw / 2, mid - .22f * R, cxm + bw / 2, mid + .22f * R);
-        p.setColor(chosen ? 0x2EFFFFFF : 0x0FFFFFFF); c.drawRoundRect(rf, .22f * R, .22f * R, p);
+        p.setColor(chosen ? Ui.WHITE_20 : 0x0FFFFFFF); c.drawRoundRect(rf, .22f * R, .22f * R, p);
         float len = (float) Math.min(1, Math.abs(d) / diffMax) * bw / 2;
         if (len > .5f) {
             rf.set(d >= 0 ? cxm : cxm - len, mid - .22f * R, d >= 0 ? cxm + len : cxm, mid + .22f * R);
             p.setColor(chosen ? Color.WHITE : d >= 0 ? IN : RED); p.setAlpha(Math.min(dimA, chosen ? 235 : 215)); c.drawRoundRect(rf, .22f * R, .22f * R, p); p.setAlpha(255);
         }
-        p.setColor(chosen ? 0x80FFFFFF : 0x33FFFFFF); float hw = Math.max(.5f, .03f * R); c.drawRect(cxm - hw, mid - .45f * R, cxm + hw, mid + .45f * R, p);
+        p.setColor(chosen ? Ui.WHITE_50 : Ui.WHITE_20); float hw = Math.max(.5f, .03f * R); c.drawRect(cxm - hw, mid - .45f * R, cxm + hw, mid + .45f * R, p);
         String s = v.isEmpty() ? "" : d > 0 && !v.startsWith("+") ? "+" + v : v.replace("-", "−");
         text(c, s, right, base, fMed, 1.3f, alpha(chosen ? 0xEBFFFFFF : SUB, dimA), Paint.Align.RIGHT);
     }
@@ -1350,10 +1350,10 @@ final class StandingsView extends View {
         rf.set(pad, hy, w - pad, hy + hH);
         p.setShader(new LinearGradient(pad, 0, w - pad, 0, new int[] { withA(col, 255), withA(col, 95), PANEL }, new float[] { 0, .55f, 1 }, Shader.TileMode.CLAMP));
         c.drawRoundRect(rf, 1.4f * R, 1.4f * R, p);
-        p.setShader(new LinearGradient(0, hy, 0, hy + hH, 0x0FFFFFFF, 0x40000000, Shader.TileMode.CLAMP));
+        p.setShader(new LinearGradient(0, hy, 0, hy + hH, 0x0FFFFFFF, Ui.BLACK_25, Shader.TileMode.CLAMP));
         c.drawRoundRect(rf, 1.4f * R, 1.4f * R, p);
         p.setShader(null);
-        stroke(c, rf, 1.4f * R, 0x14FFFFFF, Math.max(1, .07f * R));
+        stroke(c, rf, 1.4f * R, Ui.WHITE_7, Math.max(1, .07f * R));
         float ls = 8 * R, lx = pad + 2 * R;
         if (teamLogo != null) { rf.set(lx, hy + (hH - ls) / 2, lx + ls, hy + (hH + ls) / 2); c.drawBitmap(teamLogo, null, rf, p); }
         float nx = lx + ls + 2.2f * R;
@@ -1361,21 +1361,21 @@ final class StandingsView extends View {
         text(c, TextUtils.ellipsize(r.full, t, w * .5f, TextUtils.TruncateAt.END).toString(), nx, hy + 4.6f * R, fSemi, 3f, INK, Paint.Align.LEFT);
         Group g = groupOf(r);
         String sub = td != null && !td.summary.isEmpty() ? td.summary : g != null ? g.name : "";
-        text(c, sub, nx, hy + 6.6f * R, fMed, 1.3f, 0xB3FFFFFF, Paint.Align.LEFT);
+        text(c, sub, nx, hy + 6.6f * R, fMed, 1.3f, Ui.WHITE_75, Paint.Align.LEFT);
         float sx = nx;
         for (String[] st : headline(r)) {
             t.setTypeface(fSemi); t.setTextSize(1.9f * R); float vw = t.measureText(st[0]);
             t.setTypeface(fMed); t.setTextSize(1f * R); float lw = t.measureText(st[1]);
             if (sx + Math.max(vw, lw) > w * .72f) break;
             text(c, st[0], sx, hy + 10 * R, fSemi, 1.9f, INK, Paint.Align.LEFT);
-            text(c, st[1], sx, hy + 11.3f * R, fMed, 1f, 0x9EFFFFFF, Paint.Align.LEFT);
+            text(c, st[1], sx, hy + 11.3f * R, fMed, 1f, Ui.WHITE_60, Paint.Align.LEFT);
             sx += Math.max(vw, lw) + 3.2f * R;
         }
         // the form: the last results in order, oldest on the left
         if (td != null && !td.past.isEmpty()) {
             int n = Math.min(10, td.past.size());
             float d = 1.6f * R, gp = .5f * R, x1 = w - pad - 2 * R, x0 = x1 - n * d - (n - 1) * gp;
-            text(c, "Last " + n, x1, hy + 4.3f * R, fMed, 1.05f, 0x9EFFFFFF, Paint.Align.RIGHT);
+            text(c, "Last " + n, x1, hy + 4.3f * R, fMed, 1.05f, Ui.WHITE_60, Paint.Align.RIGHT);
             boolean soccer = teamLg[1].equals("soccer");
             for (int i = 0; i < n; i++) {
                 int res = result(td.past.get(n - 1 - i), r.id);

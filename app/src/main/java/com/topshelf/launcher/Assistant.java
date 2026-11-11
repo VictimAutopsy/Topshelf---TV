@@ -546,11 +546,11 @@ final class Assistant {
             if (card != null && card.getParent() != null) ((FrameLayout) card.getParent()).removeView(card);
             card = new LinearLayout(h.getContext());
             card.setOrientation(LinearLayout.VERTICAL);
-            GradientDrawable bg = new GradientDrawable(); bg.setColor(0xF2121217); bg.setCornerRadius(1.6f * h.R); bg.setStroke(Math.max(1, h.px(.1f)), 0x26FFFFFF);
+            GradientDrawable bg = new GradientDrawable(); bg.setColor(0xF2121217); bg.setCornerRadius(1.6f * h.R); bg.setStroke(Math.max(1, h.px(.1f)), Ui.WHITE_12);
             card.setBackground(bg);
             card.setPadding(h.px(2.4f), h.px(1.8f), h.px(2.4f), h.px(2f));
-            cardTitle = h.text(h.fSemi, 1.3f, 0xB3FFFFFF);
-            cardBody = h.text(h.fReg, 1.45f, Color.WHITE);
+            cardTitle = h.text(h.fSemi, Ui.TEXT_L, Ui.WHITE_75);
+            cardBody = h.text(h.fReg, Ui.TEXT_XL, Color.WHITE);
             cardBody.setLineSpacing(0, 1.3f);
             card.addView(cardTitle);
             LinearLayout.LayoutParams bl = new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT); bl.topMargin = h.px(.7f);
@@ -566,7 +566,7 @@ final class Assistant {
         if (card.getVisibility() != View.VISIBLE) {
             card.setVisibility(View.VISIBLE);
             card.setAlpha(0f); card.setTranslationY(-h.px(2));
-            card.animate().alpha(1f).translationY(0).setDuration(240).start();
+            card.animate().alpha(1f).translationY(0).setDuration(Ui.BASE).start();
         }
         MAIN.removeCallbacks(HIDE);
         int words = text.split("\\s+").length;
@@ -693,6 +693,6 @@ final class Assistant {
         MAIN.removeCallbacks(HIDE);
         if (!cardShown()) return;
         final LinearLayout c = card;
-        c.animate().alpha(0f).setDuration(180).withEndAction(new Runnable() { @Override public void run() { c.setVisibility(View.GONE); } }).start();
+        c.animate().alpha(0f).setDuration(Ui.FAST).withEndAction(new Runnable() { @Override public void run() { c.setVisibility(View.GONE); } }).start();
     }
 }

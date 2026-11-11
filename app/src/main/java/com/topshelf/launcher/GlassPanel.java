@@ -226,7 +226,7 @@ final class GlassPanel extends FrameLayout {
        On Air's is red and square, the shelf's warm dark with an outline of its light, Photo Ink's the photo's
        colour with a pale outline, glass and Spotlight as before */
     static int raiseFill() { return look.equals("air") ? airColor : look.equals("shelf") ? 0xFF241D20 : look.equals("ink") ? (inkColor | 0xFF000000) : 0xFF34333D; }
-    static int raiseRing() { return look.equals("air") ? 0xF2FFFFFF : look.equals("shelf") ? shelfLight() : look.equals("ink") ? inkPaper() : 0xD9FFFFFF; }
+    static int raiseRing() { return look.equals("air") ? Ui.WHITE_95 : look.equals("shelf") ? shelfLight() : look.equals("ink") ? inkPaper() : Ui.WHITE_85; }
     static float corner(float r) { return look.equals("air") ? 0 : look.equals("shelf") || look.equals("ink") ? Math.min(r, .5f * rem) : r; }
     static int buttonText(boolean on) {
         if (look.equals("air")) return 0xFFFFFFFF;
@@ -291,8 +291,8 @@ final class GlassPanel extends FrameLayout {
         Edge(int color, float radius) { this.color = color; r = radius; line.setColor(color); }
         @Override protected void onBoundsChange(android.graphics.Rect b) {
             float gh = Math.min(b.height() * .6f, 3.2f * rem);
-            glow.setShader(new LinearGradient(0, b.top, 0, b.top + gh, new int[] { (color & 0x00FFFFFF) | 0x8C000000, (color & 0x00FFFFFF) | 0x29000000, color & 0x00FFFFFF }, new float[] { 0, .35f, 1 }, Shader.TileMode.CLAMP));
-            ledge.setShader(new LinearGradient(b.left, 0, b.right, 0, new int[] { color & 0x00FFFFFF, (color & 0x00FFFFFF) | 0x80000000, color & 0x00FFFFFF }, null, Shader.TileMode.CLAMP));
+            glow.setShader(new LinearGradient(0, b.top, 0, b.top + gh, new int[] { (color & 0x00FFFFFF) | Ui.BLACK_55, (color & 0x00FFFFFF) | 0x29000000, color & 0x00FFFFFF }, new float[] { 0, .35f, 1 }, Shader.TileMode.CLAMP));
+            ledge.setShader(new LinearGradient(b.left, 0, b.right, 0, new int[] { color & 0x00FFFFFF, (color & 0x00FFFFFF) | Ui.BLACK_55, color & 0x00FFFFFF }, null, Shader.TileMode.CLAMP));
             clip.reset(); clip.addRoundRect(new RectF(b), r, r, android.graphics.Path.Direction.CW);
         }
         @Override public void draw(Canvas c) {
@@ -479,7 +479,7 @@ final class GlassPanel extends FrameLayout {
             float len = Math.abs(b.width() * dx) + Math.abs(b.height() * dy);
             float cx = b.exactCenterX(), cy = b.exactCenterY();
             p.setShader(new LinearGradient(cx - dx * len / 2, cy - dy * len / 2, cx + dx * len / 2, cy + dy * len / 2,
-                    new int[] { 0xD9FFFFFF, 0x29FFFFFF, 0x00FFFFFF, 0x0DFFFFFF, 0x80FFFFFF },
+                    new int[] { Ui.WHITE_85, 0x29FFFFFF, 0x00FFFFFF, Ui.WHITE_7, Ui.WHITE_50 },
                     new float[] { 0f, 0.2f, 0.42f, 0.68f, 1f }, Shader.TileMode.CLAMP));
         }
         @Override public void draw(Canvas c) {

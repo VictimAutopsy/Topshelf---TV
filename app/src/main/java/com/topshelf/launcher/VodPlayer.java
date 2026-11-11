@@ -61,7 +61,7 @@ final class VodPlayer extends FrameLayout {
         h = host; R = host.R;
         setClickable(true);
         loading = h.text(h.fSemi, 1.6f, Color.WHITE); loading.setGravity(Gravity.CENTER);
-        loading.setShadowLayer(R, 0, 0, 0xCC000000);
+        loading.setShadowLayer(R, 0, 0, Ui.BLACK_85);
         addView(loading, new LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.MATCH_PARENT));
         cues = h.text(h.fMed, 2.2f, Color.WHITE); cues.setGravity(Gravity.CENTER); cues.setVisibility(GONE);
         LayoutParams cl = new LayoutParams(LayoutParams.WRAP_CONTENT, LayoutParams.WRAP_CONTENT, Gravity.BOTTOM | Gravity.CENTER_HORIZONTAL);
@@ -75,15 +75,15 @@ final class VodPlayer extends FrameLayout {
         bar = new FrameLayout(getContext());
         bar.setClipChildren(false);
         View topShade = new View(getContext());
-        topShade.setBackground(new GradientDrawable(GradientDrawable.Orientation.TOP_BOTTOM, new int[] { 0xC0000000, 0x66000000, 0x00000000 }));
+        topShade.setBackground(new GradientDrawable(GradientDrawable.Orientation.TOP_BOTTOM, new int[] { 0xC0000000, Ui.BLACK_45, 0x00000000 }));
         bar.addView(topShade, new LayoutParams(LayoutParams.MATCH_PARENT, h.px(15)));
         View footShade = new View(getContext());
-        footShade.setBackground(new GradientDrawable(GradientDrawable.Orientation.BOTTOM_TOP, new int[] { 0xD9000000, 0xA6000000, 0x4D000000, 0x00000000 }));
+        footShade.setBackground(new GradientDrawable(GradientDrawable.Orientation.BOTTOM_TOP, new int[] { Ui.BLACK_85, Ui.BLACK_60, 0x4D000000, 0x00000000 }));
         bar.addView(footShade, new LayoutParams(LayoutParams.MATCH_PARENT, h.px(26), Gravity.BOTTOM));
         LinearLayout col = new LinearLayout(getContext()); col.setOrientation(LinearLayout.VERTICAL);
-        tSub = h.text(h.fMed, 1.1f, 0xC7FFFFFF); tSub.setSingleLine(true); tSub.setEllipsize(TextUtils.TruncateAt.END);
+        tSub = h.text(h.fMed, Ui.TEXT_S, Ui.WHITE_75); tSub.setSingleLine(true); tSub.setEllipsize(TextUtils.TruncateAt.END);
         tTitle = h.text(h.fSemi, 2.3f, Color.WHITE); tTitle.setSingleLine(true); tTitle.setEllipsize(TextUtils.TruncateAt.END);
-        tTitle.setShadowLayer(.8f * R, 0, .1f * R, 0x99000000); tSub.setShadowLayer(.6f * R, 0, .1f * R, 0x99000000);
+        tTitle.setShadowLayer(.8f * R, 0, .1f * R, Ui.BLACK_60); tSub.setShadowLayer(.6f * R, 0, .1f * R, Ui.BLACK_60);
         col.addView(tSub);
         LinearLayout.LayoutParams ttl = new LinearLayout.LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT); ttl.topMargin = h.px(.3f);
         col.addView(tTitle, ttl);
@@ -100,8 +100,8 @@ final class VodPlayer extends FrameLayout {
         addView(bar, new LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.MATCH_PARENT));
         buildPauseInfo();
         buildOpening();
-        skipBtn = h.text(h.fSemi, 1.5f, 0xFF111111);
-        GradientDrawable sb = new GradientDrawable(); sb.setCornerRadius(h.px(2.4f)); sb.setColor(0xF2FFFFFF); skipBtn.setBackground(sb);
+        skipBtn = h.text(h.fSemi, Ui.TEXT_XL, 0xFF111111);
+        GradientDrawable sb = new GradientDrawable(); sb.setCornerRadius(h.px(2.4f)); sb.setColor(Ui.WHITE_95); skipBtn.setBackground(sb);
         skipBtn.setPadding(h.px(2.2f), h.px(1.1f), h.px(2.2f), h.px(1.1f));
         skipBtn.setElevation(h.px(.6f));
         LayoutParams kl = new LayoutParams(LayoutParams.WRAP_CONTENT, LayoutParams.WRAP_CONTENT, Gravity.BOTTOM | Gravity.RIGHT);
@@ -110,20 +110,20 @@ final class VodPlayer extends FrameLayout {
         skipBtn.setAlpha(0f); skipBtn.setVisibility(GONE);
         // Up next: the next episode, counting down to it
         upCard = new LinearLayout(getContext()); upCard.setOrientation(LinearLayout.VERTICAL);
-        GradientDrawable ub = new GradientDrawable(); ub.setCornerRadius(h.px(1.8f)); ub.setColor(0xE6141820); ub.setStroke(Math.max(1, h.px(.08f)), 0x33FFFFFF);
+        GradientDrawable ub = new GradientDrawable(); ub.setCornerRadius(h.px(1.8f)); ub.setColor(0xE6141820); ub.setStroke(Math.max(1, h.px(.08f)), Ui.WHITE_20);
         upCard.setBackground(ub);
         upCard.setPadding(h.px(2f), h.px(1.6f), h.px(2f), h.px(1.6f));
         upCard.setElevation(h.px(.8f));
-        upLab = h.text(h.fSemi, 1f, 0xFF9FD3FF); upLab.setLetterSpacing(.1f); upCard.addView(upLab);
+        upLab = h.text(h.fSemi, Ui.TEXT_S, 0xFF9FD3FF); upLab.setLetterSpacing(.1f); upCard.addView(upLab);
         upName = h.text(h.fSemi, 1.7f, Color.WHITE); upName.setSingleLine(true); upName.setEllipsize(TextUtils.TruncateAt.END); upName.setMaxWidth(h.px(36));
         LinearLayout.LayoutParams unl = new LinearLayout.LayoutParams(LayoutParams.WRAP_CONTENT, LayoutParams.WRAP_CONTENT); unl.topMargin = h.px(.5f);
         upCard.addView(upName, unl);
         LinearLayout ubtns = new LinearLayout(getContext()); ubtns.setGravity(Gravity.CENTER_VERTICAL);
-        upPlay = h.text(h.fSemi, 1.3f, 0xFF111111);
+        upPlay = h.text(h.fSemi, Ui.TEXT_L, 0xFF111111);
         GradientDrawable pb = new GradientDrawable(); pb.setCornerRadius(h.px(1.6f)); pb.setColor(Color.WHITE); upPlay.setBackground(pb);
         upPlay.setPadding(h.px(1.6f), h.px(.7f), h.px(1.6f), h.px(.7f));
         ubtns.addView(upPlay);
-        upCredits = h.text(h.fMed, 1.2f, 0xD9FFFFFF); upCredits.setText("Back · watch the credits");
+        upCredits = h.text(h.fMed, Ui.TEXT_M, Ui.WHITE_85); upCredits.setText("Back · watch the credits");
         LinearLayout.LayoutParams ucl = new LinearLayout.LayoutParams(LayoutParams.WRAP_CONTENT, LayoutParams.WRAP_CONTENT); ucl.leftMargin = h.px(1.4f);
         ubtns.addView(upCredits, ucl);
         LinearLayout.LayoutParams ubl = new LinearLayout.LayoutParams(LayoutParams.WRAP_CONTENT, LayoutParams.WRAP_CONTENT); ubl.topMargin = h.px(1.1f);
@@ -156,27 +156,27 @@ final class VodPlayer extends FrameLayout {
         opening.setBackgroundColor(Color.BLACK);
         opBg = new android.widget.ImageView(getContext()); opBg.setScaleType(android.widget.ImageView.ScaleType.CENTER_CROP);
         opening.addView(opBg, new LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.MATCH_PARENT));
-        View dim = new View(getContext()); dim.setBackgroundColor(0x99000000);
+        View dim = new View(getContext()); dim.setBackgroundColor(Ui.BLACK_60);
         opening.addView(dim, new LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.MATCH_PARENT));
         View vig = new View(getContext());
         GradientDrawable vg = new GradientDrawable(); vg.setGradientType(GradientDrawable.RADIAL_GRADIENT);
-        vg.setColors(new int[] { 0x00000000, 0x8C000000 }); vg.setGradientRadius(h.px(78)); vig.setBackground(vg);
+        vg.setColors(new int[] { 0x00000000, Ui.BLACK_55 }); vg.setGradientRadius(h.px(78)); vig.setBackground(vg);
         opening.addView(vig, new LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.MATCH_PARENT));
         LinearLayout col = new LinearLayout(getContext()); col.setOrientation(LinearLayout.VERTICAL); col.setGravity(Gravity.CENTER_HORIZONTAL);
         opLogo = new android.widget.ImageView(getContext()); opLogo.setScaleType(android.widget.ImageView.ScaleType.FIT_CENTER); opLogo.setAdjustViewBounds(true);
         opLogo.setMaxWidth(h.px(40)); opLogo.setMaxHeight(h.px(14));
         col.addView(opLogo, new LinearLayout.LayoutParams(LayoutParams.WRAP_CONTENT, LayoutParams.WRAP_CONTENT));
         opName = h.text(h.fSemi, 4.2f, Color.WHITE); opName.setGravity(Gravity.CENTER); opName.setMaxLines(2); opName.setEllipsize(TextUtils.TruncateAt.END);
-        opName.setLetterSpacing(-.02f); opName.setShadowLayer(R, 0, .1f * R, 0x99000000); opName.setMaxWidth(h.px(Math.min(70, h.SW - 10)));
+        opName.setLetterSpacing(-.02f); opName.setShadowLayer(R, 0, .1f * R, Ui.BLACK_60); opName.setMaxWidth(h.px(Math.min(70, h.SW - 10)));
         col.addView(opName, new LinearLayout.LayoutParams(LayoutParams.WRAP_CONTENT, LayoutParams.WRAP_CONTENT));
-        opEp = h.text(h.fSemi, 1.5f, 0xE6FFFFFF); opEp.setGravity(Gravity.CENTER); opEp.setMaxLines(1); opEp.setEllipsize(TextUtils.TruncateAt.END);
-        opEp.setShadowLayer(.6f * R, 0, .1f * R, 0x99000000); opEp.setMaxWidth(h.px(Math.min(70, h.SW - 10)));
+        opEp = h.text(h.fSemi, Ui.TEXT_XL, Ui.WHITE_95); opEp.setGravity(Gravity.CENTER); opEp.setMaxLines(1); opEp.setEllipsize(TextUtils.TruncateAt.END);
+        opEp.setShadowLayer(.6f * R, 0, .1f * R, Ui.BLACK_60); opEp.setMaxWidth(h.px(Math.min(70, h.SW - 10)));
         LinearLayout.LayoutParams el = new LinearLayout.LayoutParams(LayoutParams.WRAP_CONTENT, LayoutParams.WRAP_CONTENT); el.topMargin = h.px(1.6f);
         col.addView(opEp, el);
         opLine = new Sweep(getContext());
         LinearLayout.LayoutParams sl = new LinearLayout.LayoutParams(h.px(16), h.px(.5f)); sl.topMargin = h.px(3f);
         col.addView(opLine, sl);
-        opNote = h.text(h.fMed, 1.1f, 0x99FFFFFF); opNote.setGravity(Gravity.CENTER); opNote.setMaxLines(1); opNote.setEllipsize(TextUtils.TruncateAt.END);
+        opNote = h.text(h.fMed, Ui.TEXT_S, Ui.WHITE_60); opNote.setGravity(Gravity.CENTER); opNote.setMaxLines(1); opNote.setEllipsize(TextUtils.TruncateAt.END);
         opNote.setMaxWidth(h.px(Math.min(70, h.SW - 10)));
         LinearLayout.LayoutParams nl = new LinearLayout.LayoutParams(LayoutParams.WRAP_CONTENT, LayoutParams.WRAP_CONTENT); nl.topMargin = h.px(1.4f);
         col.addView(opNote, nl);
@@ -203,7 +203,7 @@ final class VodPlayer extends FrameLayout {
                 new HomeImages.Done() { @Override public void done(android.graphics.Bitmap b) {
                     if (b == null || !openingUp || my != pid) return;
                     opBg.setImageBitmap(b);
-                    opBg.animate().alpha(1f).setDuration(500).start();
+                    opBg.animate().alpha(1f).setDuration(Ui.SLOW).start();
                     opBg.animate().scaleX(1f).scaleY(1f).setDuration(12000).setInterpolator(new android.view.animation.DecelerateInterpolator()).start();
                 } });
         if (logo.startsWith("http")) h.imgs.load("op:" + logo, new HomeImages.Source() { @Override public byte[] bytes() throws Exception { return HomeImages.http(logo, null); } }, h.px(40), h.px(14),
@@ -226,7 +226,7 @@ final class VodPlayer extends FrameLayout {
         openingUp = false;
         opLine.stop();
         opLogo.animate().cancel(); opName.animate().cancel(); opBg.animate().cancel();
-        if (fade) opening.animate().alpha(0f).setDuration(450).withEndAction(new Runnable() { @Override public void run() { if (!openingUp) { opening.setVisibility(GONE); opBg.setImageDrawable(null); opLogo.setImageDrawable(null); } } }).start();
+        if (fade) opening.animate().alpha(0f).setDuration(Ui.SLOW).withEndAction(new Runnable() { @Override public void run() { if (!openingUp) { opening.setVisibility(GONE); opBg.setImageDrawable(null); opLogo.setImageDrawable(null); } } }).start();
         else { opening.animate().cancel(); opening.setVisibility(GONE); opBg.setImageDrawable(null); opLogo.setImageDrawable(null); }
     }
     /** a thin line with a bright stretch sweeping across it, over and over */
@@ -240,7 +240,7 @@ final class VodPlayer extends FrameLayout {
         @Override protected void onDraw(Canvas c) {
             int w = getWidth(), hh = getHeight();
             float rad = hh / 2f;
-            p.setColor(0x33FFFFFF); r.set(0, 0, w, hh); c.drawRoundRect(r, rad, rad, p);
+            p.setColor(Ui.WHITE_20); r.set(0, 0, w, hh); c.drawRoundRect(r, rad, rad, p);
             if (!on) return;
             float f = ((SystemClock.uptimeMillis() - t0) % 1500) / 1500f;
             float e = f < .5f ? 2 * f * f : 1 - (float) Math.pow(-2 * f + 2, 2) / 2;     // (eases in and out)
@@ -254,10 +254,10 @@ final class VodPlayer extends FrameLayout {
     private void buildPauseInfo() {
         pauseInfo = new FrameLayout(getContext());
         View dim = new View(getContext());
-        dim.setBackground(new GradientDrawable(GradientDrawable.Orientation.LEFT_RIGHT, new int[] { 0xF0000000, 0xB3000000, 0x59000000 }));
+        dim.setBackground(new GradientDrawable(GradientDrawable.Orientation.LEFT_RIGHT, new int[] { Ui.BLACK_90, Ui.BLACK_70, 0x59000000 }));
         pauseInfo.addView(dim, new LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.MATCH_PARENT));
         LinearLayout col = new LinearLayout(getContext()); col.setOrientation(LinearLayout.VERTICAL);
-        piKicker = h.text(h.fSemi, 1.1f, 0xB3FFFFFF); piKicker.setLetterSpacing(.16f); piKicker.setText("PAUSED");
+        piKicker = h.text(h.fSemi, Ui.TEXT_S, Ui.WHITE_75); piKicker.setLetterSpacing(.16f); piKicker.setText("PAUSED");
         col.addView(piKicker);
         piLogo = new android.widget.ImageView(getContext()); piLogo.setScaleType(android.widget.ImageView.ScaleType.FIT_START); piLogo.setAdjustViewBounds(true);
         piLogo.setMaxWidth(h.px(34)); piLogo.setMaxHeight(h.px(11));
@@ -266,16 +266,16 @@ final class VodPlayer extends FrameLayout {
         piName = h.text(h.fSemi, 4f, Color.WHITE); piName.setLetterSpacing(-.02f); piName.setMaxLines(2); piName.setEllipsize(TextUtils.TruncateAt.END);
         LinearLayout.LayoutParams nl = new LinearLayout.LayoutParams(LayoutParams.WRAP_CONTENT, LayoutParams.WRAP_CONTENT); nl.topMargin = h.px(1f);
         col.addView(piName, nl);
-        piMeta = h.text(h.fMed, 1.35f, 0xD9FFFFFF);
+        piMeta = h.text(h.fMed, Ui.TEXT_L, Ui.WHITE_85);
         LinearLayout.LayoutParams ml = new LinearLayout.LayoutParams(LayoutParams.WRAP_CONTENT, LayoutParams.WRAP_CONTENT); ml.topMargin = h.px(1.2f);
         col.addView(piMeta, ml);
         piEp = h.text(h.fSemi, 1.6f, Color.WHITE); piEp.setMaxLines(1); piEp.setEllipsize(TextUtils.TruncateAt.END);
         LinearLayout.LayoutParams el = new LinearLayout.LayoutParams(LayoutParams.WRAP_CONTENT, LayoutParams.WRAP_CONTENT); el.topMargin = h.px(1.8f);
         col.addView(piEp, el);
-        piDesc = h.text(h.fReg, 1.4f, 0xCCFFFFFF); piDesc.setMaxLines(5); piDesc.setEllipsize(TextUtils.TruncateAt.END); piDesc.setLineSpacing(0, 1.3f);
+        piDesc = h.text(h.fReg, Ui.TEXT_L, Ui.WHITE_85); piDesc.setMaxLines(5); piDesc.setEllipsize(TextUtils.TruncateAt.END); piDesc.setLineSpacing(0, 1.3f);
         LinearLayout.LayoutParams dl = new LinearLayout.LayoutParams(h.px(54), LayoutParams.WRAP_CONTENT); dl.topMargin = h.px(1.2f);
         col.addView(piDesc, dl);
-        piHint = h.text(h.fMed, 1.15f, 0x99FFFFFF); piHint.setText("OK · Play   ·   Back · Stop");
+        piHint = h.text(h.fMed, Ui.TEXT_M, Ui.WHITE_60); piHint.setText("OK · Play   ·   Back · Stop");
         LinearLayout.LayoutParams hl = new LinearLayout.LayoutParams(LayoutParams.WRAP_CONTENT, LayoutParams.WRAP_CONTENT); hl.topMargin = h.px(2.6f);
         col.addView(piHint, hl);
         LayoutParams cl = new LayoutParams(h.px(Math.min(62, h.SW - 10)), LayoutParams.WRAP_CONTENT, Gravity.CENTER_VERTICAL | Gravity.LEFT);
@@ -309,17 +309,17 @@ final class VodPlayer extends FrameLayout {
                 new HomeImages.Done() { @Override public void done(android.graphics.Bitmap b) { if (b != null && pauseInfoUp) { piLogo.setImageBitmap(b); piLogo.setVisibility(VISIBLE); piName.setVisibility(GONE); } } });
         pauseInfoUp = true;
         removeCallbacks(barHide);
-        bar.animate().cancel(); bar.animate().alpha(0f).setDuration(300).start();
+        bar.animate().cancel(); bar.animate().alpha(0f).setDuration(Ui.MOVE).start();
         pauseInfo.setVisibility(VISIBLE); pauseInfo.bringToFront();
         pauseInfo.animate().cancel(); pauseInfo.setTranslationX(-h.px(2));
-        pauseInfo.animate().alpha(1f).translationX(0).setDuration(450).setInterpolator(TileView.EASE).start();
+        pauseInfo.animate().alpha(1f).translationX(0).setDuration(Ui.SLOW).setInterpolator(TileView.EASE).start();
     }
     private void hidePauseInfo(boolean animate) {
         if (pauseInfo == null) return;
         pauseInfoUp = false;
         pauseInfo.animate().cancel();
         if (!animate) { pauseInfo.setAlpha(0f); pauseInfo.setVisibility(GONE); return; }
-        pauseInfo.animate().alpha(0f).setDuration(250).withEndAction(new Runnable() { @Override public void run() { if (!pauseInfoUp) pauseInfo.setVisibility(GONE); } }).start();
+        pauseInfo.animate().alpha(0f).setDuration(Ui.BASE).withEndAction(new Runnable() { @Override public void run() { if (!pauseInfoUp) pauseInfo.setVisibility(GONE); } }).start();
     }
 
     /* ------------------------------------------------------------------ skipping intros, recaps and credits
@@ -363,13 +363,13 @@ final class VodPlayer extends FrameLayout {
         upPlay.setText("▶  Play now · " + upLeft);
         hideSkip();
         upCard.setVisibility(VISIBLE); upCard.bringToFront();
-        upCard.setTranslationX(h.px(3)); upCard.animate().alpha(1f).translationX(0).setDuration(300).start();
+        upCard.setTranslationX(h.px(3)); upCard.animate().alpha(1f).translationX(0).setDuration(Ui.MOVE).start();
         removeCallbacks(upTick); postDelayed(upTick, 1000);
     }
     private void hideUpNext() {
         upShown = false; removeCallbacks(upTick);
         upCard.animate().cancel();
-        upCard.animate().alpha(0f).setDuration(200).withEndAction(new Runnable() { @Override public void run() { if (!upShown) upCard.setVisibility(GONE); } }).start();
+        upCard.animate().alpha(0f).setDuration(Ui.FAST).withEndAction(new Runnable() { @Override public void run() { if (!upShown) upCard.setVisibility(GONE); } }).start();
     }
     /** the next episode now (this one counts as watched) */
     private void goNext() {
@@ -450,9 +450,9 @@ final class VodPlayer extends FrameLayout {
         if (in[2] == 2 && next != null && from != null && h.S.optBoolean("autoNext", true)) { segNow = null; return; }   // (the Up next card has the credits)
         skipBtn.setText(in[2] == 2 ? (next != null ? "Next episode  ›" : "Skip credits  ›") : in[2] == 1 ? "Skip recap  ›" : "Skip intro  ›");
         skipBtn.setVisibility(VISIBLE); skipBtn.bringToFront();
-        skipBtn.animate().alpha(1f).setDuration(250).start();
+        skipBtn.animate().alpha(1f).setDuration(Ui.BASE).start();
     }
-    private void hideSkip() { segNow = null; skipBtn.animate().cancel(); skipBtn.animate().alpha(0f).setDuration(200).withEndAction(new Runnable() { @Override public void run() { if (segNow == null) skipBtn.setVisibility(GONE); } }).start(); }
+    private void hideSkip() { segNow = null; skipBtn.animate().cancel(); skipBtn.animate().alpha(0f).setDuration(Ui.FAST).withEndAction(new Runnable() { @Override public void run() { if (segNow == null) skipBtn.setVisibility(GONE); } }).start(); }
     private boolean skipShown() { return segNow != null && skipBtn.getVisibility() == VISIBLE; }
     private void doSkip() {
         long[] g = segNow;
@@ -700,7 +700,7 @@ final class VodPlayer extends FrameLayout {
         /* the bar (all of it) goes once nothing's happened for 7 s while playing: it used to stay up after a menu
            (More, Subtitles) had closed, since nothing set it going again */
         if (bar.getAlpha() > .5f && !paused && !scrubbing && !h.menuOpenNow() && SystemClock.uptimeMillis() - barAt > 7000) {
-            bar.animate().cancel(); bar.animate().alpha(0f).setDuration(300).start();
+            bar.animate().cancel(); bar.animate().alpha(0f).setDuration(Ui.MOVE).start();
         }
         postDelayed(this, 500);
     } };
@@ -792,7 +792,7 @@ final class VodPlayer extends FrameLayout {
         boolean box = !"shadow".equals(h.S.optString("subBg"));
         cues.setShadowLayer(box ? 0 : .5f * R, 0, box ? 0 : .1f * R, 0xFF000000);
         android.text.SpannableString sp = new android.text.SpannableString(s);
-        if (box) sp.setSpan(new android.text.style.BackgroundColorSpan(0xB8000000), 0, s.length(), 0);
+        if (box) sp.setSpan(new android.text.style.BackgroundColorSpan(Ui.BLACK_70), 0, s.length(), 0);
         cues.setText(sp); cues.setVisibility(VISIBLE);
     }
 
@@ -801,13 +801,13 @@ final class VodPlayer extends FrameLayout {
     private final Runnable barHide = new Runnable() { @Override public void run() {
         if (paused) return;
         if (scrubbing) commitScrub();
-        bar.animate().alpha(0f).setDuration(300).start();
+        bar.animate().alpha(0f).setDuration(Ui.MOVE).start();
     } };
     private boolean barShown() { return bar.getAlpha() > .5f; }
     private long barAt;
     private void showBar() {
         barAt = SystemClock.uptimeMillis();
-        bar.animate().alpha(1f).setDuration(250).start();
+        bar.animate().alpha(1f).setDuration(Ui.BASE).start();
         ctl.invalidate();
         removeCallbacks(barHide); postDelayed(barHide, 6000);
     }
@@ -852,7 +852,7 @@ final class VodPlayer extends FrameLayout {
         }
         if (c == KeyEvent.KEYCODE_BACK || c == KeyEvent.KEYCODE_ESCAPE) {
             if (scrubbing) { removeCallbacks(scrubCommit); scrubbing = false; scrubEnd(false); ctl.invalidate(); return true; }
-            if (barShown()) { removeCallbacks(barHide); bar.animate().alpha(0f).setDuration(200).start(); return true; }
+            if (barShown()) { removeCallbacks(barHide); bar.animate().alpha(0f).setDuration(Ui.FAST).start(); return true; }
             close(); return true;
         }
         // a "Skip intro" button showing (and the bar away): OK takes it
@@ -901,7 +901,7 @@ final class VodPlayer extends FrameLayout {
         for (int i = 0; i < bs.size() && i < ctl.bx.length; i++) {
             if (Math.hypot(l[0] - ctl.bx[i], l[1] - ctl.by) < 2.9f * R) { row = 1; sel = i; press(bs.get(i)); showBar(); return "done"; }
         }
-        removeCallbacks(barHide); bar.animate().alpha(0f).setDuration(200).start();
+        removeCallbacks(barHide); bar.animate().alpha(0f).setDuration(Ui.FAST).start();
         return "done";
     }
     private final Runnable scrubCommit = new Runnable() { @Override public void run() { commitScrub(); } };
@@ -1050,7 +1050,7 @@ final class VodPlayer extends FrameLayout {
         float[] bx = new float[0]; float by, ty, tx0, tx1;        // (where things are: for a finger)
         Bar(android.content.Context c) {
             super(c);
-            tTime.setTypeface(h.fMed); tTime.setTextSize(1.1f * R); tTime.setColor(0xE0FFFFFF); tTime.setFontFeatureSettings("tnum");
+            tTime.setTypeface(h.fMed); tTime.setTextSize(1.1f * R); tTime.setColor(Ui.WHITE_85); tTime.setFontFeatureSettings("tnum");
             tNum.setTypeface(h.fSemi); tNum.setTextSize(.74f * R); tNum.setTextAlign(Paint.Align.CENTER);
             st.setStyle(Paint.Style.STROKE); st.setStrokeCap(Paint.Cap.ROUND); st.setStrokeJoin(Paint.Join.ROUND);
         }
@@ -1068,16 +1068,16 @@ final class VodPlayer extends FrameLayout {
             float tl = tTime.measureText("0:00:00") + 1.4f * R;
             tx0 = pad + tl; tx1 = w - pad - tl;
             float base = ty + tTime.getTextSize() * .36f;
-            tTime.setColor(seekRow ? Color.WHITE : 0xE0FFFFFF);
+            tTime.setColor(seekRow ? Color.WHITE : Ui.WHITE_85);
             tTime.setTextAlign(Paint.Align.LEFT); c.drawText(left, pad, base, tTime);
             tTime.setTextAlign(Paint.Align.RIGHT); c.drawText(right, w - pad, base, tTime);
             float th = (seekRow ? .62f : .44f) * R, len = tx1 - tx0;
-            p.setColor(0x2EFFFFFF); r.set(tx0, ty - th / 2, tx1, ty + th / 2); c.drawRoundRect(r, th, th, p);
+            p.setColor(Ui.WHITE_20); r.set(tx0, ty - th / 2, tx1, ty + th / 2); c.drawRoundRect(r, th, th, p);
             p.setColor(0x52FFFFFF); r.set(tx0, ty - th / 2, tx0 + len * Math.min(1, buf / span), ty + th / 2); c.drawRoundRect(r, th, th, p);
             float posX = tx0 + len * Math.min(1, pos / span), kx = tx0 + len * Math.min(1, tw / span);
             p.setColor(Color.WHITE); r.set(tx0, ty - th / 2, posX, ty + th / 2); c.drawRoundRect(r, th, th, p);
             if (seekRow) {
-                p.setColor(0x40FFFFFF); c.drawCircle(kx, ty, 1.25f * R, p);
+                p.setColor(Ui.WHITE_25); c.drawCircle(kx, ty, 1.25f * R, p);
                 p.setColor(Color.WHITE); c.drawCircle(kx, ty, .8f * R, p);
             } else c.drawCircle(posX, ty, .62f * R, p);
             // the buttons

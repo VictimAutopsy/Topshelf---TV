@@ -47,8 +47,8 @@ Quick compile check without building:
 - Java 8 source: no lambdas (anonymous inner classes), minSdk 26 (nothing newer without a version check).
 - Sizes are in rem: R = min(width/120, height/67.5); helpers `h.px()`, `h.at()`, `h.text(typeface, sizeRem, color)`.
 - Colours, small text sizes and timings come from the shared steps in `Ui.java` (`Ui.WHITE_60`, `Ui.TEXT_M`, `Ui.SLIDE`…): use the
-  nearest step, not a new number. `python3 tools/tokens.py <file.java>` swaps a file's literals for them. Done so far:
-  NativeHome, Billboard, TileView. Still to do: the other screens, one update each.
+  nearest step, not a new number. `python3 tools/tokens.py <file.java>` swaps a file's literals for them. Every screen
+  has been through it (1.0.386); text drawn on a canvas (Sports, Standings, parts of the title page) still has its own sizes.
 - Diagnostics: `Diag.ev("...")`. Lines are scrubbed of keys and logins, but don't log full stream or addon links anyway.
 
 ## Working with Chad

@@ -820,7 +820,7 @@ public class MainActivity extends Activity {
         try { h = nativeHome(); } catch (Throwable t) { nativeHomeBroken(t); return; }
         if (h == null) return;
         h.setAlpha(0f);
-        h.animate().alpha(1f).setDuration(220).start();
+        h.animate().alpha(1f).setDuration(Ui.FAST).start();
         bridge.reapply(h);
         if (!tab.equals("home")) try { h.showTab(tab); } catch (Throwable ignored) { }
         js("try { NH.owner = ''; nhSync(); } catch (e) {}");
@@ -1125,7 +1125,7 @@ public class MainActivity extends Activity {
         final android.widget.ImageView c = cover;
         if (c == null) return;
         cover = null;
-        c.animate().alpha(0f).setDuration(220).withEndAction(new Runnable() { @Override public void run() {
+        c.animate().alpha(0f).setDuration(Ui.FAST).withEndAction(new Runnable() { @Override public void run() {
             root.removeView(c);
             android.graphics.drawable.Drawable d = c.getDrawable();
             if (d instanceof android.graphics.drawable.BitmapDrawable) { android.graphics.Bitmap bm = ((android.graphics.drawable.BitmapDrawable) d).getBitmap(); c.setImageDrawable(null); if (bm != null) bm.recycle(); }

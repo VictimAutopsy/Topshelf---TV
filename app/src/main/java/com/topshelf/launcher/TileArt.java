@@ -25,7 +25,7 @@ final class TileArt {
         if (a.special) {
             gradient(c, w, h, 0xFF3A3A40, 0xFF1D1D21);
             HomeIcons g = new HomeIcons(HomeIcons.GEAR_BIG, 1.6f);
-            g.setColor(0xE6FFFFFF);
+            g.setColor(Ui.WHITE_95);
             int s = Math.round(4.4f * rem);
             g.setBounds((w - s) / 2, (h - s) / 2, (w + s) / 2, (h + s) / 2);
             g.draw(c);

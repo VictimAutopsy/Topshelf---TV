@@ -126,9 +126,9 @@ final class TitleView extends FrameLayout {
     private void trailerExit() {
         trFull = false;
         if (tp != null) tp.stop();
-        trHost.animate().cancel(); trHost.animate().alpha(0f).setDuration(350).start();
-        for (View v : new View[] { panel, shade, shade2, hint, hintShade }) { v.animate().cancel(); v.animate().alpha(1f).setDuration(350).start(); }
-        epBg.animate().cancel(); epBg.animate().alpha(epBgFor.isEmpty() ? 0f : 1f).setDuration(350).start();
+        trHost.animate().cancel(); trHost.animate().alpha(0f).setDuration(Ui.SLIDE).start();
+        for (View v : new View[] { panel, shade, shade2, hint, hintShade }) { v.animate().cancel(); v.animate().alpha(1f).setDuration(Ui.SLIDE).start(); }
+        epBg.animate().cancel(); epBg.animate().alpha(epBgFor.isEmpty() ? 0f : 1f).setDuration(Ui.SLIDE).start();
         scheduleTrailer();
     }
     /** a video starts, or the page closes: the trailer stops and lets go of the TV's video decoder */
@@ -149,7 +149,7 @@ final class TitleView extends FrameLayout {
         if (want.equals(epBgFor)) return;
         epBgFor = want;
         removeCallbacks(epBgLater);
-        if (want.isEmpty()) { epBg.animate().cancel(); epBg.animate().alpha(0f).setDuration(450).start(); return; }
+        if (want.isEmpty()) { epBg.animate().cancel(); epBg.animate().alpha(0f).setDuration(Ui.SLOW).start(); return; }
         postDelayed(epBgLater, 220);          // (passing episodes by quickly doesn't fetch each one)
     }
     private void loadEpBg() {
@@ -176,7 +176,7 @@ final class TitleView extends FrameLayout {
                 Bitmap old = bitmapOf(epBg);
                 epBg.setImageBitmap(fb);
                 epBg.animate().cancel(); epBg.setAlpha(Math.min(epBg.getAlpha(), .35f));
-                if (!trFull) epBg.animate().alpha(1f).setDuration(450).start();
+                if (!trFull) epBg.animate().alpha(1f).setDuration(Ui.SLOW).start();
                 if (old != null && old != fb) h.reclaim(old);
             } });
         } });
@@ -204,11 +204,11 @@ final class TitleView extends FrameLayout {
         logo = new ImageView(getContext()); logo.setScaleType(ImageView.ScaleType.FIT_START);
         addView(logo, h.at(5, 4, h.px(42), h.px(10)));
         title = h.text(h.fSemi, 4.2f, Color.WHITE); title.setSingleLine(true); title.setEllipsize(TextUtils.TruncateAt.END);
-        title.setShadowLayer(R, 0, .2f * R, 0x99000000);
+        title.setShadowLayer(R, 0, .2f * R, Ui.BLACK_60);
         addView(title, h.at(5, 5.4f, h.px(70), LayoutParams.WRAP_CONTENT));
-        meta = h.text(h.fMed, 1.45f, 0xD9FFFFFF);
+        meta = h.text(h.fMed, Ui.TEXT_XL, Ui.WHITE_85);
         addView(meta, h.at(5, 15.2f, h.px(70), LayoutParams.WRAP_CONTENT));
-        desc = h.text(h.fReg, 1.35f, 0xBFFFFFFF); desc.setMaxLines(3); desc.setEllipsize(TextUtils.TruncateAt.END); desc.setLineSpacing(0, 1.22f);
+        desc = h.text(h.fReg, Ui.TEXT_L, Ui.WHITE_75); desc.setMaxLines(3); desc.setEllipsize(TextUtils.TruncateAt.END); desc.setLineSpacing(0, 1.22f);
         addView(desc, h.at(5, 18f, h.px(64), LayoutParams.WRAP_CONTENT));
         panel = new Panel(getContext());
         addView(panel, new LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.MATCH_PARENT));
@@ -217,7 +217,7 @@ final class TitleView extends FrameLayout {
         hintShade = new View(getContext());
         hintShade.setBackground(new GradientDrawable(GradientDrawable.Orientation.TOP_BOTTOM, new int[] { 0x0007080D, 0xD907080D, 0xFF07080D }));
         addView(hintShade, new LayoutParams(LayoutParams.MATCH_PARENT, h.px(6.5f), android.view.Gravity.BOTTOM));
-        hint = h.text(h.fReg, 1.35f, 0x8CFFFFFF);
+        hint = h.text(h.fReg, Ui.TEXT_L, Ui.WHITE_60);
         addView(hint, h.at(5, h.SH - 2.9f, h.px(Math.min(100, h.SW - 10)), LayoutParams.WRAP_CONTENT));
         if (h.portrait) {
             // a phone held upright: the picture across the top (whole, not cropped), fading into the page below it
@@ -260,7 +260,7 @@ final class TitleView extends FrameLayout {
         loadPic(m.optString("background").isEmpty() ? m.optString("poster") : m.optString("background"), bg, h.W, h.H);
         if (!m.optString("logo").isEmpty()) loadLogo(m.optString("logo"));
         setVisibility(VISIBLE); bringToFront();
-        setAlpha(0f); animate().alpha(1f).setDuration(200).start();
+        setAlpha(0f); animate().alpha(1f).setDuration(Ui.FAST).start();
         if (tp != null) tp.stop();
         trHost.animate().cancel(); trHost.setAlpha(0f);
         scheduleTrailer();
@@ -282,7 +282,7 @@ final class TitleView extends FrameLayout {
         stopTrailer();
         if (curAsk != null) { curAsk.cancel(); curAsk = null; }
         binge = null;
-        animate().alpha(0f).setDuration(160).withEndAction(new Runnable() { @Override public void run() {
+        animate().alpha(0f).setDuration(Ui.QUICK).withEndAction(new Runnable() { @Override public void run() {
             setVisibility(GONE); drop(bg); drop(logo); drop(epBg); epBgFor = "";
             // (its pictures go too: up to 32 MB of stills, photos and posters)
             thumbs.evictAll(); thumbFailed.clear(); similar.clear(); reviews.clear(); traktCast.clear(); castFor = null; castCache = null;
@@ -1469,7 +1469,7 @@ final class TitleView extends FrameLayout {
                 float sc = Math.min(cw(48) / lb.getWidth(), 12.5f * R / lb.getHeight());
                 c.drawBitmap(lb, null, new RectF(x, 17.5f * R - lb.getHeight() * sc, x + lb.getWidth() * sc, 17.5f * R), bp);
             } else {
-                big.setTextSize(5.2f * R); big.setColor(Color.WHITE); big.setShadowLayer(R, 0, .2f * R, 0x99000000);
+                big.setTextSize(5.2f * R); big.setColor(Color.WHITE); big.setShadowLayer(R, 0, .2f * R, Ui.BLACK_60);
                 String t = item.optString("name");
                 android.text.StaticLayout sl = android.text.StaticLayout.Builder.obtain(t, 0, t.length(), big, Math.round(cw(72))).setMaxLines(2).setEllipsize(TextUtils.TruncateAt.END).setLineSpacing(0, .95f).build();
                 c.save(); c.translate(x, 17.5f * R - sl.getHeight()); sl.draw(c); c.restore();
@@ -1477,7 +1477,7 @@ final class TitleView extends FrameLayout {
             }
             // genres · year · IMDb
             float y = 21.4f * R;
-            small.setTextSize(1.75f * R); small.setColor(0xD9FFFFFF);
+            small.setTextSize(1.75f * R); small.setColor(Ui.WHITE_85);
             List<String> g = new ArrayList<>();
             JSONArray ga = f.optJSONArray("genres");
             if (ga != null) for (int i = 0; i < ga.length() && g.size() < 3; i++) g.add(ga.optString(i));
@@ -1531,7 +1531,7 @@ final class TitleView extends FrameLayout {
             if (!rt.isEmpty()) r2.add(rt);
             if (!f.optString("country").isEmpty()) r2.add(f.optString("country"));
             if (!f.optString("language").isEmpty()) r2.add(f.optString("language"));
-            small.setTextSize(1.6f * R); small.setColor(0xB3FFFFFF);
+            small.setTextSize(1.6f * R); small.setColor(Ui.WHITE_75);
             if (!r2.isEmpty()) c.drawText(TextUtils.ellipsize(TextUtils.join("   ·   ", r2), small, cw(70) - (bx - x), TextUtils.TruncateAt.END).toString(), bx + (bx > x ? .4f * R : 0), y + .55f * R, small);
             // credits
             y = 28.6f * R;
@@ -1541,12 +1541,12 @@ final class TitleView extends FrameLayout {
             else if (!wri.isEmpty()) cr.add("Writers  " + wri);
             List<JSONObject> cs = cast();
             if (!cs.isEmpty()) { List<String> nm = new ArrayList<>(); for (int i = 0; i < Math.min(3, cs.size()); i++) nm.add(cs.get(i).optString("name")); cr.add("Starring  " + TextUtils.join(", ", nm)); }
-            if (!cr.isEmpty()) { small.setTextSize(1.55f * R); small.setColor(0x99FFFFFF); c.drawText(TextUtils.ellipsize(TextUtils.join("     ", cr), small, cw(78), TextUtils.TruncateAt.END).toString(), x, y, small); }
+            if (!cr.isEmpty()) { small.setTextSize(1.55f * R); small.setColor(Ui.WHITE_60); c.drawText(TextUtils.ellipsize(TextUtils.join("     ", cr), small, cw(78), TextUtils.TruncateAt.END).toString(), x, y, small); }
             // the story
             String d = item.optString("desc"); if (d.isEmpty() && full != null) d = full.optString("description");
             float dw = cw(68);
             if (descL == null || !d.equals(descFor) || dw != descW) {
-                body.setTextSize(1.85f * R); body.setColor(0xE6FFFFFF);
+                body.setTextSize(1.85f * R); body.setColor(Ui.WHITE_95);
                 descL = d.isEmpty() ? null : android.text.StaticLayout.Builder.obtain(d, 0, d.length(), body, Math.round(dw)).setMaxLines(3).setEllipsize(TextUtils.TruncateAt.END).setLineSpacing(0, 1.22f).build();
                 descFor = d; descW = dw;
             }
@@ -1583,9 +1583,9 @@ final class TitleView extends FrameLayout {
             float ly = by + 7.6f * R;
             if (resume) {
                 float pw = 18 * R;
-                p.setColor(0x40FFFFFF); c.drawRoundRect(new RectF(x, ly - .9f * R, x + pw, ly - .4f * R), .25f * R, .25f * R, p);
+                p.setColor(Ui.WHITE_25); c.drawRoundRect(new RectF(x, ly - .9f * R, x + pw, ly - .4f * R), .25f * R, .25f * R, p);
                 p.setColor(Color.WHITE); c.drawRoundRect(new RectF(x, ly - .9f * R, x + pw * (float) Progress.fraction(pr), ly - .4f * R), .25f * R, .25f * R, p);
-                small.setTextSize(1.5f * R); small.setColor(0xB3FFFFFF);
+                small.setTextSize(1.5f * R); small.setColor(Ui.WHITE_75);
                 c.drawText(pr.optLong("dur") > 0 ? Math.max(1, (pr.optLong("dur") - pr.optLong("pos")) / 60000) + " min left" : Math.round(pr.optDouble("pct")) + "% watched", x + pw + 1.2f * R, ly - .1f * R, small);
                 ly += 2.8f * R;
             }
@@ -1599,10 +1599,10 @@ final class TitleView extends FrameLayout {
                     parts.add(q.contains("DV") && !q.contains("Remux") ? "Dolby Vision" : q.contains("HDR10+") ? "HDR10+" : q.contains("DV") || q.contains("HDR") ? "HDR10" : "SDR");
                     String sum = summary(all); if (!sum.isEmpty()) parts.add(sum.replace("  ·  ", " · "));
                     String sz = size(all); if (!sz.isEmpty()) parts.add(sz);
-                    small.setColor(0x80FFFFFF); c.drawText("Play picks", x, ly, small);
+                    small.setColor(Ui.WHITE_50); c.drawText("Play picks", x, ly, small);
                     float px = x + small.measureText("Play picks") + R;
-                    small.setColor(0xD9FFFFFF); c.drawText(TextUtils.ellipsize(TextUtils.join("  ·  ", parts), small, 70 * R, TextUtils.TruncateAt.END).toString(), px, ly, small);
-                } else { small.setColor(0x80FFFFFF); c.drawText(asked.containsValue("…") ? "Asking your addons for streams…" : streams.isEmpty() && !asked.isEmpty() ? "No playable streams found" : "", x, ly, small); }
+                    small.setColor(Ui.WHITE_85); c.drawText(TextUtils.ellipsize(TextUtils.join("  ·  ", parts), small, 70 * R, TextUtils.TruncateAt.END).toString(), px, ly, small);
+                } else { small.setColor(Ui.WHITE_50); c.drawText(asked.containsValue("…") ? "Asking your addons for streams…" : streams.isEmpty() && !asked.isEmpty() ? "No playable streams found" : "", x, ly, small); }
             }
         }
         String namesAll(Object o) {
@@ -1657,12 +1657,12 @@ final class TitleView extends FrameLayout {
                 c.save(); if (f) c.scale(1.05f, 1.05f, x + iw / 2, y + ih / 2);
                 rq.set(x, y, x + iw, y + ih); hit(x, y, x + iw, y + ih, "videos", i, true);
                 drawImage(c, thumb("https://img.youtube.com/vi/" + v.get(i).optString("yt") + "/mqdefault.jpg", Math.round(iw), Math.round(ih)), new RectF(rq), R);
-                if (!f) { p.setColor(0x40000000); c.drawRoundRect(rq, R, R, p); }
-                p.setColor(0xCC000000); c.drawCircle(rq.centerX(), rq.centerY(), 2.2f * R, p);
+                if (!f) { p.setColor(Ui.BLACK_25); c.drawRoundRect(rq, R, R, p); }
+                p.setColor(Ui.BLACK_85); c.drawCircle(rq.centerX(), rq.centerY(), 2.2f * R, p);
                 tq.setTextSize(2f * R); tq.setColor(Color.WHITE); c.drawText("▶", rq.centerX() + .2f * R, rq.centerY() + .7f * R, tq);
                 if (f) ring(c, rq, R);
                 c.restore();
-                big.setTextSize(1.55f * R); big.setColor(f ? Color.WHITE : 0xB3FFFFFF);
+                big.setTextSize(1.55f * R); big.setColor(f ? Color.WHITE : Ui.WHITE_75);
                 c.drawText(TextUtils.ellipsize(v.get(i).optString("title"), big, iw, TextUtils.TruncateAt.END).toString(), x, y + ih + (f ? 2.7f : 2.2f) * R, big);
             }
         }
@@ -1681,15 +1681,15 @@ final class TitleView extends FrameLayout {
                 rq.set(x, y, x + iw, y + ih); hit(x, y, x + iw, y + ih, "similar", i, true);
                 Bitmap b = thumb(m.optString("poster"), Math.round(iw), Math.round(ih));
                 drawImage(c, b, new RectF(rq), .8f * R);
-                if (b == null) { tq.setTextSize(1.4f * R); tq.setColor(0x99FFFFFF);
+                if (b == null) { tq.setTextSize(1.4f * R); tq.setColor(Ui.WHITE_60);
                     android.text.StaticLayout sl = android.text.StaticLayout.Builder.obtain(m.optString("name"), 0, m.optString("name").length(), tq, Math.round(iw - 2 * R)).setAlignment(android.text.Layout.Alignment.ALIGN_NORMAL).setMaxLines(4).build();
                     tq.setTextAlign(Paint.Align.LEFT); c.save(); c.translate(x + R, y + ih / 2 - sl.getHeight() / 2f); sl.draw(c); c.restore(); tq.setTextAlign(Paint.Align.CENTER); }
                 if (f) ring(c, rq, .8f * R);
                 c.restore();
-                small.setTextSize(1.35f * R); small.setColor(f ? Color.WHITE : 0x99FFFFFF);
+                small.setTextSize(1.35f * R); small.setColor(f ? Color.WHITE : Ui.WHITE_60);
                 c.drawText(TextUtils.ellipsize(m.optString("name"), small, iw, TextUtils.TruncateAt.END).toString(), x, y + ih + (f ? 2.6f : 2.1f) * R, small);
                 String sub = m.optString("year") + (m.optString("rating").isEmpty() ? "" : "   ★ " + m.optString("rating"));
-                small.setTextSize(1.15f * R); small.setColor(0x80FFFFFF);
+                small.setTextSize(1.15f * R); small.setColor(Ui.WHITE_50);
                 c.drawText(sub.trim(), x, y + ih + (f ? 4.3f : 3.8f) * R, small);
             }
         }
@@ -1714,10 +1714,10 @@ final class TitleView extends FrameLayout {
                 JSONObject us = m.optJSONObject("user_stats");
                 int rt = us == null ? 0 : us.optInt("rating");
                 String meta2 = (rt > 0 ? "★ " + rt + "/10    " : "") + "♥ " + m.optInt("likes");
-                small.setTextSize(1.25f * R); small.setColor(0x99FFFFFF); small.setTextAlign(Paint.Align.RIGHT);
+                small.setTextSize(1.25f * R); small.setColor(Ui.WHITE_60); small.setTextAlign(Paint.Align.RIGHT);
                 c.drawText(meta2, x + iw - 1.6f * R, y + 2.6f * R, small); small.setTextAlign(Paint.Align.LEFT);
                 String tx = m.optString("comment").replaceAll("\\s+", " ").trim();
-                body.setTextSize(1.45f * R); body.setColor(f ? 0xE6FFFFFF : 0xB3FFFFFF);
+                body.setTextSize(1.45f * R); body.setColor(f ? Ui.WHITE_95 : Ui.WHITE_75);
                 // as many lines as fit in the card (with room at the foot), the rest cut with "…"
                 Paint.FontMetrics fm = body.getFontMetrics();
                 float lineH = (fm.descent - fm.ascent) * 1.18f;
@@ -1742,16 +1742,16 @@ final class TitleView extends FrameLayout {
             String when = m.optString("created_at");
             if (when.length() >= 10) try { when = new java.text.SimpleDateFormat("MMM d, yyyy", Locale.US).format(new java.text.SimpleDateFormat("yyyy-MM-dd", Locale.US).parse(when.substring(0, 10))); } catch (Exception ignored) { }
             String meta2 = (rt > 0 ? "★ " + rt + "/10      " : "") + "♥ " + m.optInt("likes") + (when.isEmpty() ? "" : "      " + when) + "      " + (reviewOpen + 1) + " of " + reviews.size();
-            small.setTextSize(1.45f * R); small.setColor(0x99FFFFFF); small.setTextAlign(Paint.Align.RIGHT);
+            small.setTextSize(1.45f * R); small.setColor(Ui.WHITE_60); small.setTextAlign(Paint.Align.RIGHT);
             c.drawText(meta2, x0 + cw - 2.4f * R, y0 + 3.6f * R, small); small.setTextAlign(Paint.Align.LEFT);
-            p.setColor(0x1FFFFFFF); c.drawRect(x0 + 2.4f * R, y0 + 5.4f * R, x0 + cw - 2.4f * R, y0 + 5.4f * R + Math.max(1, .08f * R), p);
+            p.setColor(Ui.WHITE_12); c.drawRect(x0 + 2.4f * R, y0 + 5.4f * R, x0 + cw - 2.4f * R, y0 + 5.4f * R + Math.max(1, .08f * R), p);
             String tx = m.optString("comment").trim();
-            body.setTextSize(1.8f * R); body.setColor(0xF0FFFFFF);
+            body.setTextSize(1.8f * R); body.setColor(Ui.WHITE_95);
             android.text.StaticLayout sl = android.text.StaticLayout.Builder.obtain(tx, 0, tx.length(), body, Math.round(cw - 4.8f * R)).setLineSpacing(0, 1.3f).build();
             float ty0 = y0 + 6.8f * R, vh = y1 - 2 * R - ty0;
             reviewScroll = Math.max(0, Math.min(reviewScroll, Math.max(0, sl.getHeight() - vh)));
             c.save(); c.clipRect(x0, ty0, x0 + cw, ty0 + vh); c.translate(x0 + 2.4f * R, ty0 - reviewScroll); sl.draw(c); c.restore();
-            small.setTextSize(1.3f * R); small.setColor(0x99FFFFFF);
+            small.setTextSize(1.3f * R); small.setColor(Ui.WHITE_60);
             if (sl.getHeight() - reviewScroll > vh + 2) c.drawText("▼ more", x0 + cw - 8 * R, y1 - .8f * R, small);
             if (reviewScroll > 0) c.drawText("▲", x0 + cw - 8 * R, y0 + 6.4f * R, small);
         }
@@ -1765,9 +1765,9 @@ final class TitleView extends FrameLayout {
             float colW = 42 * R;
             for (int i = 0; i < a.size(); i++) {
                 float x = 5 * R + (i < half ? 0 : colW + 4 * R), y = top + 5.6f * R + (i < half ? i : i - half) * 4.6f * R;
-                small.setTextSize(1.25f * R); small.setColor(0x80FFFFFF);
+                small.setTextSize(1.25f * R); small.setColor(Ui.WHITE_50);
                 c.drawText(a.get(i)[0].toUpperCase(Locale.US), x, y, small);
-                body.setTextSize(1.6f * R); body.setColor(on ? Color.WHITE : 0xE6FFFFFF);
+                body.setTextSize(1.6f * R); body.setColor(on ? Color.WHITE : Ui.WHITE_95);
                 c.drawText(TextUtils.ellipsize(a.get(i)[1], body, colW, TextUtils.TruncateAt.END).toString(), x, y + 2.1f * R, body);
             }
         }
@@ -1779,8 +1779,8 @@ final class TitleView extends FrameLayout {
             small.setTextSize(1.3f * R);
             float bw = small.measureText(s) + 1.4f * R;
             rq.set(x, y - 1.05f * R, x + bw, y + 1.05f * R);
-            p.setStyle(Paint.Style.STROKE); p.setStrokeWidth(Math.max(2, .1f * R)); p.setColor(0x99FFFFFF); c.drawRoundRect(rq, .35f * R, .35f * R, p); p.setStyle(Paint.Style.FILL);
-            small.setColor(0xE6FFFFFF); c.drawText(s, x + .7f * R, y + .47f * R, small);
+            p.setStyle(Paint.Style.STROKE); p.setStrokeWidth(Math.max(2, .1f * R)); p.setColor(Ui.WHITE_60); c.drawRoundRect(rq, .35f * R, .35f * R, p); p.setStyle(Paint.Style.FILL);
+            small.setColor(Ui.WHITE_95); c.drawText(s, x + .7f * R, y + .47f * R, small);
             return rq.right + .8f * R;
         }
         private float button(Canvas c, String label, float x, float y, boolean focused, boolean primary) {
@@ -1790,11 +1790,11 @@ final class TitleView extends FrameLayout {
             if (air) { label = label.toUpperCase(Locale.US); bw = th.measureText(label) + 6.2f * R; }
             rf.set(x, y, x + bw, y + bh);
             if (GlassPanel.look.equals("glass") || GlassPanel.look.equals("spot")) {
-                if (focused) { p.setShadowLayer(1.6f * R, 0, .4f * R, 0x80000000); p.setColor(Color.WHITE); c.drawRoundRect(rf, bh / 2, bh / 2, p); p.clearShadowLayer(); }
-                else { p.setColor(primary ? 0x4DFFFFFF : 0x2EFFFFFF); c.drawRoundRect(rf, bh / 2, bh / 2, p); }
+                if (focused) { p.setShadowLayer(1.6f * R, 0, .4f * R, Ui.BLACK_55); p.setColor(Color.WHITE); c.drawRoundRect(rf, bh / 2, bh / 2, p); p.clearShadowLayer(); }
+                else { p.setColor(primary ? 0x4DFFFFFF : Ui.WHITE_20); c.drawRoundRect(rf, bh / 2, bh / 2, p); }
             } else {
                 // the look's own buttons (On Air's cut bars, the shelf's lit plates, Photo Ink's prints)
-                android.graphics.drawable.Drawable d = GlassPanel.buttonBg(focused, bh / 2, primary ? 0x4DFFFFFF : 0x2EFFFFFF);
+                android.graphics.drawable.Drawable d = GlassPanel.buttonBg(focused, bh / 2, primary ? 0x4DFFFFFF : Ui.WHITE_20);
                 d.setBounds(Math.round(rf.left), Math.round(rf.top), Math.round(rf.right), Math.round(rf.bottom));
                 d.draw(c);
             }
@@ -1809,7 +1809,7 @@ final class TitleView extends FrameLayout {
             float x = 5 * R, sy = top;
             boolean fz = zone.equals("seasons");
             small.setTextSize(2f * R); small.setColor(Color.WHITE);
-            if (seasons.isEmpty()) { small.setTextSize(1.6f * R); small.setColor(0x99FFFFFF); c.drawText(full == null ? "Loading episodes…" : "No episodes listed", x, sy + 2.2f * R, small); }
+            if (seasons.isEmpty()) { small.setTextSize(1.6f * R); small.setColor(Ui.WHITE_60); c.drawText(full == null ? "Loading episodes…" : "No episodes listed", x, sy + 2.2f * R, small); }
             th.setTextSize(1.6f * R);
             /* The season names scroll sideways when there are more than fit (the chosen one always in view),
                beside the ratings strip when there is one. */
@@ -1841,15 +1841,15 @@ final class TitleView extends FrameLayout {
                     rf.set(x, sy, x + cw, sy + 3.6f * R);
                     hit(Math.max(x, x0), sy, Math.min(x + cw, x1), sy + 3.6f * R, "season", s, true);
                     if (cur && fz) { p.setColor(Color.WHITE); c.drawRoundRect(rf, 1.8f * R, 1.8f * R, p); }
-                    else if (cur) { p.setColor(0x38FFFFFF); c.drawRoundRect(rf, 1.8f * R, 1.8f * R, p); }
-                    th.setColor(cur && fz ? 0xFF111111 : cur ? Color.WHITE : 0x8CFFFFFF);
+                    else if (cur) { p.setColor(Ui.WHITE_20); c.drawRoundRect(rf, 1.8f * R, 1.8f * R, p); }
+                    th.setColor(cur && fz ? 0xFF111111 : cur ? Color.WHITE : Ui.WHITE_60);
                     c.drawText(lab, x + 1.6f * R, rf.centerY() + th.getTextSize() * .35f, th);
                 }
                 x += cw + .6f * R;
             }
             c.restore();
             // more seasons off either side: a small arrow says so
-            th.setColor(0x99FFFFFF);
+            th.setColor(Ui.WHITE_60);
             if (seasonOff > 1) c.drawText("‹", x0 - 2.2f * R, sy + 2.45f * R, th);
             if (total - .6f * R - seasonOff > room + 1) c.drawText("›", x1 + .9f * R, sy + 2.45f * R, th);
             th.setTextSize(1.3f * R);
@@ -1865,7 +1865,7 @@ final class TitleView extends FrameLayout {
                 if (f) c.scale(1.05f, 1.05f, cx + cardW / 2, y + cardH / 2);
                 rq.set(cx, y, cx + cardW, y + cardH);
                 hit(cx, y, cx + cardW, y + cardH, "episodes", i, true);
-                if (f) { p.setShadowLayer(2f * R, 0, .6f * R, 0xB3000000); p.setColor(0xFF000000); c.drawRoundRect(rq, R, R, p); p.clearShadowLayer(); }
+                if (f) { p.setShadowLayer(2f * R, 0, .6f * R, Ui.BLACK_70); p.setColor(0xFF000000); c.drawRoundRect(rq, R, R, p); p.clearShadowLayer(); }
                 String th0 = e.optString("thumbnail"), th1 = epStill(e);
                 Bitmap b = th0.isEmpty() ? thumb(th1, null, Math.round(cardW), Math.round(cardH)) : thumb(th0, th1 != null && th1.equals(th0) ? null : th1, Math.round(cardW), Math.round(cardH));
                 // not seen yet: its picture blurred (no spoilers); seen: the picture itself
@@ -1879,18 +1879,18 @@ final class TitleView extends FrameLayout {
                     c.drawBitmap(b, null, new RectF(rq.centerX() - dw / 2, rq.centerY() - dh / 2, rq.centerX() + dw / 2, rq.centerY() + dh / 2), bp);
                 } else {
                     p.setShader(new LinearGradient(rq.left, rq.top, rq.right, rq.bottom, 0xFF2C2B38, 0xFF15141C, Shader.TileMode.CLAMP)); c.drawRect(rq, p); p.setShader(null);
-                    tq.setTextSize(4.5f * R); tq.setColor(0x33FFFFFF);
+                    tq.setTextSize(4.5f * R); tq.setColor(Ui.WHITE_20);
                     c.drawText(String.valueOf(e.optInt("episode", e.optInt("number"))), rq.centerX(), rq.centerY() + 1.6f * R, tq);
                 }
                 if (!f) { p.setColor(fe ? 0x59000000 : 0x33000000); c.drawRect(rq, p); }
                 int sn = e.optInt("season", season), en = e.optInt("episode", e.optInt("number"));
-                chip(c, rq.left + .9f * R, rq.top + .9f * R, "S" + sn + " · E" + (en < 10 ? "0" : "") + en, 0xB3000000, Color.WHITE, false);
+                chip(c, rq.left + .9f * R, rq.top + .9f * R, "S" + sn + " · E" + (en < 10 ? "0" : "") + en, Ui.BLACK_70, Color.WHITE, false);
                 Double rt = epRating.get(sn + ":" + en);
-                if (rt != null) chip(c, rq.right - .9f * R, rq.top + .9f * R, String.format(Locale.US, "★ %.1f", rt), 0xB3000000, heat(rt), true);
+                if (rt != null) chip(c, rq.right - .9f * R, rq.top + .9f * R, String.format(Locale.US, "★ %.1f", rt), Ui.BLACK_70, heat(rt), true);
                 JSONObject pr = Progress.get(getContext(), e.optString("id"));
                 boolean seen = (pr != null && Progress.done(pr)) || Progress.watched(getContext(), e.optString("id"));
                 if (pr != null && !seen && Progress.fraction(pr) > 0) {
-                    p.setColor(0x99000000); c.drawRect(rq.left, rq.bottom - .55f * R, rq.right, rq.bottom, p);
+                    p.setColor(Ui.BLACK_60); c.drawRect(rq.left, rq.bottom - .55f * R, rq.right, rq.bottom, p);
                     p.setColor(0xFFFF5A5F); c.drawRect(rq.left, rq.bottom - .55f * R, rq.left + rq.width() * (float) Progress.fraction(pr), rq.bottom, p);
                 }
                 c.restore();
@@ -1904,10 +1904,10 @@ final class TitleView extends FrameLayout {
                 int n = e.optInt("episode", e.optInt("number"));
                 String name = e.optString("name", e.optString("title"));
                 float ty = y + cardH + (f ? 3.2f : 2.6f) * R;
-                big.setTextSize(1.8f * R); big.setColor(f ? Color.WHITE : 0xB3FFFFFF);
+                big.setTextSize(1.8f * R); big.setColor(f ? Color.WHITE : Ui.WHITE_75);
                 c.drawText(TextUtils.ellipsize(n + ".  " + (name.isEmpty() ? "Episode " + n : name), big, cardW, TextUtils.TruncateAt.END).toString(), cx, ty, big);
                 String when = pr != null && !seen && Progress.fraction(pr) > 0 ? (pr.optLong("dur") > 0 ? Math.max(1, (pr.optLong("dur") - pr.optLong("pos")) / 60000) + " min left" : Math.round(pr.optDouble("pct")) + "% watched") : airDate(e);
-                small.setTextSize(1.4f * R); small.setColor(f ? 0x99FFFFFF : 0x66FFFFFF);
+                small.setTextSize(1.4f * R); small.setColor(f ? Ui.WHITE_60 : Ui.WHITE_40);
                 c.drawText(when, cx, ty + 2.1f * R, small);
             }
             // the chosen episode's story
@@ -1915,7 +1915,7 @@ final class TitleView extends FrameLayout {
                 JSONObject e = eps.get(epSel);
                 String ov = e.optString("overview", e.optString("description")).replace('\n', ' ').trim();
                 if (!ov.isEmpty()) {
-                    body.setTextSize(1.7f * R); body.setColor(fe ? 0xD9FFFFFF : 0x99FFFFFF);
+                    body.setTextSize(1.7f * R); body.setColor(fe ? Ui.WHITE_85 : Ui.WHITE_60);
                     android.text.StaticLayout sl = android.text.StaticLayout.Builder.obtain(ov, 0, ov.length(), body, Math.round(84 * R))
                             .setMaxLines(2).setEllipsize(TextUtils.TruncateAt.END).setLineSpacing(0, 1.22f).build();
                     c.save(); c.translate(5 * R, y + cardH + 6.8f * R); sl.draw(c); c.restore();
@@ -1952,7 +1952,7 @@ final class TitleView extends FrameLayout {
                 JSONObject e = eps.get(i);
                 Double rt = epRating.get(e.optInt("season", season) + ":" + e.optInt("episode", e.optInt("number")));
                 rf.set(x, top, x + sq, top + sq);
-                p.setColor(rt == null ? 0x26FFFFFF : (heat(rt) & 0x00FFFFFF) | (on && i == epSel ? 0xFF000000 : 0xCC000000));
+                p.setColor(rt == null ? Ui.WHITE_12 : (heat(rt) & 0x00FFFFFF) | (on && i == epSel ? 0xFF000000 : Ui.BLACK_85));
                 c.drawRoundRect(rf, .4f * R, .4f * R, p);
                 if (nums && rt != null) { tq.setColor(0xFF111111); c.drawText(String.format(Locale.US, "%.1f", rt), rf.centerX(), rf.centerY() + tq.getTextSize() * .36f, tq); }
                 if (i == epSel) { p.setStyle(Paint.Style.STROKE); p.setStrokeWidth(Math.max(2, .16f * R)); p.setColor(Color.WHITE); c.drawRoundRect(rf, .4f * R, .4f * R, p); p.setStyle(Paint.Style.FILL); }
@@ -1997,22 +1997,22 @@ final class TitleView extends FrameLayout {
             drawImage(c, pb, pr, 1.2f * R);
             if (pb == null) {
                 String ini = ""; for (String part : P.name.split(" ")) if (!part.isEmpty() && ini.length() < 2) ini += part.charAt(0);
-                tq.setTextSize(5f * R); tq.setColor(0x66FFFFFF); c.drawText(ini.toUpperCase(Locale.US), pr.centerX(), pr.centerY() + 1.8f * R, tq);
+                tq.setTextSize(5f * R); tq.setColor(Ui.WHITE_40); c.drawText(ini.toUpperCase(Locale.US), pr.centerX(), pr.centerY() + 1.8f * R, tq);
             }
-            p.setStyle(Paint.Style.STROKE); p.setStrokeWidth(Math.max(1, .08f * R)); p.setColor(0x26FFFFFF); c.drawRoundRect(pr, 1.2f * R, 1.2f * R, p); p.setStyle(Paint.Style.FILL);
+            p.setStyle(Paint.Style.STROKE); p.setStrokeWidth(Math.max(1, .08f * R)); p.setColor(Ui.WHITE_12); c.drawRoundRect(pr, 1.2f * R, 1.2f * R, p); p.setStyle(Paint.Style.FILL);
             // who they are
             float tx = px + pw + 3.5f * R, tw = Math.max(20 * R, Math.min(72 * R, w - tx - 5 * R));
             float y = py + 1.6f * R;
             String kick = (P.dept.isEmpty() ? "" : (P.dept.equals("Acting") ? "ACTOR" : P.dept.toUpperCase(Locale.US)) + (P.place.isEmpty() ? "" : "   ·   ")) + P.place.toUpperCase(Locale.US);
-            if (!kick.isEmpty()) { ts.setTextSize(1.05f * R); ts.setColor(0x99FFFFFF); c.drawText(TextUtils.ellipsize(kick, ts, tw, TextUtils.TruncateAt.END).toString(), tx, y, ts); }
+            if (!kick.isEmpty()) { ts.setTextSize(1.05f * R); ts.setColor(Ui.WHITE_60); c.drawText(TextUtils.ellipsize(kick, ts, tw, TextUtils.TruncateAt.END).toString(), tx, y, ts); }
             y += 4.6f * R;
             big.setTextSize((h.portrait ? 3f : 4.4f) * R); big.setColor(Color.WHITE);
             c.drawText(TextUtils.ellipsize(P.name, big, tw, TextUtils.TruncateAt.END).toString(), tx, y, big);
             y += 2.8f * R;
             String life = lifeLine(P);
-            small.setTextSize(1.45f * R); small.setColor(0xD9FFFFFF);
+            small.setTextSize(1.45f * R); small.setColor(Ui.WHITE_85);
             if (!life.isEmpty()) { c.drawText(TextUtils.ellipsize(life, small, tw, TextUtils.TruncateAt.END).toString(), tx, y, small); y += 2.3f * R; }
-            if (!P.counts.isEmpty() && !P.loading) { small.setColor(0x99FFFFFF); small.setTextSize(1.3f * R); c.drawText(P.counts, tx, y, small); y += 2.3f * R; }
+            if (!P.counts.isEmpty() && !P.loading) { small.setColor(Ui.WHITE_60); small.setTextSize(1.3f * R); c.drawText(P.counts, tx, y, small); y += 2.3f * R; }
             y += .8f * R;
             // the biography (OK reads it all)
             String bio = P.loading ? "Loading…" : P.bio.isEmpty() ? (P.note.isEmpty() ? "No biography yet." : P.note) : P.bio;
@@ -2025,11 +2025,11 @@ final class TitleView extends FrameLayout {
             }
             boolean bf = P.zone.equals("bio");
             RectF br = new RectF(tx - 1.4f * R, y - 1f * R, tx + tw + 1.4f * R, y + pBioL.getHeight() + (P.bioLong ? 3.2f : 1f) * R);
-            if (bf && P.bioLong) { p.setColor(0x14FFFFFF); c.drawRoundRect(br, R, R, p); ring(c, br, R); }
+            if (bf && P.bioLong) { p.setColor(Ui.WHITE_7); c.drawRoundRect(br, R, R, p); ring(c, br, R); }
             hit(br.left, br.top - P.pageY, br.right, br.bottom - P.pageY, "p:bio", 0, false);
-            body.setColor(bf ? 0xE6FFFFFF : 0xB3FFFFFF);
+            body.setColor(bf ? Ui.WHITE_95 : Ui.WHITE_75);
             c.save(); c.translate(tx, y); pBioL.draw(c); c.restore();
-            if (P.bioLong) { small.setTextSize(1.2f * R); small.setColor(bf ? Color.WHITE : 0x80FFFFFF); c.drawText("Read more", tx, y + pBioL.getHeight() + 2f * R, small); }
+            if (P.bioLong) { small.setTextSize(1.2f * R); small.setColor(bf ? Color.WHITE : Ui.WHITE_50); c.drawText("Read more", tx, y + pBioL.getHeight() + 2f * R, small); }
             // their films and shows
             for (String z : new String[] { "known", "movies", "shows" }) {
                 List<JSONObject> l = P.list(z); if (l.isEmpty()) continue;
@@ -2057,23 +2057,23 @@ final class TitleView extends FrameLayout {
                 rq.set(x, y, x + iw, y + ih); hit(x, y - P.pageY, x + iw, y + ih - P.pageY, "p:" + z, i, false);
                 Bitmap b = thumb(m.optString("poster"), Math.round(iw), Math.round(ih));
                 drawImage(c, b, new RectF(rq), .8f * R);
-                if (b == null) { tq.setTextSize(1.4f * R); tq.setColor(0x99FFFFFF);
+                if (b == null) { tq.setTextSize(1.4f * R); tq.setColor(Ui.WHITE_60);
                     android.text.StaticLayout sl = android.text.StaticLayout.Builder.obtain(m.optString("name"), 0, m.optString("name").length(), tq, Math.round(iw - 2 * R)).setAlignment(android.text.Layout.Alignment.ALIGN_NORMAL).setMaxLines(4).build();
                     tq.setTextAlign(Paint.Align.LEFT); c.save(); c.translate(x + R, y + ih / 2 - sl.getHeight() / 2f); sl.draw(c); c.restore(); tq.setTextAlign(Paint.Align.CENTER); }
                 // (still to come: a tag on the poster)
                 if (dateKey(m).compareTo(now) > 0 && !dateKey(m).equals("0000")) {
                     ts.setTextSize(.78f * R); float lw = ts.measureText("COMING") + 1.4f * R;
-                    rf.set(x + .7f * R, y + .7f * R, x + .7f * R + lw, y + 2.5f * R); p.setColor(0xE6FFFFFF); c.drawRoundRect(rf, .5f * R, .5f * R, p);
+                    rf.set(x + .7f * R, y + .7f * R, x + .7f * R + lw, y + 2.5f * R); p.setColor(Ui.WHITE_95); c.drawRoundRect(rf, .5f * R, .5f * R, p);
                     ts.setColor(0xFF111418); c.drawText("COMING", rf.left + .7f * R, rf.bottom - .55f * R, ts);
                 }
                 if (f) ring(c, rq, .8f * R);
                 c.restore();
-                small.setTextSize(1.35f * R); small.setColor(f ? Color.WHITE : 0x99FFFFFF);
+                small.setTextSize(1.35f * R); small.setColor(f ? Color.WHITE : Ui.WHITE_60);
                 c.drawText(TextUtils.ellipsize(m.optString("name"), small, iw, TextUtils.TruncateAt.END).toString(), x, y + ih + (f ? 2.6f : 2.1f) * R, small);
                 String ch = m.optString("character");
                 String sub = (ch.isEmpty() ? "" : (m.optBoolean("_crew") ? ch : "as " + ch));
                 String yr = m.optString("year") + (m.optInt("_eps") > 1 ? "  ·  " + m.optInt("_eps") + " eps" : "");
-                small.setTextSize(1.15f * R); small.setColor(0x80FFFFFF);
+                small.setTextSize(1.15f * R); small.setColor(Ui.WHITE_50);
                 c.drawText(TextUtils.ellipsize(sub.isEmpty() ? yr : sub, small, iw, TextUtils.TruncateAt.END).toString(), x, y + ih + (f ? 4.3f : 3.8f) * R, small);
                 if (!sub.isEmpty() && !yr.trim().isEmpty()) c.drawText(TextUtils.ellipsize(yr, small, iw, TextUtils.TruncateAt.END).toString(), x, y + ih + (f ? 5.9f : 5.4f) * R, small);
             }
@@ -2086,7 +2086,7 @@ final class TitleView extends FrameLayout {
             if (pBioFull == null) { body.setTextSize(1.55f * R); pBioFull = android.text.StaticLayout.Builder.obtain(P.bio, 0, P.bio.length(), body, Math.round(bw)).setLineSpacing(0, 1.4f).build(); }
             float ty = y0 + 5 * R, room = y1 - ty;
             P.bioScroll = Math.min(P.bioScroll, Math.max(0, pBioFull.getHeight() - room));
-            body.setColor(0xE6FFFFFF);
+            body.setColor(Ui.WHITE_95);
             c.save(); c.clipRect(x - R, ty, x + bw + R, y1); c.translate(x, ty - P.bioScroll); pBioFull.draw(c); c.restore();
         }
         // ------------------------------------------------------------ cast: round photos, names and parts
@@ -2114,14 +2114,14 @@ final class TitleView extends FrameLayout {
                     p.setColor(0xFF2A2934); c.drawCircle(ccx, ccy, rad, p);
                     String nm = m.optString("name"); String ini = "";
                     for (String part : nm.split(" ")) if (!part.isEmpty() && ini.length() < 2) ini += part.charAt(0);
-                    tq.setTextSize(2.6f * R); tq.setColor(0x80FFFFFF); c.drawText(ini.toUpperCase(Locale.US), ccx, ccy + .9f * R, tq);
+                    tq.setTextSize(2.6f * R); tq.setColor(Ui.WHITE_50); c.drawText(ini.toUpperCase(Locale.US), ccx, ccy + .9f * R, tq);
                 }
                 c.restore();
                 if (f) { p.setStyle(Paint.Style.STROKE); p.setStrokeWidth(Math.max(3, .22f * R)); p.setColor(Color.WHITE); c.drawCircle(ccx, ccy, rad, p); p.setStyle(Paint.Style.FILL); }
-                tq.setTextSize(1.4f * R); tq.setColor(f ? Color.WHITE : 0xD9FFFFFF);
+                tq.setTextSize(1.4f * R); tq.setColor(f ? Color.WHITE : Ui.WHITE_85);
                 float tw = castD + castGap * .8f;
                 c.drawText(TextUtils.ellipsize(m.optString("name"), tq, tw, TextUtils.TruncateAt.END).toString(), ccx, y + castD + 2.2f * R, tq);
-                if (!m.optString("character").isEmpty()) { tq.setTextSize(1.2f * R); tq.setColor(0x80FFFFFF); c.drawText(TextUtils.ellipsize(m.optString("character"), tq, tw, TextUtils.TruncateAt.END).toString(), ccx, y + castD + 3.9f * R, tq); }
+                if (!m.optString("character").isEmpty()) { tq.setTextSize(1.2f * R); tq.setColor(Ui.WHITE_50); c.drawText(TextUtils.ellipsize(m.optString("character"), tq, tw, TextUtils.TruncateAt.END).toString(), ccx, y + castD + 3.9f * R, tq); }
             }
         }
         private String airDate(JSONObject e) {
@@ -2187,7 +2187,7 @@ final class TitleView extends FrameLayout {
             float px0 = panelX0(), px1 = panelX1(), py0 = panelY0(), py1 = panelY1();
             rf.set(px0, py0, px1, py1);
             p.setColor(0xB31C1C1E); c.drawRoundRect(rf, 1.3f * R, 1.3f * R, p);
-            p.setStyle(Paint.Style.STROKE); p.setStrokeWidth(Math.max(1, .06f * R)); p.setColor(0x1FFFFFFF); c.drawRoundRect(rf, 1.3f * R, 1.3f * R, p); p.setStyle(Paint.Style.FILL);
+            p.setStyle(Paint.Style.STROKE); p.setStrokeWidth(Math.max(1, .06f * R)); p.setColor(Ui.WHITE_12); c.drawRoundRect(rf, 1.3f * R, 1.3f * R, p); p.setStyle(Paint.Style.FILL);
             float ix0 = px0 + 1.4f * R, ix1 = px1 - 1.4f * R;
             // addon chips
             List<String> ch = chipNames();
@@ -2201,8 +2201,8 @@ final class TitleView extends FrameLayout {
                     float cw = th.measureText(nm) + 3f * R;
                     rq.set(cx, cy, cx + cw, cy + 3.3f * R);
                     hit(cx, cy, cx + cw, cy + 3.3f * R, "chips", i, false);
-                    p.setColor(foc ? Color.WHITE : cur ? 0x40FFFFFF : 0x1AFFFFFF); c.drawRoundRect(rq, 1.65f * R, 1.65f * R, p);
-                    th.setColor(foc ? 0xFF111111 : cur ? Color.WHITE : 0xB3FFFFFF);
+                    p.setColor(foc ? Color.WHITE : cur ? Ui.WHITE_25 : Ui.WHITE_12); c.drawRoundRect(rq, 1.65f * R, 1.65f * R, p);
+                    th.setColor(foc ? 0xFF111111 : cur ? Color.WHITE : Ui.WHITE_75);
                     c.drawText(nm, cx + 1.5f * R, rq.centerY() + th.getTextSize() * .35f, th);
                     cx += cw + .7f * R;
                     if (cx > ix1) break;
@@ -2213,7 +2213,7 @@ final class TitleView extends FrameLayout {
             boolean waiting = asked.containsValue("…");
             float ly0 = listY0();
             if (l.isEmpty()) {
-                nameP.setColor(0x99FFFFFF);
+                nameP.setColor(Ui.WHITE_60);
                 String why = waiting ? "Finding streams…" : asked.containsKey("Addons") ? asked.get("Addons") : "No playable streams found.";
                 if (!waiting && !asked.containsKey("Addons")) for (Map.Entry<String, String> e : asked.entrySet()) if (!e.getValue().matches("\\d+")) why += "\n\n" + e.getKey() + ": " + e.getValue();
                 android.text.StaticLayout sl = android.text.StaticLayout.Builder.obtain(why, 0, why.length(), nameP, Math.round(ix1 - ix0)).build();
@@ -2241,7 +2241,7 @@ final class TitleView extends FrameLayout {
                 hit(ix0, Math.max(y, ly0 - .4f * R), ix1, Math.min(y + hgt, py1 - .5f * R), "streams", i, false);
             }
             c.restore();
-            if (waiting) { ts.setTextSize(1.15f * R); ts.setColor(0x99FFFFFF); c.drawText("STILL ASKING " + (asked.size() - countAnswered()) + " ADDON" + (asked.size() - countAnswered() == 1 ? "" : "S") + "…", ix0, py1 + 1.9f * R, ts); }
+            if (waiting) { ts.setTextSize(1.15f * R); ts.setColor(Ui.WHITE_60); c.drawText("STILL ASKING " + (asked.size() - countAnswered()) + " ADDON" + (asked.size() - countAnswered() == 1 ? "" : "S") + "…", ix0, py1 + 1.9f * R, ts); }
             c.restore();
         }
         private int countAnswered() { int n = 0; for (String v : asked.values()) if (!v.equals("…")) n++; return n; }
@@ -2280,7 +2280,7 @@ final class TitleView extends FrameLayout {
                 th.setTextSize(1.5f * R);
                 float rw = th.measureText(r) + 3.2f * R, ry = y + (ep != null ? 5.6f : 2.8f) * R;
                 rq.set(cx - rw / 2, ry, cx + rw / 2, ry + 3.4f * R);
-                p.setColor(0x33FFFFFF); c.drawRoundRect(rq, 1.7f * R, 1.7f * R, p);
+                p.setColor(Ui.WHITE_20); c.drawRoundRect(rq, 1.7f * R, 1.7f * R, p);
                 th.setColor(Color.WHITE); c.drawText(r, rq.left + 1.6f * R, rq.centerY() + th.getTextSize() * .35f, th);
                 th.setTextSize(1.3f * R);
             }
@@ -2303,20 +2303,20 @@ final class TitleView extends FrameLayout {
             if (best) bx = chip(c, "★ BEST PICK", bx, by, 0xFFF6C344, 0xFF1A1300);
             if (s.optBoolean("_failed")) bx = chip(c, "DIDN'T PLAY", bx, by, 0x40FF9F0A, 0xFFFFC46B);
             if (s.optBoolean("_last")) bx = chip(c, "LAST USED", bx, by, 0x40FF453A, 0xFFFF8A80);
-            for (String q : new String[] { "4K", "1080p", "720p" }) if (bs.contains(q)) { bx = chip(c, q, bx, by, 0x33FFFFFF, Color.WHITE); break; }
+            for (String q : new String[] { "4K", "1080p", "720p" }) if (bs.contains(q)) { bx = chip(c, q, bx, by, Ui.WHITE_20, Color.WHITE); break; }
             if (bs.contains("DV") && !bs.contains("Remux")) bx = chip(c, "DOLBY VISION", bx, by, 0xFF6A5CFF, Color.WHITE);
-            else if (bs.contains("HDR10+")) bx = chip(c, "HDR10+", bx, by, 0x33FFFFFF, Color.WHITE);
-            else if (bs.contains("DV") || bs.contains("HDR")) bx = chip(c, "HDR10", bx, by, 0x33FFFFFF, Color.WHITE);
+            else if (bs.contains("HDR10+")) bx = chip(c, "HDR10+", bx, by, Ui.WHITE_20, Color.WHITE);
+            else if (bs.contains("DV") || bs.contains("HDR")) bx = chip(c, "HDR10", bx, by, Ui.WHITE_20, Color.WHITE);
             if (bs.contains("Cached")) bx = chip(c, "⚡ CACHED", bx, by, 0x3330D158, 0xFF6EE7A0);
             String sz = size(all);
-            if (!sz.isEmpty()) chip(c, sz, bx, by, 0x1FFFFFFF, 0xD9FFFFFF);
+            if (!sz.isEmpty()) chip(c, sz, bx, by, Ui.WHITE_12, Ui.WHITE_85);
             ty += labelH();
             // the addon's own words, as it wrote them
             c.save(); c.translate(tx, ty); l[0].draw(c); c.restore();
             ty += l[0].getHeight();
             if (l[1] != null) { descP.setColor(f ? 0xFFD0D0D0 : 0xFFA0A0A0); c.save(); c.translate(tx, ty + .5f * R); l[1].draw(c); c.restore(); }
             // the addon, on the right
-            tq.setTextSize(1.25f * R); tq.setColor(0x80FFFFFF);
+            tq.setTextSize(1.25f * R); tq.setColor(Ui.WHITE_50);
             tq.setTextAlign(Paint.Align.RIGHT);
             c.drawText(TextUtils.ellipsize(s.optString("_addon"), tq, addonColW() - R, TextUtils.TruncateAt.END).toString(), rf.right - cardPad(), rf.top + cardPad() + 1.4f * R, tq);
             tq.setTextAlign(Paint.Align.CENTER);
@@ -2385,7 +2385,7 @@ final class TitleView extends FrameLayout {
             try { byte[] d = HomeImages.http(url, null); if (d != null) b = HomeImages.decode(d, w / 2, hh / 2); } catch (Throwable ignored) { }
             final Bitmap fb = b;
             post(new Runnable() { @Override public void run() {
-                if (g == gen && fb != null) { Bitmap old = bitmapOf(into); into.setImageBitmap(fb); into.setAlpha(0f); into.animate().alpha(1f).setDuration(300).start(); if (old != fb) h.reclaim(old); }
+                if (g == gen && fb != null) { Bitmap old = bitmapOf(into); into.setImageBitmap(fb); into.setAlpha(0f); into.animate().alpha(1f).setDuration(Ui.MOVE).start(); if (old != fb) h.reclaim(old); }
                 else h.reclaim(fb);                       // (another title by now: not needed)
             } });
         } });

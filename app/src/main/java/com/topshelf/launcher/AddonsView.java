@@ -49,21 +49,21 @@ final class AddonsView extends FrameLayout {
         setClickable(true);
         TextView t = h.text(h.fSemi, 3f, Color.WHITE); t.setText("Addons");
         addView(t, h.at(5, 4, LayoutParams.WRAP_CONTENT, LayoutParams.WRAP_CONTENT));
-        TextView sub = h.text(h.fReg, 1.15f, 0xB3FFFFFF);
+        TextView sub = h.text(h.fReg, Ui.TEXT_M, Ui.WHITE_75);
         sub.setText("The same addons Nuvio and Stremio use. Choose a movie or show in Movies & TV Shows to see the streams your addons find for it — like your debrid service's — and play them in TopShelf's player.");
         sub.setLineSpacing(0, 1.25f);
         addView(sub, h.at(5, 8.4f, h.px(Math.min(60, h.SW - 10)), LayoutParams.WRAP_CONTENT));
-        count = h.text(h.fSemi, 1f, 0x99FFFFFF); count.setLetterSpacing(.08f);
+        count = h.text(h.fSemi, Ui.TEXT_S, Ui.WHITE_60); count.setLetterSpacing(.08f);
         addView(count, h.at(5, 13.6f + (h.portrait ? 4 : 0), LayoutParams.WRAP_CONTENT, LayoutParams.WRAP_CONTENT));
         listV = new ListView(getContext());
         addView(listV, h.at(4, 15.6f + (h.portrait ? 4 : 0), h.px(Math.min(62, h.SW - 8)), h.px(h.SH - 15.6f - 3 - (h.portrait ? 4 : 0))));
 
         // the phone panel
         LinearLayout side = new LinearLayout(getContext()); side.setOrientation(LinearLayout.VERTICAL); side.setGravity(Gravity.CENTER_HORIZONTAL);
-        GradientDrawable sb = new GradientDrawable(); sb.setCornerRadius(2 * R); sb.setColor(0xFF17181F); sb.setStroke(Math.max(1, h.px(.1f)), 0x24FFFFFF);
+        GradientDrawable sb = new GradientDrawable(); sb.setCornerRadius(2 * R); sb.setColor(0xFF17181F); sb.setStroke(Math.max(1, h.px(.1f)), Ui.WHITE_12);
         side.setBackground(sb); side.setPadding(h.px(2.4f), h.px(2.4f), h.px(2.4f), h.px(2.4f));
         TextView st = h.text(h.fSemi, 1.6f, Color.WHITE); st.setText("Add from your phone"); side.addView(st);
-        TextView ss = h.text(h.fReg, 1.05f, 0xC7FFFFFF); ss.setGravity(Gravity.CENTER); ss.setLineSpacing(0, 1.25f);
+        TextView ss = h.text(h.fReg, Ui.TEXT_S, Ui.WHITE_75); ss.setGravity(Gravity.CENTER); ss.setLineSpacing(0, 1.25f);
         ss.setText("Scan to paste an addon's link, or copy all your addons from your Stremio account.");
         LinearLayout.LayoutParams sl = new LinearLayout.LayoutParams(LayoutParams.WRAP_CONTENT, LayoutParams.WRAP_CONTENT); sl.topMargin = h.px(.8f);
         side.addView(ss, sl);
@@ -74,10 +74,10 @@ final class AddonsView extends FrameLayout {
         qb.addView(qr, new LayoutParams(h.px(17), h.px(17)));
         LinearLayout.LayoutParams ql = new LinearLayout.LayoutParams(LayoutParams.WRAP_CONTENT, LayoutParams.WRAP_CONTENT); ql.topMargin = h.px(1.6f);
         side.addView(qb, ql);
-        qrUrl = h.text(h.fReg, .9f, 0x8CFFFFFF); qrUrl.setGravity(Gravity.CENTER);
+        qrUrl = h.text(h.fReg, Ui.TEXT_XS, Ui.WHITE_60); qrUrl.setGravity(Gravity.CENTER);
         LinearLayout.LayoutParams ul = new LinearLayout.LayoutParams(LayoutParams.WRAP_CONTENT, LayoutParams.WRAP_CONTENT); ul.topMargin = h.px(1.2f);
         side.addView(qrUrl, ul);
-        TextView back = h.text(h.fReg, .95f, 0x80FFFFFF); back.setText("OK on an addon · options      Back · close");
+        TextView back = h.text(h.fReg, Ui.TEXT_XS, Ui.WHITE_50); back.setText("OK on an addon · options      Back · close");
         LinearLayout.LayoutParams bl = new LinearLayout.LayoutParams(LayoutParams.WRAP_CONTENT, LayoutParams.WRAP_CONTENT); bl.topMargin = h.px(1.6f);
         side.addView(back, bl);
         addView(side, h.at(h.SW - 5 - 30, 15.6f, h.px(30), LayoutParams.WRAP_CONTENT));
@@ -90,9 +90,9 @@ final class AddonsView extends FrameLayout {
         if (!url.isEmpty()) { qr.setImageBitmap(NativeHome.qrBitmapOf(url)); qrUrl.setText(url); }
         else { qr.setImageDrawable(null); qrUrl.setText("The TV isn't on your home network right now"); }
         setVisibility(VISIBLE); bringToFront();
-        setAlpha(0f); animate().alpha(1f).setDuration(220).start();
+        setAlpha(0f); animate().alpha(1f).setDuration(Ui.FAST).start();
     }
-    void close() { animate().alpha(0f).setDuration(180).withEndAction(new Runnable() { @Override public void run() { setVisibility(GONE); } }).start(); }
+    void close() { animate().alpha(0f).setDuration(Ui.FAST).withEndAction(new Runnable() { @Override public void run() { setVisibility(GONE); } }).start(); }
     boolean shownNow() { return getVisibility() == VISIBLE; }
 
     private String phoneUrl() {
@@ -172,7 +172,7 @@ final class AddonsView extends FrameLayout {
         @Override protected void onDraw(Canvas c) {
             int w = getWidth();
             if (list.length() == 0) {
-                ts.setColor(0x99FFFFFF);
+                ts.setColor(Ui.WHITE_60);
                 c.drawText("Scan the code on the right with your phone to add your first addon.", R, 2 * R, ts);
                 return;
             }
@@ -182,24 +182,24 @@ final class AddonsView extends FrameLayout {
                 JSONObject a = list.optJSONObject(i), m = a.optJSONObject("manifest");
                 boolean f = i == sel, on = a.optBoolean("on", true);
                 rf.set(R, y + .3f * R, w - R, y + rowH - .3f * R);
-                p.setColor(f ? 0xFF34333D : 0x14FFFFFF); c.drawRoundRect(rf, R, R, p);
-                if (f) { p.setStyle(Paint.Style.STROKE); p.setStrokeWidth(Math.max(2, .14f * R)); p.setColor(0xD9FFFFFF); c.drawRoundRect(rf, R, R, p); p.setStyle(Paint.Style.FILL); }
+                p.setColor(f ? 0xFF34333D : Ui.WHITE_7); c.drawRoundRect(rf, R, R, p);
+                if (f) { p.setStyle(Paint.Style.STROKE); p.setStrokeWidth(Math.max(2, .14f * R)); p.setColor(Ui.WHITE_85); c.drawRoundRect(rf, R, R, p); p.setStyle(Paint.Style.FILL); }
                 // logo
                 Bitmap lg = logo(m == null ? "" : m.optString("logo"));
                 RectF lr = new RectF(rf.left + 1.1f * R, rf.centerY() - 1.6f * R, rf.left + 4.3f * R, rf.centerY() + 1.6f * R);
-                p.setColor(0x1FFFFFFF); c.drawRoundRect(lr, .7f * R, .7f * R, p);
+                p.setColor(Ui.WHITE_12); c.drawRoundRect(lr, .7f * R, .7f * R, p);
                 if (lg != null) { float s = Math.min(lr.width() / lg.getWidth(), lr.height() / lg.getHeight()); float dw = lg.getWidth() * s, dh = lg.getHeight() * s;
                     p.setAlpha(on ? 255 : 110); c.drawBitmap(lg, null, new RectF(lr.centerX() - dw / 2, lr.centerY() - dh / 2, lr.centerX() + dw / 2, lr.centerY() + dh / 2), p); p.setAlpha(255); }
                 float tx = lr.right + 1.2f * R;
                 String chip = on ? "ON" : "OFF";
                 float cw = tc.measureText(chip) + 1.4f * R;
                 RectF cr = new RectF(rf.right - 1.2f * R - cw, rf.centerY() - .95f * R, rf.right - 1.2f * R, rf.centerY() + .95f * R);
-                p.setColor(on ? 0x3330D158 : 0x26FFFFFF); c.drawRoundRect(cr, .95f * R, .95f * R, p);
-                tc.setColor(on ? 0xFF30D158 : 0x99FFFFFF); c.drawText(chip, cr.centerX(), cr.centerY() + tc.getTextSize() * .36f, tc);
+                p.setColor(on ? 0x3330D158 : Ui.WHITE_12); c.drawRoundRect(cr, .95f * R, .95f * R, p);
+                tc.setColor(on ? 0xFF30D158 : Ui.WHITE_60); c.drawText(chip, cr.centerX(), cr.centerY() + tc.getTextSize() * .36f, tc);
                 float avail = cr.left - tx - R;
-                tn.setColor(on ? Color.WHITE : 0x8CFFFFFF);
+                tn.setColor(on ? Color.WHITE : Ui.WHITE_60);
                 c.drawText(TextUtils.ellipsize((m == null ? a.optString("url") : m.optString("name")) + (m != null && !m.optString("version").isEmpty() ? "  v" + m.optString("version") : ""), tn, Math.max(1, avail), TextUtils.TruncateAt.END).toString(), tx, rf.centerY() - .15f * R, tn);
-                ts.setColor(f ? 0xD9FFFFFF : 0x99FFFFFF);
+                ts.setColor(f ? Ui.WHITE_85 : Ui.WHITE_60);
                 c.drawText(TextUtils.ellipsize(what(m) + (m != null && !m.optString("description").isEmpty() ? "  ·  " + m.optString("description") : ""), ts, Math.max(1, avail), TextUtils.TruncateAt.END).toString(), tx, rf.centerY() + 1.45f * R, ts);
             }
         }

@@ -85,7 +85,7 @@ final class GameView extends FrameLayout {
         }
         setVisibility(VISIBLE); bringToFront();
         if (from != null) { setAlpha(1f); grown(0f); growTo(0f, 1f, 340, null); }
-        else { setClipBounds(null); page.setTranslationY(0); page.setAlpha(1f); setAlpha(0f); animate().alpha(1f).setDuration(220).start(); }
+        else { setClipBounds(null); page.setTranslationY(0); page.setAlpha(1f); setAlpha(0f); animate().alpha(1f).setDuration(Ui.FAST).start(); }
         load();
         loadActs();
     }
@@ -115,7 +115,7 @@ final class GameView extends FrameLayout {
         removeCallbacks(again);
         final Runnable gone = new Runnable() { @Override public void run() { setVisibility(GONE); setClipBounds(null); page.setTranslationY(0); page.setAlpha(1f); logos.clear(); } };
         if (from != null && scroll < R) { growTo(1f, 0f, 240, gone); animate().alpha(0f).setStartDelay(120).setDuration(120).withEndAction(new Runnable() { @Override public void run() { animate().setStartDelay(0); } }).start(); }
-        else animate().alpha(0f).setDuration(160).withEndAction(gone).start();
+        else animate().alpha(0f).setDuration(Ui.QUICK).withEndAction(gone).start();
     }
     /** gone at once (something else takes the screen: a channel starts playing) */
     private void closeNow() {
@@ -229,7 +229,7 @@ final class GameView extends FrameLayout {
         scrollT = to;
         if (anim != null) anim.cancel();
         anim = ValueAnimator.ofFloat(scroll, to);
-        anim.setDuration(320); anim.setInterpolator(TileView.EASE);
+        anim.setDuration(Ui.MOVE); anim.setInterpolator(TileView.EASE);
         anim.addUpdateListener(new ValueAnimator.AnimatorUpdateListener() { @Override public void onAnimationUpdate(ValueAnimator a) { scroll = (Float) a.getAnimatedValue(); page.invalidate(); } });
         anim.start();
     }
@@ -293,7 +293,7 @@ final class GameView extends FrameLayout {
             c.restore();
             maxScroll = Math.max(0, y + 3 * R - hh);
             // the foot
-            text(c, "◀ ▶ choose   ·   OK select   ·   ▲ ▼ move   ·   Back close", h.fMed, 1.1f, 0x99FFFFFF, px, hh - 1.6f * R, Paint.Align.LEFT, 0);
+            text(c, "◀ ▶ choose   ·   OK select   ·   ▲ ▼ move   ·   Back close", h.fMed, 1.1f, Ui.WHITE_60, px, hh - 1.6f * R, Paint.Align.LEFT, 0);
         }
 
         /** the game's buttons, under the scoreboard: Sports' own controls, the one the remote is on lit and ringed */
@@ -354,7 +354,7 @@ final class GameView extends FrameLayout {
             text(c, detail.toUpperCase(Locale.US), heavy, 1.8f, live ? GOLD : Color.WHITE, cx, ly + 4.4f * R, Paint.Align.CENTER, .04f);
             if (live) { p.setColor(LIVE_C); c.drawRoundRect(new RectF(cx - 2.6f * R, 1.2f * R, cx + 2.6f * R, 3.1f * R), .4f * R, .4f * R, p); text(c, "LIVE", heavy, 1.1f, SportsLook.ON_LIVE, cx, 2.55f * R, Paint.Align.CENTER, .1f); }
             JSONObject gi = sum == null ? null : sum.optJSONObject("gameInfo"), v = gi == null ? null : gi.optJSONObject("venue");
-            if (v != null) text(c, v.optString("fullName").toUpperCase(Locale.US), cond, 1.1f, 0xCCFFFFFF, cx, hh - 1.4f * R, Paint.Align.CENTER, .1f);
+            if (v != null) text(c, v.optString("fullName").toUpperCase(Locale.US), cond, 1.1f, Ui.WHITE_85, cx, hh - 1.4f * R, Paint.Align.CENTER, .1f);
             return hh;
         }
 
@@ -403,9 +403,9 @@ final class GameView extends FrameLayout {
                 line.lineTo(px0, py); upper.lineTo(px0, Math.min(py, mid)); lower.lineTo(px0, Math.max(py, mid));
             }
             upper.lineTo(gx1, mid); upper.close(); lower.lineTo(gx1, mid); lower.close();
-            p.setColor((teamCol(1) & 0xFFFFFF) | 0x8C000000); c.drawPath(upper, p);        // (home winning: above the middle)
-            p.setColor((teamCol(0) & 0xFFFFFF) | 0x8C000000); c.drawPath(lower, p);
-            p.setStyle(Paint.Style.STROKE); p.setStrokeWidth(Math.max(1, .08f * R)); p.setColor(0x40FFFFFF);
+            p.setColor((teamCol(1) & 0xFFFFFF) | Ui.BLACK_55); c.drawPath(upper, p);        // (home winning: above the middle)
+            p.setColor((teamCol(0) & 0xFFFFFF) | Ui.BLACK_55); c.drawPath(lower, p);
+            p.setStyle(Paint.Style.STROKE); p.setStrokeWidth(Math.max(1, .08f * R)); p.setColor(Ui.WHITE_25);
             p.setPathEffect(new DashPathEffect(new float[] { .5f * R, .4f * R }, 0)); c.drawLine(gx0, mid, gx1, mid, p); p.setPathEffect(null);
             p.setStrokeWidth(Math.max(2, .16f * R)); p.setColor(Color.WHITE); c.drawPath(line, p);
             p.setStyle(Paint.Style.FILL);
@@ -507,7 +507,7 @@ final class GameView extends FrameLayout {
                 text(c, vb, heavy, 1.5f, bw ? Color.WHITE : SportsLook.SUB, x + cw - 2 * R, ry, Paint.Align.RIGHT, 0);
                 if (na >= 0 && nb >= 0 && na + nb > 0) {
                     float bwid = cw * .16f, by = ry + .6f * R, fa = (float) (na / (na + nb));
-                    p.setColor(0x26FFFFFF); c.drawRect(mid - bwid, by, mid + bwid, by + .3f * R, p);
+                    p.setColor(Ui.WHITE_12); c.drawRect(mid - bwid, by, mid + bwid, by + .3f * R, p);
                     float split = mid - bwid + 2 * bwid * fa;
                     p.setColor(teamCol(0)); c.drawRect(mid - bwid, by, split, by + .3f * R, p);
                     p.setColor(teamCol(1)); c.drawRect(split, by, mid + bwid, by + .3f * R, p);
