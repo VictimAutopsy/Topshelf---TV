@@ -297,7 +297,9 @@ final class NativeHome extends FrameLayout {
     private void build() {
         removeAllViews(); panels.clear(); tiles.clear();
         portrait = H > W;
-        R = portrait ? W / 56f : Math.min(W / 120f, H / 67.5f);
+        /* (a phone held upright is 46 rem wide, so text and the things you tap are a size for the hand: small text
+           comes out at about 10 to 12 points and a poster a quarter of the screen. It was 56, the TV's sizes shrunk.) */
+        R = portrait ? W / (phone ? 46f : 56f) : Math.min(W / 120f, H / 67.5f);
         SW = W / R; SH = H / R;
         readSettings();
         side = sideWanted();
@@ -307,7 +309,7 @@ final class NativeHome extends FrameLayout {
         menuStyle = side ? menuStylePref(S) : "panel";
         menuHead = null; rowStart = -1; railOpen = false; nowHead = nowGame = nowCw = null;
         barExtras.clear(); cornerL = cornerR = null; barScrim = null;
-        COLS = portrait ? 3 : 5; GAP_REM = portrait ? 2.2f : 2.75f; BOT = portrait && !side ? (phone ? 11.4f : 8.6f) : 0;
+        COLS = portrait ? 3 : 5; GAP_REM = portrait ? 2.2f : 2.75f; BOT = portrait && !side ? (phone ? 10.6f : 8.6f) : 0;
         TW = portrait ? (SW - 7 - (COLS - 1) * GAP_REM) / COLS : TW_REM; TH = TW * 9 / 16f; PITCH = TH + 5.8f; DOCK_PANEL_H = TH + 3.6f;     // (no names under the dock's icons: just room for the focused one to grow)
         M = (SW - COLS * TW - (COLS - 1) * GAP_REM) / 2f;
         DOCK_PANEL_Y = SH - 2.8f - DOCK_PANEL_H - BOT; DOCK_Y = DOCK_PANEL_Y + 1.8f;
@@ -480,20 +482,20 @@ final class NativeHome extends FrameLayout {
         tabViews = new TextView[TAB_IDS.length];
         final boolean thumb = phone && portrait;
         for (int i = 0; i < TAB_IDS.length; i++) {
-            TextView t = text(fSemi, thumb ? 1.6f : portrait ? 1.3f : 1.35f, Ui.WHITE_75);
+            TextView t = text(fSemi, thumb ? 1.4f : portrait ? 1.3f : 1.35f, Ui.WHITE_75);
             t.setText(TAB_NAMES[i]);
             float tp = portrait ? 1.2f : 2.1f;
             if (thumb) { t.setGravity(Gravity.CENTER); t.setSingleLine(true); t.setPadding(0, 0, 0, 0); }
             else t.setPadding(px(tp), px(.95f), px(tp), px(.95f));
             t.setBackground(pill(Color.TRANSPARENT));
-            LinearLayout.LayoutParams lp = thumb ? new LinearLayout.LayoutParams(0, px(6.2f), 1) : new LinearLayout.LayoutParams(LayoutParams.WRAP_CONTENT, LayoutParams.WRAP_CONTENT);
+            LinearLayout.LayoutParams lp = thumb ? new LinearLayout.LayoutParams(0, px(5.6f), 1) : new LinearLayout.LayoutParams(LayoutParams.WRAP_CONTENT, LayoutParams.WRAP_CONTENT);
             if (i > 0) lp.leftMargin = px(.3f);
             tabsRow.addView(t, lp);
             tabViews[i] = t;
         }
         tabs.addView(tabsRow, new LayoutParams(thumb ? LayoutParams.MATCH_PARENT : LayoutParams.WRAP_CONTENT, LayoutParams.WRAP_CONTENT));
-        FrameLayout.LayoutParams tl = new FrameLayout.LayoutParams(thumb ? px(SW - 4) : LayoutParams.WRAP_CONTENT, LayoutParams.WRAP_CONTENT, (portrait ? Gravity.BOTTOM : Gravity.TOP) | Gravity.CENTER_HORIZONTAL);
-        if (portrait) tl.bottomMargin = px(thumb ? 3f : 2f); else tl.topMargin = px(2.3f);      // (3 rem: above the strip Android's swipe-up-for-home takes)
+        FrameLayout.LayoutParams tl = new FrameLayout.LayoutParams(thumb ? px(SW - 3) : LayoutParams.WRAP_CONTENT, LayoutParams.WRAP_CONTENT, (portrait ? Gravity.BOTTOM : Gravity.TOP) | Gravity.CENTER_HORIZONTAL);
+        if (portrait) tl.bottomMargin = px(thumb ? 2.8f : 2f); else tl.topMargin = px(2.3f);      // (3 rem: above the strip Android's swipe-up-for-home takes)
         addView(tabs, tl);
 
         // --- top bar (round buttons, weather, clock)
@@ -1686,7 +1688,13 @@ final class NativeHome extends FrameLayout {
        the way the remote's arrows do — a step for each card's width the finger travels, and a few more for a
        flick. A tap at the very top brings the tabs back while they're tucked away. */
     private float tDownX, tDownY, tLastX, tLastY, tAcc;
-    private boolean tDragging, tLongFired, tFromTop;
+    private boolean tDragging, tLongFired, tFromTop, tFree;
+    /** the screen under the finger that slides freely with it (Movies, TV Shows), when nothing is open over it */
+    private NativeVod freeNow() {
+        if (!phone || !onVod() || isLive() || isSports() || !(mode.equals("grid") || mode.equals("top"))) return null;
+        if (saver || titleOpenNow() || vodPlayingNow() || addonsOpenNow() || gameOpenNow() || fySetupOpen() || launchOv.getVisibility() == VISIBLE) return null;
+        return vod;
+    }
     private char tAxis;
     private android.view.VelocityTracker tVel;
     private final Runnable tLong = new Runnable() { @Override public void run() {
@@ -1712,6 +1720,9 @@ final class NativeHome extends FrameLayout {
             case android.view.MotionEvent.ACTION_DOWN:
                 tDownX = tLastX = x; tDownY = tLastY = y; tAcc = 0; tAxis = 0; tDragging = false; tLongFired = false;
                 tFromTop = y < px(3f);
+                tFree = false;
+                if (vodM != null) vodM.touchDown();
+                if (vodS != null) vodS.touchDown();
                 if (tVel != null) tVel.recycle();
                 tVel = android.view.VelocityTracker.obtain(); tVel.addMovement(e);
                 main.removeCallbacks(tLong); main.postDelayed(tLong, 460);
@@ -1730,6 +1741,8 @@ final class NativeHome extends FrameLayout {
                     if (tFromTop && tAxis == 'v' && dy > 0 && barsHidden && !titleOpenNow() && !vodPlayingNow() && !(isLive() && live.fullNow()) && !mode.equals("sheet") && !mode.equals("find") && !mode.equals("dialog")) { enterTop(); tLongFired = true; break; }
                 }
                 if (tDragging) {
+                    NativeVod fv = freeNow();
+                    if (fv != null && fv.drag(tAxis, tDownX, tDownY, tAxis == 'h' ? x - tLastX : y - tLastY)) { tFree = true; tLastX = x; tLastY = y; break; }
                     float step = px(tStep(tAxis));
                     tAcc += tAxis == 'h' ? x - tLastX : y - tLastY;
                     tLastX = x; tLastY = y;
@@ -1744,6 +1757,13 @@ final class NativeHome extends FrameLayout {
                 if (tVel != null) tVel.addMovement(e);
                 if (tLongFired) break;
                 if (!tDragging) { tap(x, y); break; }
+                if (tFree) {
+                    NativeVod fv = freeNow();
+                    float v = 0;
+                    if (tVel != null) { tVel.computeCurrentVelocity(1000); v = tAxis == 'h' ? tVel.getXVelocity() : tVel.getYVelocity(); }
+                    if (fv != null) fv.dragEnd(tAxis, v);
+                    break;
+                }
                 // a flick carries on a few more steps
                 if (tVel != null) {
                     tVel.computeCurrentVelocity(1000);

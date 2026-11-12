@@ -110,6 +110,88 @@ final class NativeVod extends FrameLayout {
     }
     private final List<Row> rows = new ArrayList<>();
     private int r = 0;
+
+    /* ------------------------------------------------------------------ a phone: the page under your finger
+       On the TV the row you're on sits at the top of the rows and the highlight walks along it. A phone has no
+       highlight: the whole page (the title up top, then every row) slides freely under a finger, each row slides
+       sideways by itself, both carry on after a flick, and a tap opens what it lands on. pageY is how far the page
+       has been pushed up (rem); a row's own `scroll` is how far it has been pushed left. */
+    private final boolean free;
+    private float pageY;
+    private final float ROWS0;                 // where the rows start on the page (rem): under the title up top
+    private FrameLayout head; private View pageDim;
+    private JSONObject picked; private View pickedV;
+    private android.widget.OverScroller fling;
+    private char flingAxis; private Row flingRow, dragRow; private boolean dragBegun;
+    private float maxPage() { return Math.max(0, ROWS0 + rowY(rows.size()) + (h.BOT > 0 ? h.BOT : 2) - h.SH); }
+    private float maxScroll(Row x) {
+        int n = x.items == null ? 0 : x.items.size();
+        if (x.kind.equals("top")) n = Math.min(n, 10);
+        return n == 0 ? 0 : Math.max(0, cellX(x, n - 1) + cardW(x) + PAD - h.SW);
+    }
+    private int topRowSeen = -1;
+    /** the page where it has been pushed to: the rows, the title up top going with them (and fading), the picture dimming */
+    private void applyPage() {
+        pageY = Math.max(0, Math.min(maxPage(), pageY));
+        rowsIn.animate().cancel();
+        rowsIn.setTranslationY(h.px(ROWS0) - Math.round(pageY * R));
+        head.setTranslationY(-Math.round(pageY * R));
+        head.setAlpha(Math.max(0f, 1f - pageY / 16f));
+        pageDim.setAlpha(Math.min(.72f, pageY / 26f));
+        int t = topRow();
+        if (t != topRowSeen) { topRowSeen = t; syncRows(); }
+    }
+    /** the first row that shows (at least partly) on the screen */
+    private int topRow() {
+        float y = pageY - ROWS0, at = 0;
+        for (int i = 0; i < rows.size(); i++) { at += rowH(rows.get(i)); if (at > y) return i; }
+        return Math.max(0, rows.size() - 1);
+    }
+    private Row rowAt(float yPx) {
+        float y = yPx / R - (ROWS0 - pageY), at = 0;
+        if (y < 0) return null;
+        for (int i = 0; i < rows.size(); i++) { Row x = rows.get(i); if (y < at + rowH(x)) return x; at += rowH(x); }
+        return null;
+    }
+    /** a finger down: whatever was still gliding stops under it */
+    void touchDown() { if (fling != null) fling.forceFinished(true); dragBegun = false; dragRow = null; }
+    /** a finger sliding (it went down at x0, y0): the page up and down, the row under it sideways. False: not here. */
+    boolean drag(char axis, float x0, float y0, float dPx) {
+        if (!free || rows.isEmpty()) return false;
+        if (!dragBegun) { dragBegun = true; dragRow = axis == 'h' ? rowAt(y0) : null; }
+        if (axis == 'v') { pageY -= dPx / R; applyPage(); }
+        else if (dragRow != null && dragRow.strip != null) {
+            dragRow.strip.animate().cancel();
+            setScroll(dragRow, Math.max(0, Math.min(maxScroll(dragRow), dragRow.scroll - dPx / R)), false);
+        }
+        return true;
+    }
+    /** the finger let go at this speed (pixels a second): it glides on and slows, as lists on a phone do */
+    void dragEnd(char axis, float v) {
+        if (!free || !dragBegun) return;
+        dragBegun = false;
+        if (fling == null) fling = new android.widget.OverScroller(getContext());
+        flingAxis = axis; flingRow = dragRow;
+        if (axis == 'v') fling.fling(0, Math.round(pageY * R), 0, -Math.round(v), 0, 0, 0, Math.round(maxPage() * R));
+        else if (flingRow != null) fling.fling(Math.round(flingRow.scroll * R), 0, -Math.round(v), 0, 0, Math.round(maxScroll(flingRow) * R), 0, 0);
+        else return;
+        removeCallbacks(glide); postOnAnimation(glide);
+    }
+    private final Runnable glide = new Runnable() { @Override public void run() {
+        if (fling == null || !shown || !fling.computeScrollOffset()) return;
+        if (flingAxis == 'v') { pageY = fling.getCurrY() / R; applyPage(); }
+        else if (flingRow != null && flingRow.strip != null) setScroll(flingRow, fling.getCurrX() / R, false);
+        if (!fling.isFinished()) postOnAnimation(this);
+    } };
+    /** the page glides to where a row is at the top (a Browse tile, Back) */
+    private void pageTo(float y) {
+        if (fling == null) fling = new android.widget.OverScroller(getContext());
+        fling.forceFinished(true);
+        int from = Math.round(pageY * R), to = Math.round(Math.max(0, Math.min(maxPage(), y)) * R);
+        flingAxis = 'v';
+        fling.startScroll(0, from, 0, to - from, Ui.SLIDE);
+        removeCallbacks(glide); postOnAnimation(glide);
+    }
     /** a title from the first ordinary row (not Continue watching): for the self-check to open */
     JSONObject firstTitle() {
         for (Row w : rows) if (!w.cw && !w.cal && w.items != null) for (JSONObject m : w.items) if (m != null && m.optString("id").startsWith("tt")) return m;
@@ -192,6 +274,7 @@ final class NativeVod extends FrameLayout {
         super(host.getContext());
         h = host; R = host.R; W = host.W; H = host.H;
         PAD = h.portrait ? 3 : 5;
+        free = h.phone; ROWS0 = ROWS_Y + h.TOP;
         setClipChildren(true);
         for (int i = 0; i < 2; i++) {
             bg[i] = new ImageView(getContext());
@@ -209,6 +292,12 @@ final class NativeVod extends FrameLayout {
         trBgShade = new View(getContext());
         trBgShade.setVisibility(GONE);
         addView(trBgShade, new LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.MATCH_PARENT));
+        if (free) {
+            pageDim = new View(getContext()); pageDim.setBackgroundColor(Color.BLACK); pageDim.setAlpha(0f);
+            addView(pageDim, new LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.MATCH_PARENT));
+            head = new FrameLayout(getContext()); head.setClipChildren(false);
+            addView(head, new LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.MATCH_PARENT));
+        }
 
         label = new TextView(getContext()) {
             @Override protected void onLayout(boolean c, int l, int t, int rr, int b) { super.onLayout(c, l, t, rr, b); shadeLabel(); }
@@ -217,7 +306,7 @@ final class NativeVod extends FrameLayout {
         label.setIncludeFontPadding(false);
         label.setLetterSpacing(-.02f);
         label.setShadowLayer(.8f * R, 0, .1f * R, Ui.BLACK_45);
-        addView(label, h.at(PAD, 2.5f, LayoutParams.WRAP_CONTENT, LayoutParams.WRAP_CONTENT));
+        (free ? head : this).addView(label, h.at(PAD, 2.5f + h.TOP, LayoutParams.WRAP_CONTENT, LayoutParams.WRAP_CONTENT));
 
         hero = new LinearLayout(getContext());
         hero.setOrientation(LinearLayout.VERTICAL);
@@ -254,14 +343,16 @@ final class NativeVod extends FrameLayout {
         heroHint.setText("OK · Open in Nuvio  ·  hold OK · More");
         LinearLayout.LayoutParams hl = new LinearLayout.LayoutParams(LayoutParams.WRAP_CONTENT, LayoutParams.WRAP_CONTENT); hl.topMargin = h.px(1);
         hero.addView(heroHint, hl);
-        addView(hero, h.at(PAD, 8.6f, h.px(Math.min(72, h.SW - 2 * PAD)), LayoutParams.WRAP_CONTENT));
+        (free ? head : this).addView(hero, h.at(PAD, 8.6f + h.TOP, h.px(Math.min(72, h.SW - 2 * PAD)), LayoutParams.WRAP_CONTENT));
 
         rowsBox = new FrameLayout(getContext());
         rowsBox.setClipChildren(true);
-        addView(rowsBox, h.at(0, ROWS_Y, LayoutParams.MATCH_PARENT, H - h.px(ROWS_Y)));
+        if (free) addView(rowsBox, new LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.MATCH_PARENT));
+        else addView(rowsBox, h.at(0, ROWS_Y, LayoutParams.MATCH_PARENT, H - h.px(ROWS_Y)));
         rowsIn = new FrameLayout(getContext());
         rowsIn.setClipChildren(false);
         rowsBox.addView(rowsIn, new LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.MATCH_PARENT));
+        if (free) rowsIn.setTranslationY(h.px(ROWS0));
         glowView = new View(getContext());
         glowView.setAlpha(0f);
     }
@@ -439,6 +530,7 @@ final class NativeVod extends FrameLayout {
         rowsIn.setTranslationY(0);
         sizeRowsIn();
         if (r >= rows.size()) r = 0;
+        if (free) { pageY = 0; topRowSeen = -1; }
         focus(false);
     }
     /** each row's shape, the Top 10 and the Browse tiles (mixed shelves); every row a poster row when classic */
@@ -484,10 +576,11 @@ final class NativeVod extends FrameLayout {
     private void syncRows() {
         for (int i = 0; i < rows.size(); i++) {
             Row x = rows.get(i);
-            boolean near = i >= r - 1 && i <= r + 2;
+            int t0 = free ? topRow() : r, far = free ? (int) Math.ceil(h.SH / ROW_H) + 2 : 3;
+            boolean near = free ? i >= t0 - 1 && i <= t0 + far - 1 : i >= r - 1 && i <= r + 2;
             if (near && x.items == null) load(i);
             if (near && x.view == null) makeRowView(i);
-            if (!near && x.view != null && Math.abs(i - r) > 3) { rowsIn.removeView(x.view); x.view = null; x.strip = null; x.posters.clear(); }
+            if (!near && x.view != null && (free ? i < t0 - 2 || i > t0 + far : Math.abs(i - r) > 3)) { rowsIn.removeView(x.view); x.view = null; x.strip = null; x.posters.clear(); }
             if (x.view != null) syncPosters(x);
         }
     }
@@ -684,6 +777,15 @@ final class NativeVod extends FrameLayout {
     private void focus(boolean smooth) {
         if (rows.isEmpty()) return;
         Row x = rows.get(r);
+        if (free) {
+            // (a phone: nothing is highlighted and nothing moves by itself; the title up top is the first row's first)
+            topRowSeen = -1;
+            applyPage();
+            main().removeCallbacks(heroLater);
+            main().postDelayed(heroLater, smooth ? 160 : 0);
+            scheduleBackdrop();
+            return;
+        }
         syncRows();
         // the focused row sits at the top of the rows
         float ty = -h.px(rowY(r) - .4f);
@@ -816,6 +918,7 @@ final class NativeVod extends FrameLayout {
     // ================================================================== keys (from NativeHome)
 
     boolean move(char d) {
+        if (free) return true;
         if (untuck()) return true;
         if (rows.isEmpty()) return true;
         Row x = rows.get(r);
@@ -833,6 +936,17 @@ final class NativeVod extends FrameLayout {
 
     /** a finger (phones): the poster under it becomes the chosen one (true: OK then opens it); the widened card or the details up top are the chosen title */
     boolean focusAt(float x, float y) {
+        if (free) {
+            picked = null; pickedV = null;
+            for (Row x0 : rows) for (Map.Entry<Integer, PosterView> en : x0.posters.entrySet()) {
+                if (!h.hit(en.getValue(), x, y, 0)) continue;
+                int c = en.getKey();
+                if (x0.items == null || c >= x0.items.size()) return false;
+                picked = x0.items.get(c); pickedV = en.getValue();
+                return true;
+            }
+            return head.getAlpha() > .5f && h.hit(hero, x, y, 0) && cur() != null;
+        }
         if (wide != null && h.hit(wide, x, y, 0)) return true;
         for (int i = 0; i < rows.size(); i++) {
             Row x0 = rows.get(i);
@@ -852,12 +966,19 @@ final class NativeVod extends FrameLayout {
     }
     void ok() {
         if (untuck()) return;
-        final JSONObject m = cur();
+        final JSONObject m = free && picked != null ? picked : cur();
         if (m == null) return;
         if (m.optBoolean("tile")) {
             // Browse: to that row
-            for (int k = 0; k < rows.size(); k++) if (rows.get(k).id.equals(m.optString("target"))) { collapse(true); r = k; rows.get(k).col = 0; focus(true); return; }
+            for (int k = 0; k < rows.size(); k++) if (rows.get(k).id.equals(m.optString("target"))) {
+                if (free) { pageTo(ROWS0 + rowY(k) - h.TOP - 4); return; }
+                collapse(true); r = k; rows.get(k).col = 0; focus(true); return;
+            }
             return;
+        }
+        if (free && pickedV != null) {
+            final View pv = pickedV;
+            pv.animate().scaleX(.96f).scaleY(.96f).setDuration(90).withEndAction(new Runnable() { @Override public void run() { pv.animate().scaleX(1f).scaleY(1f).setDuration(Ui.QUICK).start(); } }).start();
         }
         if (focused != null) focused.animate().scaleX(1.06f).scaleY(1.06f).setDuration(100).withEndAction(new Runnable() { @Override public void run() {
             if (focused != null) { float s = focusScale(focused.row); focused.animate().scaleX(s).scaleY(s).setDuration(Ui.FAST).setInterpolator(TileView.EASE).start(); }
@@ -867,9 +988,9 @@ final class NativeVod extends FrameLayout {
 
     void hold() {
         if (untuck()) return;
-        final JSONObject m = cur();
+        final JSONObject m = free && picked != null ? picked : cur();
         if (m == null || m.optBoolean("tile")) return;
-        holdFor(m, focused, 1.12f);
+        holdFor(m, free ? pickedV : focused, free ? 1f : 1.12f);
     }
     /** a title found in Search: its page (or Nuvio) */
     void openFromSearch(JSONObject m) { open(m); }
@@ -908,6 +1029,7 @@ final class NativeVod extends FrameLayout {
     }
 
     boolean back() {
+        if (free) { if (pageY > 1f) { pageTo(0); return true; } return false; }
         if (untuck()) return true;
         if (r > 0) { collapse(true); r = 0; focus(true); return true; }
         return false;     // NativeHome goes back to Home
