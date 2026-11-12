@@ -57,7 +57,7 @@ Quick compile check without building:
   only write what the code really does. Written so far: Home. A new setting gets an entry there too.
 - On a phone (`h.phone`, `!act.isTv()`) TopShelf is a standalone app for movies, shows, sports and Live TV, not a launcher:
   no apps, app bar or All apps, and upright the tabs are always a full-width bar along the bottom (`h.BOT` rem to keep
-  clear above it, `h.TOP` rem for the camera cutout). Movies and TV Shows slide freely under a finger there (`NativeVod.free`: `drag`, `dragEnd`; other screens still get the remote's steps from `NativeHome.touch`), and upright the screen is 46 rem wide. A phone is browsed upright only (Chad chose it); a movie, episode or channel full screen turns it sideways (`h.videoTurn`), and Home is not made again for that turn. Being redone for phones area by area (1.0.398: step 2 of 7); the
+  clear above it, `h.TOP` rem for the camera cutout). Movies and TV Shows slide freely under a finger there (`NativeVod.free`: `drag`, `dragEnd`; other screens still get the remote's steps from `NativeHome.touch`), and upright the screen is 46 rem wide. A phone is browsed upright only (Chad chose it); a movie, episode or channel full screen turns it sideways (`h.videoTurn`), and Home is not made again for that turn. The phone's Home is a `NativeVod` page too (`vodH`, `home` flag: featured title with Watch now / More details, Continue watching, rows of movies and shows), not the photo Home. Being redone for phones area by area (1.0.402: step 3 of 7; next: title pages, Live TV, Sports/Search/Settings, the player); the
   TV's screens must not change with it.
 - Diagnostics: `Diag.ev("...")`. Lines are scrubbed of keys and logins, but don't log full stream or addon links anyway.
 

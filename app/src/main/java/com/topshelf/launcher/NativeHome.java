@@ -202,7 +202,13 @@ final class NativeHome extends FrameLayout {
     /* Movies and TV Shows each keep their own screen, so going between them (resting on the tab in the
        top bar) shows rows that are already made instead of rebuilding them */
     private NativeVod vodM, vodS;
+    /* a phone's Home: a page like Movies and TV Shows (the featured title, Continue watching, rows of both), not
+       the TV's photo with its clock, widgets and apps */
+    private NativeVod vodH;
+    private boolean vodTab(String id) { return id.equals("movies") || id.equals("series") || (phone && id.equals("home")); }
+    private String homeStyleWanted() { return phone ? "classic" : homeStylePref(S); }
     private NativeVod vodFor(String id) {
+        if (id.equals("home") && vodH != null) return vodH;
         if (!id.equals("series")) return vodM;
         if (vodS == null) { vodS = new NativeVod(this); vodS.setVisibility(INVISIBLE); addView(vodS, indexOfChild(vodM) + 1, new LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.MATCH_PARENT)); }
         return vodS;
@@ -308,7 +314,7 @@ final class NativeHome extends FrameLayout {
         side = sideWanted();
         TOP = phone && portrait ? act.cutoutTop() / R : 0;
         barStyle = side || portrait ? "classic" : barStylePref(S);
-        homeStyle = homeStylePref(S);
+        homeStyle = homeStyleWanted();
         menuStyle = side ? menuStylePref(S) : "panel";
         menuHead = null; rowStart = -1; railOpen = false; nowHead = nowGame = nowCw = null;
         barExtras.clear(); cornerL = cornerR = null; barScrim = null;
@@ -426,16 +432,19 @@ final class NativeHome extends FrameLayout {
 
         // --- Movies & TV Shows (over Home's layers, under the bars)
         vod = vodM = new NativeVod(this);
-        vodS = null;
+        vodS = null; vodH = null;
+        if (phone) { vodH = new NativeVod(this, true); vodH.setVisibility(INVISIBLE); }
         // Continue watching changed (you watched something, Trakt synced): the rows and the top shelf again
         // addons added, removed or switched on/off: Movies & TV Shows make their rows again (addons' own catalogs are rows)
         Addons.onChange = new Runnable() { @Override public void run() {
             if (vodM != null) vodM.addonsChanged();
             if (vodS != null) vodS.addonsChanged();
+            if (vodH != null) vodH.addonsChanged();
         } };
         Progress.onChange = new Runnable() { @Override public void run() {
             if (vodM != null) vodM.cwChanged();
             if (vodS != null) vodS.cwChanged();
+            if (vodH != null) vodH.cwChanged();
             cwRefresh();
         } };
         vod.setVisibility(INVISIBLE);
@@ -590,6 +599,14 @@ final class NativeHome extends FrameLayout {
         applyFocus(false, ' ');
         applyMode(false);
         if (photos.length() == 0) loadPhotos(true); else restartPhoto();
+        if (phone && vodH != null) {
+            // the phone opens on its own Home (no photo, clock or widgets under it)
+            addView(vodH, indexOfChild(vodM) + 1, new LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.MATCH_PARENT));
+            vod = vodH;
+            photoBox.setVisibility(INVISIBLE); scrim.setVisibility(INVISIBLE); content.setVisibility(INVISIBLE);
+            vodH.show("home");
+            updateBars();
+        }
         mergeShelf();
         updateTshelf(false);
         // the start-up picture (MainActivity.showCover) goes once Home has drawn itself (and its photo has a moment)
@@ -1511,7 +1528,7 @@ final class NativeHome extends FrameLayout {
     }
 
     /** not on Home (Movies, TV Shows or Live TV, drawn here) */
-    private boolean onVod() { return !tab.equals("home") && vod != null; }
+    private boolean onVod() { return (phone || !tab.equals("home")) && vod != null; }
     private boolean isLive() { return tab.equals("live") && live != null; }
     private boolean isSports() { return tab.equals("sports") && sports != null; }
     boolean vodHasKeys() { return onVod() && !isLive() && !isSports() && mode.equals("grid") && owner.equals("native") && !titleOpenNow() && !vodPlayingNow(); }
@@ -1656,13 +1673,19 @@ final class NativeHome extends FrameLayout {
         if (mode.equals("shelf")) { exitShelf(); return; }
         if (mode.equals("top")) { if (!tab.equals("home")) { exitTopQuiet(); showTab("home"); } else exitTop(); return; }
         if (mode.equals("tshelf")) { mode = "grid"; applyFocus(true, ' '); return; }
-        if (isLive()) { if (!live.back()) enterTop(); return; }
-        if (isSports()) { if (!sports.back()) enterTop(); return; }
-        if (onVod()) { if (!vod.back()) enterTop(); return; }
+        if (isLive()) { if (!live.back()) upFromTab(); return; }
+        if (isSports()) { if (!sports.back()) upFromTab(); return; }
+        if (onVod()) { if (!vod.back()) upFromTab(); return; }
         if (noDock()) { if (!rest) { rest = true; applyFocus(true, 'u'); } else if (billboard != null && tab.equals("home")) billboard.back(); return; }
         if (focus >= COLS) { focus = focus % COLS; applyFocus(true, 'u'); }
     }
 
+    /* Back at the top of a tab: on the TV, to the menu; on a phone, to Home, and from Home out of TopShelf (as apps do) */
+    private void upFromTab() {
+        if (!phone) { enterTop(); return; }
+        if (tab.equals("home")) act.moveTaskToBack(true);
+        else { mode = "grid"; showTab("home"); }
+    }
     void enterTopFromVod() { enterTop(); }
     /** the self-check: its presses go to the screen itself, not the top bar (where ◀ ▶ changes tab) */
     NativeSports sportsNow() { return sports; }
@@ -1675,7 +1698,7 @@ final class NativeHome extends FrameLayout {
         Choreographer.getInstance().removeFrameCallback(fcb);
         Choreographer.getInstance().removeFrameCallback(redrawCb);
         try { if (billboard != null) billboard.dispose(); } catch (Throwable ignored) { }
-        try { if (vodM != null) vodM.dispose(); if (vodS != null) vodS.dispose(); } catch (Throwable ignored) { }
+        try { if (vodM != null) vodM.dispose(); if (vodS != null) vodS.dispose(); if (vodH != null) vodH.dispose(); } catch (Throwable ignored) { }
         try { if (sports != null) sports.dispose(); } catch (Throwable ignored) { }
         try { if (sportsData != null) sportsData.dispose(); } catch (Throwable ignored) { }
         try { imgs.dispose(); } catch (Throwable ignored) { }
@@ -1726,6 +1749,7 @@ final class NativeHome extends FrameLayout {
                 tFree = false;
                 if (vodM != null) vodM.touchDown();
                 if (vodS != null) vodS.touchDown();
+                if (vodH != null) vodH.touchDown();
                 if (tVel != null) tVel.recycle();
                 tVel = android.view.VelocityTracker.obtain(); tVel.addMovement(e);
                 main.removeCallbacks(tLong); main.postDelayed(tLong, 460);
@@ -1917,8 +1941,8 @@ final class NativeHome extends FrameLayout {
         tab = id;
         if (was.equals("live") && live != null) live.hide();
         if (was.equals("sports") && sports != null) sports.hide();
-        if ((was.equals("movies") || was.equals("series")) && !(id.equals("movies") || id.equals("series"))) vod.hide();
-        if (id.equals("home")) {
+        if (vodTab(was) && !vodTab(id)) vod.hide();
+        if (id.equals("home") && !phone) {
             photoBox.setVisibility(VISIBLE); scrim.setVisibility(VISIBLE); content.setVisibility(VISIBLE);
             restoreHomeGlass();
             if (focus >= COLS) focus = focus % COLS;
@@ -1941,9 +1965,9 @@ final class NativeHome extends FrameLayout {
                 sports.show();
             } else {
                 NativeVod want = vodFor(id);
-                if (want != vod && (was.equals("movies") || was.equals("series"))) vod.hide();
+                if (want != vod && vodTab(was)) vod.hide();
                 vod = want;
-                vod.show(id.equals("series") ? "series" : "movie");
+                vod.show(id.equals("series") ? "series" : id.equals("home") ? "home" : "movie");
             }
             main.postDelayed(new Runnable() { @Override public void run() {
                 if (!onVod()) return;
@@ -3223,6 +3247,7 @@ final class NativeHome extends FrameLayout {
     private Runnable slideTimer;
 
     private void loadPhotos(boolean force) {
+        if (phone) return;            // (no photo wallpaper on a phone: its Home is a page of titles)
         final String sub = sub(), sort = sort();
         String cached = prefs.getString("photos." + sub.toLowerCase(Locale.US) + "." + sort, null);
         if (cached != null) setPhotos(arr(cached), false);
@@ -3945,7 +3970,7 @@ final class NativeHome extends FrameLayout {
         if (!oldWx.equals(S.optString("wxLat") + S.optString("wxLon") + S.optString("wxUnit"))) main.post(wxLoad);
         applyWidgetPref(); refreshNext();
         // Settings › Home › Menu changed: Home is made again in the other style
-        if (side != sideWanted() || (!side && !portrait && !barStyle.equals(barStylePref(S))) || !homeStyle.equals(homeStylePref(S)) || (side && !menuStyle.equals(menuStylePref(S))) || !GlassPanel.look.equals(lookPref(S))) { main.postDelayed(new Runnable() { @Override public void run() { act.recreate(); } }, 700); return; }
+        if (side != sideWanted() || (!side && !portrait && !barStyle.equals(barStylePref(S))) || !homeStyle.equals(homeStyleWanted()) || (side && !menuStyle.equals(menuStylePref(S))) || !GlassPanel.look.equals(lookPref(S))) { main.postDelayed(new Runnable() { @Override public void run() { act.recreate(); } }, 700); return; }
         if (!oldLook.equals(S.optString("vodLook", "shelves"))) { if (vodM != null) vodM.lookChanged(); if (vodS != null) vodS.lookChanged(); }
         // a TMDB key added or removed: Movies & TV Shows make their rows again (TMDB's rows come or go)
         if (!oldTmdb.equals(S.optString("tmdbKey", ""))) { if (vodM != null) vodM.addonsChanged(); if (vodS != null) vodS.addonsChanged(); }

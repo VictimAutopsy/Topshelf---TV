@@ -101,7 +101,7 @@ final class NativeVod extends FrameLayout {
 
     // rows
     private final class Row {
-        String id, title, url; boolean mine, cw, cal, loading; String err = "";
+        String id, title, url, ty; boolean mine, cw, cal, loading; String err = "";
         String kind = "poster";        // poster | wide (landscape, title under) | top (numbered) | tile (Browse)
         List<JSONObject> items;
         int col; float scroll;
@@ -117,6 +117,10 @@ final class NativeVod extends FrameLayout {
        sideways by itself, both carry on after a flick, and a tap opens what it lands on. pageY is how far the page
        has been pushed up (rem); a row's own `scroll` is how far it has been pushed left. */
     private final boolean free;
+    /* The phone's Home is one of these pages too (h.phone only): the featured title up top, Continue watching for
+       movies and shows together, then a few rows of each. Its rows carry their own kind of title (Row.ty). */
+    private final boolean home;
+    private TextView btnPlay, btnMore; private String heroAct = "";
     private float pageY;
     private final float ROWS0;                 // where the rows start on the page (rem): under the title up top
     private FrameLayout head; private View pageDim;
@@ -209,7 +213,7 @@ final class NativeVod extends FrameLayout {
     // backdrops
     /** Continue watching first (what you're part-way through, and shows' next episodes) */
     private void addCw() {
-        if (!Progress.continueList(getContext(), type, 1).isEmpty()) { Row cw = new Row(); cw.id = "cw"; cw.title = "Continue watching"; cw.cw = true; rows.add(cw); }
+        if (!Progress.continueList(getContext(), home ? null : type, 1).isEmpty()) { Row cw = new Row(); cw.id = "cw"; cw.title = "Continue watching"; cw.cw = true; rows.add(cw); }
         // TV Shows: the next new episode of each show you watch (Upcoming)
         if (type.equals("series") && !Upcoming.cached().isEmpty()) { Row c = new Row(); c.id = "cal"; c.title = "Coming up"; c.cal = true; rows.add(c); }
     }
@@ -270,11 +274,13 @@ final class NativeVod extends FrameLayout {
     private int heroTok;
     private static Bitmap grain;
 
-    NativeVod(NativeHome host) {
+    NativeVod(NativeHome host) { this(host, false); }
+    NativeVod(NativeHome host, boolean homePage) {
         super(host.getContext());
+        home = homePage;
         h = host; R = host.R; W = host.W; H = host.H;
         PAD = h.portrait ? 3 : 5;
-        free = h.phone; ROWS0 = ROWS_Y + h.TOP;
+        free = h.phone; ROWS0 = ROWS_Y + h.TOP + (free ? 4.5f : 0);      // (a phone: room for the two buttons under the title up top)
         setClipChildren(true);
         for (int i = 0; i < 2; i++) {
             bg[i] = new ImageView(getContext());
@@ -343,6 +349,22 @@ final class NativeVod extends FrameLayout {
         heroHint.setText("OK · Open in Nuvio  ·  hold OK · More");
         LinearLayout.LayoutParams hl = new LinearLayout.LayoutParams(LayoutParams.WRAP_CONTENT, LayoutParams.WRAP_CONTENT); hl.topMargin = h.px(1);
         hero.addView(heroHint, hl);
+        if (free) {
+            // a phone: two buttons to tap instead of the remote's hint
+            heroHint.setVisibility(GONE);
+            LinearLayout btns = new LinearLayout(getContext());
+            btnPlay = h.text(h.fSemi, 1.5f, Color.WHITE); btnPlay.setText("Watch now"); btnPlay.setGravity(Gravity.CENTER);
+            btnMore = h.text(h.fSemi, 1.5f, Color.WHITE); btnMore.setText("More details"); btnMore.setGravity(Gravity.CENTER);
+            GlassPanel.onButton(btnPlay, 2.6f * R, 0, 0);
+            boolean air = GlassPanel.look.equals("air");
+            btnMore.setBackground(GlassPanel.buttonBg(false, 2.6f * R, Ui.WHITE_20)); btnMore.setTextColor(GlassPanel.buttonText(false));
+            btnMore.setAllCaps(air); btnMore.setLetterSpacing(air ? .06f : 0f);
+            LinearLayout.LayoutParams b1 = new LinearLayout.LayoutParams(0, h.px(5.2f), 1), b2 = new LinearLayout.LayoutParams(0, h.px(5.2f), 1);
+            b2.leftMargin = h.px(1.1f);
+            btns.addView(btnPlay, b1); btns.addView(btnMore, b2);
+            LinearLayout.LayoutParams bl = new LinearLayout.LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT); bl.topMargin = h.px(1.5f);
+            hero.addView(btns, bl);
+        }
         (free ? head : this).addView(hero, h.at(PAD, 8.6f + h.TOP, h.px(Math.min(72, h.SW - 2 * PAD)), LayoutParams.WRAP_CONTENT));
 
         rowsBox = new FrameLayout(getContext());
@@ -363,7 +385,7 @@ final class NativeVod extends FrameLayout {
     String type() { return type; }
 
     void show(String t) {
-        String nt = t.equals("series") ? "series" : "movie";
+        String nt = home ? "movie" : t.equals("series") ? "series" : "movie";
         boolean changed = !nt.equals(type) || rows.isEmpty();
         type = nt;
         theme();
@@ -380,7 +402,7 @@ final class NativeVod extends FrameLayout {
 
     /* Backdrops have a worker of their own (they waited behind dozens of posters before). */
     private final java.util.concurrent.ExecutorService bgWorker = java.util.concurrent.Executors.newSingleThreadExecutor();
-    private File lastBgFile(String t) { return new File(h.act.getCacheDir(), "vodbg-" + t + (h.portrait ? "-p" : "") + ".jpg"); }
+    private File lastBgFile(String t) { return new File(h.act.getCacheDir(), "vodbg-" + t + (h.portrait ? "-p" : "") + (home ? "-home" : "") + ".jpg"); }
 
     private void instantBackdrop() {
         final String t = type;
@@ -465,7 +487,7 @@ final class NativeVod extends FrameLayout {
         else if (lk.equals("shelf")) { rad = Math.min(rad, .5f * R); ring = GlassPanel.shelfLight(); glowCol = (GlassPanel.shelfLight() & 0x00FFFFFF) | Ui.BLACK_45; }
         else if (lk.equals("ink")) { rad = Math.min(rad, .6f * R); ring = GlassPanel.inkPaper(); glowCol = (GlassPanel.inkColor & 0x00FFFFFF) | Ui.BLACK_55; }
         else if (lk.equals("spot")) { ring = 0xFFFFFFFF; glowCol = 0x73FFFFFF; }
-        label.setText(mv ? "Movies" : "TV Shows");
+        label.setText(home ? "TopShelf" : mv ? "Movies" : "TV Shows");
         if (lk.equals("air")) { label.setAllCaps(true); label.setLetterSpacing(.04f); }
         label.setTypeface(lk.equals("air") ? h.fSemi : mv && !shelves() ? Typeface.create(Typeface.SERIF, Typeface.BOLD_ITALIC) : h.fSemi);
         shadeLabel();
@@ -497,10 +519,26 @@ final class NativeVod extends FrameLayout {
         rows.clear();
         JSONArray mine = myList();
         boolean any = false;
-        for (int i = 0; i < mine.length(); i++) if (type.equals(mine.optJSONObject(i).optString("type"))) any = true;
+        for (int i = 0; i < mine.length(); i++) if (home || type.equals(mine.optJSONObject(i).optString("type"))) any = true;
         addCw();
         if (any) { Row m = new Row(); m.id = "mine"; m.title = "My List"; m.mine = true; rows.add(m); }
         int y = Calendar.getInstance().get(Calendar.YEAR);
+        if (home) {
+            // the phone's Home: a few rows of each kind (the tabs have the rest)
+            boolean tkH = Feeds.traktOn(h);
+            if (tkH) homeRow("h-tk-m", "Trending movies", "trakt:/movies/trending?limit=40", "movie");
+            homeRow("h-pop-m", "Popular movies", CINEMETA + "/catalog/movie/top.json", "movie");
+            if (tkH) homeRow("h-tk-s", "Trending shows", "trakt:/shows/trending?limit=40", "series");
+            homeRow("h-pop-s", "Popular shows", CINEMETA + "/catalog/series/top.json", "series");
+            homeRow("h-new-m", "New movies", CINEMETA + "/catalog/movie/year/genre=" + y + ".json", "movie");
+            homeRow("h-new-s", "New shows", CINEMETA + "/catalog/series/year/genre=" + y + ".json", "series");
+            applyKinds();
+            rowsIn.setTranslationY(0);
+            sizeRowsIn();
+            r = 0; pageY = 0; topRowSeen = -1;
+            focus(false);
+            return;
+        }
         /* Rows that stay current (Feeds): Trakt's (with its app ID) and TMDB's (with a key), around Cinemeta's */
         boolean tk = Feeds.traktOn(h), tm = Feeds.tmdbOn(h), mv = type.equals("movie");
         String tt = mv ? "movies" : "shows";
@@ -537,6 +575,7 @@ final class NativeVod extends FrameLayout {
     private void applyKinds() {
         for (int i = rows.size() - 1; i >= 0; i--) if (rows.get(i).id.equals("browse") || rows.get(i).id.equals("genres")) rows.remove(i);
         boolean sh = shelves(), mv = type.equals("movie");
+        if (home) { for (Row x : rows) { x.kind = x.cw && sh ? "wide" : "poster"; if (x.cw) x.title = "Continue watching"; } return; }
         int topAt = -1;
         for (int i = 0; i < rows.size(); i++) {
             Row x = rows.get(i);
@@ -570,6 +609,7 @@ final class NativeVod extends FrameLayout {
         int ga = -1; for (int i = 0; i < rows.size(); i++) if (rows.get(i).id.equals("new")) ga = i + 1;
         if (gr.items.size() >= 2) rows.add(ga > 0 ? ga : at, gr);
     }
+    private void homeRow(String id, String title, String url, String ty) { Row x = new Row(); x.id = id; x.title = title; x.url = url; x.ty = ty; rows.add(x); }
     private void addRow(String id, String title, String url) { Row x = new Row(); x.id = id; x.title = title; x.url = url; rows.add(x); }
 
     /** rows near the focus have views (and their pictures); rows further away are let go */
@@ -682,18 +722,18 @@ final class NativeVod extends FrameLayout {
     private void load(final int i) {
         final Row x = rows.get(i);
         if (x.items != null || x.loading) return;
-        if (x.cw) { x.items = Progress.continueList(getContext(), type, 20); return; }
+        if (x.cw) { x.items = Progress.continueList(getContext(), home ? null : type, 20); return; }
         if (x.cal) { x.items = new ArrayList<>(Upcoming.cached()); return; }
         if (x.mine) {
             x.items = new ArrayList<>();
             JSONArray a = myList();
-            for (int k = 0; k < a.length(); k++) { JSONObject o = a.optJSONObject(k); if (o != null && type.equals(o.optString("type"))) x.items.add(o); }
+            for (int k = 0; k < a.length(); k++) { JSONObject o = a.optJSONObject(k); if (o != null && (home || type.equals(o.optString("type")))) x.items.add(o); }
             return;
         }
         Object[] c = cat.get(x.url);
         if (c != null && System.currentTimeMillis() - (Long) c[0] < Feeds.ttl(x.url)) { x.items = asList(c[1]); return; }
         x.loading = true;
-        final String url = x.url, t = type;
+        final String url = x.url, t = type, pt = x.ty != null ? x.ty : type;
         h.imgs.run(new Runnable() { @Override public void run() {
             List<JSONObject> out = null; String err = "";
             String body = readCache(url);
@@ -702,11 +742,11 @@ final class NativeVod extends FrameLayout {
             boolean recent = body != null && System.currentTimeMillis() - cacheFile(url).lastModified() < Feeds.ttl(url);
             if (!recent) {
                 try {
-                    String d = Feeds.fetch(h, url, t);       // (Cinemeta, an addon, Trakt or TMDB)
+                    String d = Feeds.fetch(h, url, pt);       // (Cinemeta, an addon, Trakt or TMDB)
                     if (d != null) { body = d; fresh = true; }
                 } catch (Throwable e) { err = e.getMessage() == null ? "offline" : e.getMessage(); }
             }
-            try { if (body != null) out = parse(body, t); } catch (Throwable e) { err = "bad data"; }
+            try { if (body != null) out = parse(body, pt); } catch (Throwable e) { err = "bad data"; }
             if (fresh && out != null && !out.isEmpty()) writeCache(url, body);
             final List<JSONObject> res = out; final String er = err;
             main().post(new Runnable() { @Override public void run() {
@@ -937,7 +977,11 @@ final class NativeVod extends FrameLayout {
     /** a finger (phones): the poster under it becomes the chosen one (true: OK then opens it); the widened card or the details up top are the chosen title */
     boolean focusAt(float x, float y) {
         if (free) {
-            picked = null; pickedV = null;
+            picked = null; pickedV = null; heroAct = "";
+            if (head.getAlpha() > .5f && cur() != null) {
+                if (h.hit(btnPlay, x, y, .3f)) { heroAct = "play"; return true; }
+                if (h.hit(btnMore, x, y, .3f)) { heroAct = "more"; return true; }
+            }
             for (Row x0 : rows) for (Map.Entry<Integer, PosterView> en : x0.posters.entrySet()) {
                 if (!h.hit(en.getValue(), x, y, 0)) continue;
                 int c = en.getKey();
@@ -968,6 +1012,8 @@ final class NativeVod extends FrameLayout {
         if (untuck()) return;
         final JSONObject m = free && picked != null ? picked : cur();
         if (m == null) return;
+        if (free && heroAct.equals("play") && Addons.get(getContext()).anyStreams()) { heroAct = ""; h.openTitlePlay(m); return; }
+        heroAct = "";
         if (m.optBoolean("tile")) {
             // Browse: to that row
             for (int k = 0; k < rows.size(); k++) if (rows.get(k).id.equals(m.optString("target"))) {
@@ -1101,7 +1147,7 @@ final class NativeVod extends FrameLayout {
         rows.clear();
         boolean any = false;
         JSONArray mine = myList();
-        for (int i = 0; i < mine.length(); i++) if (type.equals(mine.optJSONObject(i).optString("type"))) any = true;
+        for (int i = 0; i < mine.length(); i++) if (home || type.equals(mine.optJSONObject(i).optString("type"))) any = true;
         addCw();
         if (any) { Row m = new Row(); m.id = "mine"; m.title = "My List"; m.mine = true; rows.add(m); }
         for (Row o : old) if (!o.mine && !o.cw && !o.cal && !o.id.equals("browse") && !o.id.equals("genres")) { o.view = null; o.strip = null; o.posters.clear(); rows.add(o); }
