@@ -68,6 +68,8 @@ final class NativeHome extends FrameLayout {
        which is Android's own Back gesture). TOP is the room the camera cutout takes at the top, upright (rem). */
     boolean phone;
     float TOP;
+    /** a phone: a video full screen turns the screen sideways, and back upright when it's left */
+    void videoTurn(boolean on) { if (phone) act.setVideoLandscape(on); }
     private boolean sideWanted() { return !"top".equals(S.optString("nav", "side")) && !(phone && portrait); }
     /* Settings › Home › Menu: the side menu (glass down the left), or the tab bar across the top with the round
        buttons at the top right, as before */
@@ -263,6 +265,7 @@ final class NativeHome extends FrameLayout {
     @Override protected void onSizeChanged(int w, int h, int ow, int oh) {
         super.onSizeChanged(w, h, ow, oh);
         if (w == 0 || h == 0 || (w == W && h == H && built)) return;
+        if (phone && w > h) return;       // (a phone sideways: a video has the screen; the screens under it stay as they are, upright)
         W = w; H = h;
         main.post(new Runnable() { @Override public void run() { try { build(); } catch (Throwable t) { act.nativeHomeBroken(t); } } });
     }

@@ -232,7 +232,8 @@ public class MainActivity extends Activity {
        phone held upright keeps the page's upright layout. */
     boolean nativeHomeWanted() {
         SharedPreferences sp = getSharedPreferences(Bridge.PREFS, MODE_PRIVATE);
-        return (isTv() || sideways() || sp.getBoolean("uprightNative", false)) && !homeBroken && !sp.getBoolean("nativeHomeOff", false);
+        // (a phone is browsed upright only now, always on the app's own screens; the page's layouts are the fallback if those fail)
+        return !homeBroken && !sp.getBoolean("nativeHomeOff", false);
     }
     private boolean sideways() {
         android.util.DisplayMetrics dm = getResources().getDisplayMetrics();
@@ -784,11 +785,9 @@ public class MainActivity extends Activity {
     /** TVs stay landscape; phones follow the Screen rotation setting (auto / portrait / landscape). */
     void applyOrientation() {
         if (isTv()) { setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE); return; }
-        if (videoLandscape) { setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE); return; }
-        String r = getSharedPreferences(Bridge.PREFS, MODE_PRIVATE).getString("rotate", "auto");
-        setRequestedOrientation("portrait".equals(r) ? ActivityInfo.SCREEN_ORIENTATION_USER_PORTRAIT
-                : "landscape".equals(r) ? ActivityInfo.SCREEN_ORIENTATION_USER_LANDSCAPE
-                : ActivityInfo.SCREEN_ORIENTATION_FULL_USER);
+        /* a phone: upright for everything you browse; a movie, an episode or a channel full screen turns it sideways
+           (either way round), and leaving the video puts it upright again */
+        setRequestedOrientation(videoLandscape ? ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE : ActivityInfo.SCREEN_ORIENTATION_PORTRAIT);
     }
 
     /** Full-screen video on a phone turns the screen sideways, like YouTube; leaving puts it back. */

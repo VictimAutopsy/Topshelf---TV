@@ -1053,10 +1053,6 @@ function buildAllSettings() {
       cycle: d => { S.barStyle = step(BAR_STYLES, S.barStyle || 'classic', d || 1); save(); toast('Bar style: ' + BAR_STYLES.find(x => x[0] === S.barStyle)[1]); } }] : []),
     ...(IS_TV ? [{ label: 'App bar', value: () => S.dock ? 'Shown' : 'Hidden', cycle: () => { S.dock = !S.dock; save(); } }] : []),
     { label: 'Change photo every', value: () => EVERY.find(s => s[0] === S.every)[1], cycle: d => { S.every = step(EVERY, S.every, d); save(); scheduleSlide(); } },
-    ...(!IS_TV && B.nhUpright ? [{ label: 'Upright layout', value: () => { let on = false; try { on = !!JSON.parse(B.nhInfo()).upright; } catch (e) {} return on ? 'Same as the TV (beta)' : 'Phone'; },
-      cycle: () => { let on = false; try { on = !!JSON.parse(B.nhInfo()).upright; } catch (e) {} toast(on ? 'Upright, TopShelf goes back to the phone layout' : 'Upright, TopShelf now looks like it does on the TV'); setTimeout(() => B.nhUpright(!on), 600); } }] : []),
-    ...(!IS_TV && B.nhSetOff ? [{ label: 'Sideways layout', value: () => { let off = false; try { off = !!JSON.parse(B.nhInfo()).off; } catch (e) {} return off ? 'Classic' : 'Same as the TV'; },
-      cycle: () => { let off = false; try { off = !!JSON.parse(B.nhInfo()).off; } catch (e) {} B.nhSetOff(!off); toast(off ? 'Turned sideways, TopShelf now looks like it does on the TV' : 'Sideways, TopShelf keeps its classic look'); setTimeout(() => location.reload(), 400); } }] : []),
     ...(IS_TV && B.nhSetOff ? [{ label: 'Home screen', value: () => (typeof NH !== 'undefined' && NH.on) ? 'Android (smooth)' : 'Web page (older)',
       cycle: () => { const on = typeof NH !== 'undefined' && NH.on; B.nhSetOff(on); toast(on ? 'Switching to the page version…' : 'Switching to the Android version…'); setTimeout(() => location.reload(), 400); } }] : []),
     { label: 'Look', value: () => (LOOKS.find(x => x[0] === (S.look || 'glass')) || LOOKS[0])[1], chevron: true,
@@ -1074,8 +1070,6 @@ function buildAllSettings() {
       cycle: d => { S.saver = step(SAVER_TIMES, S.saver != null ? S.saver : (IS_TV ? 10 : 0), d); save(); } },
     { label: 'Bedtime', value: () => (BED_TIMES.find(t => t[0] === bedStart()) || BED_TIMES[0])[1] + (bedNow() ? ' · on now' : ''),
       cycle: d => { S.bedtime = step(BED_TIMES, bedStart(), d); save(); bedApply(); } },
-    ...(IS_TV ? [] : [{ label: 'Screen rotation', value: () => ({ auto: 'Auto (follow phone)', portrait: 'Portrait', landscape: 'Landscape' })[rotation()] || 'Auto',
-      cycle: d => { const v = step([['auto'], ['portrait'], ['landscape']], rotation(), d); try { B.setRotation(v); } catch (e) { S.rotate = v; } } }]),
     { id: 'posters', label: 'Movie & TV poster URL', gap: true, value: () => S.posterUrl ? urlLabel(S.posterUrl, 'Custom') : 'Default posters',
       edit: { wide: true, get: () => S.posterUrl || '', set: v => {
         v = (v || '').trim();

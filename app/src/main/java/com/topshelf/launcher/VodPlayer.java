@@ -512,6 +512,7 @@ final class VodPlayer extends FrameLayout {
         hidden.clear();
         for (int i = 0; i < h.getChildCount(); i++) { View v = h.getChildAt(i); if (v != this && !h.overlay(v) && v.getVisibility() == VISIBLE) { hidden.put(v, VISIBLE); v.setVisibility(INVISIBLE); } }
         setVisibility(VISIBLE); bringToFront();
+        h.videoTurn(true);
         removeCallbacks(barHide); bar.animate().cancel(); bar.setAlpha(0f);      // (the controls come with the picture)
         h.stopTrailers();
         final NativePlayer np = h.act.nativePlayer();
@@ -605,6 +606,7 @@ final class VodPlayer extends FrameLayout {
         for (Map.Entry<View, Integer> e : hidden.entrySet()) e.getKey().setVisibility(e.getValue());
         hidden.clear();
         setVisibility(GONE);
+        h.videoTurn(false);
         if (from != null) from.refreshProgress();
         h.settleMemory();                 // (the video's buffers and pictures are let go)
     }

@@ -1746,6 +1746,7 @@ final class NativeLive extends FrameLayout {
     private void enterFull() {
         Diag.ev("live: full screen");
         full = true;
+        h.videoTurn(true);
         zone = "guide";
         h.updateBars();
         bg.setVisibility(INVISIBLE); info.setVisibility(INVISIBLE); guide.setVisibility(INVISIBLE); empty.setVisibility(GONE);
@@ -1771,6 +1772,7 @@ final class NativeLive extends FrameLayout {
         stopShift();
         if (wasBehind && playing != null) start(playing, tried, lastUrl);
         full = false;
+        h.videoTurn(false);
         pushWatching();
         h.updateBars();
         fs.setVisibility(INVISIBLE);

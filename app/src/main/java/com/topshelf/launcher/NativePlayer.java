@@ -253,6 +253,11 @@ final class NativePlayer implements Player.Listener {
 
     NativePlayer(MainActivity act, FrameLayout root, View web, Events out) {
         this.act = act; this.root = root; this.web = web; this.out = out;
+        root.addOnLayoutChangeListener(new View.OnLayoutChangeListener() {
+            @Override public void onLayoutChange(View v, int l, int t, int r, int b, int ol, int ot, int or, int ob) {
+                if (r - l != or - ol || b - t != ob - ot) rootResized();
+            }
+        });
     }
 
     // ------------------------------------------------------------------ view
@@ -319,6 +324,15 @@ final class NativePlayer implements Player.Listener {
         if (sv.getScaleX() != s) { sv.setScaleX(s); sv.setScaleY(s); }
     }
 
+    /* A phone turned sideways for a video (or back): the picture that fills the screen fills its new shape. */
+    private boolean whole;
+    void rootResized() {
+        if (sv == null || !whole || !"fs".equals(mode)) return;
+        if (bw == root.getWidth() && bh == root.getHeight()) return;
+        bx = 0; by = 0; bw = root.getWidth(); bh = root.getHeight();
+        Diag.ev("video: the screen is now " + bw + "x" + bh);
+        fit();
+    }
     /** mode: "pv" | "fs" | "hide"; rect in screen pixels (fs: 0 = whole screen) */
     void layout(String newMode, int x, int y, int w, int h, float r, int animMs) {
         String nm = "top".equals(newMode) ? "fs" : newMode;
@@ -326,7 +340,8 @@ final class NativePlayer implements Player.Listener {
         mode = "top".equals(newMode) ? "fs" : newMode;
         if ("hide".equals(mode) && player == null && sv == null) return;     // (nothing to show: no picture plane)
         sv();
-        if (w <= 0 || h <= 0) { x = 0; y = 0; w = root.getWidth(); h = root.getHeight(); }
+        whole = w <= 0 || h <= 0;
+        if (whole) { x = 0; y = 0; w = root.getWidth(); h = root.getHeight(); }
         else {
             // the page may be drawn smaller and enlarged (Picture sharpness): its pixels → screen pixels
             float k = 1f / act.renderScale();
