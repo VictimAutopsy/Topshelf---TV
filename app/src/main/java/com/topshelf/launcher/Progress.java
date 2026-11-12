@@ -87,6 +87,26 @@ final class Progress {
         } catch (Exception ignored) { }
         store(c, a);
     }
+    /** from Trakt: an episode you finished on another device, and the one that comes after it (Continue watching
+        offers that next one). Kept unless this TV's own record of the episode is newer; one you removed from
+        Continue watching stays removed until you watch more of the show. */
+    static synchronized void putRemoteNext(Context c, String id, long at, String show, int season, int episode, JSONObject title, String label, String nextId, String nextLabel) {
+        JSONObject a = all(c);
+        try {
+            JSONObject old = a.optJSONObject(id);
+            if (old != null && old.optLong("at") > at) return;
+            if (old != null && old.optLong("at") == at && old.optJSONObject("next") != null && nextId.equals(old.optJSONObject("next").optString("id"))) return;
+            JSONObject o = old != null ? new JSONObject(old.toString())
+                    : new JSONObject().put("id", id).put("pos", 0).put("dur", 0).put("show", show).put("season", season).put("episode", episode);
+            if (old != null && at > old.optLong("at")) o.remove("hidden");
+            o.put("pct", 100).put("watched", true).put("at", at).put("trakt", true).put("next", new JSONObject().put("id", nextId).put("label", nextLabel));
+            if (title != null && o.optJSONObject("title") == null) o.put("title", title);
+            if (label != null && o.optString("label").isEmpty()) o.put("label", label);
+            a.put(id, o);
+            trim(a);
+        } catch (Exception ignored) { }
+        store(c, a);
+    }
     /** watched (from Trakt's history): ticks in the episode lists */
     static synchronized void markWatched(Context c, Set<String> ids) {
         Set<String> s = new HashSet<>(ids);

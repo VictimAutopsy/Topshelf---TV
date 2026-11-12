@@ -14,7 +14,12 @@ import java.io.OutputStream;
 import java.net.HttpURLConnection;
 import java.net.URL;
 import java.text.SimpleDateFormat;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.Comparator;
 import java.util.HashSet;
+import java.util.List;
+import java.util.Map;
 import java.util.Locale;
 import java.util.Set;
 import java.util.TimeZone;
@@ -284,6 +289,7 @@ final class Trakt {
     // ================================================================== what you watched elsewhere
 
     /** Trakt's paused movies/episodes into Continue watching, and watched episodes as ticks (every 15 minutes at most unless forced) */
+    private final Map<String, Long> nextFor = new java.util.concurrent.ConcurrentHashMap<>();     // show → when you last watched it, as of asking for its next episode
     void sync(boolean force) {
         if (!connected()) return;
         if (!force && System.currentTimeMillis() - syncedAt < 15 * 60000L) return;
@@ -314,10 +320,14 @@ final class Trakt {
                 // watched episodes (ticks in the episode lists)
                 JSONArray ws = new JSONArray(get(API + "/sync/watched/shows"));
                 Set<String> ids = new HashSet<>();
+                List<JSONObject> lately = new ArrayList<>();
+                long twoMonths = System.currentTimeMillis() - 60L * 86400000L;
                 for (int i = 0; i < ws.length(); i++) {
                     JSONObject x = ws.optJSONObject(i);
                     JSONObject sh = x.optJSONObject("show");
                     String imdb = sh == null || sh.optJSONObject("ids") == null ? "" : sh.optJSONObject("ids").optString("imdb");
+                    // (shows you've watched lately: their next episodes, below)
+                    try { long lw = iso.parse(x.optString("last_watched_at")).getTime(); if (!imdb.isEmpty() && lw > twoMonths) lately.add(new JSONObject().put("imdb", imdb).put("at", lw).put("name", sh.optString("title"))); } catch (Exception ignored) { }
                     JSONArray ss = x.optJSONArray("seasons");
                     if (imdb.isEmpty() || ss == null) continue;
                     for (int k = 0; k < ss.length(); k++) {
@@ -335,8 +345,31 @@ final class Trakt {
                     }
                 } catch (Exception e) { Diag.ev("trakt: watched movies failed " + e.getMessage()); }
                 Progress.markWatched(act, ids);
+                /* The next episode of each show you've been watching, wherever you watched it (Continue watching
+                   only had what was paused part-way, and next episodes of shows finished on this TV: a show
+                   you'd been watching in another app never appeared). Trakt is asked once per show each time
+                   you watch more of it; the fifteen most recent. */
+                Collections.sort(lately, new Comparator<JSONObject>() { @Override public int compare(JSONObject a, JSONObject b) { return Long.compare(b.optLong("at"), a.optLong("at")); } });
+                int nexts = 0, asked = 0;
+                for (int i = 0; i < lately.size() && i < 15; i++) {
+                    JSONObject sh = lately.get(i);
+                    String imdb = sh.optString("imdb"); long at = sh.optLong("at");
+                    Long had = nextFor.get(imdb);
+                    if (had != null && had == at) continue;
+                    try {
+                        asked++;
+                        JSONObject pr = new JSONObject(get(API + "/shows/" + imdb + "/progress/watched?hidden=false&specials=false&count_specials=false"));
+                        JSONObject nx = pr.optJSONObject("next_episode"), last = pr.optJSONObject("last_episode");
+                        nextFor.put(imdb, at);
+                        if (nx == null || last == null) continue;                 // (caught up, or nothing watched)
+                        int ls = last.optInt("season"), le = last.optInt("number"), ns = nx.optInt("season"), ne = nx.optInt("number");
+                        Progress.putRemoteNext(act, imdb + ":" + ls + ":" + le, at, imdb, ls, le, title("series", imdb, sh.optString("name")),
+                                "S" + ls + " · E" + le + "  " + last.optString("title"), imdb + ":" + ns + ":" + ne, "S" + ns + " · E" + ne + "  " + nx.optString("title"));
+                        nexts++;
+                    } catch (Exception e) { Diag.ev("trakt: a show's next episode failed " + e.getMessage()); }
+                }
                 prefs.edit().putLong(P + "synced", System.currentTimeMillis()).remove(P + "err").apply();
-                Diag.ev("trakt: synced (" + pb.length() + " in progress, " + ids.size() + " episodes watched)");
+                Diag.ev("trakt: synced (" + pb.length() + " in progress, " + ids.size() + " episodes watched, " + Math.min(15, lately.size()) + " shows watched lately: " + asked + " asked, " + nexts + " with a next episode)");
             } catch (Exception e) {
                 prefs.edit().putString(P + "err", String.valueOf(e.getMessage())).apply();
                 Diag.ev("trakt: sync failed " + e.getMessage());
