@@ -53,10 +53,11 @@ Quick compile check without building:
   nearest step, not a new number. `python3 tools/tokens.py <file.java>` swaps a file's literals for them. Every screen
   has been through it (1.0.386); text drawn on a canvas (Sports, Standings, parts of the title page) still has its own sizes.
 - Settings on the TV (NativeSheet) is Chad's design: the sections in full down the left with the chosen one's settings
-  beside them. OK on a setting with three or more choices pops a panel out on the right (the sections shrink to icons)
-  with what it does and its choices: ▲▼ and OK choose, Back closes. Nothing changes with ◀ ▶ on a TV (he didn't want
-  to step through choices sideways); two choices flip on OK. The panel's words come from `assets/setinfo.js`: only
-  write what the code really does, and give a new setting an entry there too.
+  beside them. OK on any setting with choices (two included) pops a panel out on the right (the sections shrink to
+  icons) with what it does and its choices: ▲▼ and OK choose, Back closes. Nothing changes with ◀ ▶ or in place on a
+  TV (he didn't want to step through choices). The panel's words come from `assets/setinfo.js`: only write what the
+  code really does, and give a new setting an entry there too — one whose `cycle` calls `B.` needs its `opts` listed
+  there, or it can't get the panel (see `nhSheetChoices` in nativehome.js for how a choice is set).
 - The flight recorder only counts a frame as late when it's in a run of frames (the one before it under 60 ms earlier):
   lone redraws report long times that aren't stutter. Numbers from before 1.0.410 over-count for that reason.
 - On a phone (`h.phone`, `!act.isTv()`) TopShelf is a standalone app for movies, shows, sports and Live TV, not a launcher:

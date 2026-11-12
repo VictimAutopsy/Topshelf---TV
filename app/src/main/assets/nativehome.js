@@ -217,41 +217,65 @@ if (NH.on) {
       SET.sub = null; SET.sec = i; sSel = 0;
       buildSettings(); drawSettings();
     };
-    /* OK on a setting (TV): its choices, for the panel that pops out. A setting with two choices, or one whose
-       choices can't be listed, does what OK always did (flips, steps on, or runs its action). */
+    /* OK on a setting (TV): its choices, for the panel that pops out. Every setting with choices gets it, two
+       choices included (Chad: none of them should change in place). How a choice is then set:
+         steps  the choices were listed by stepping through them quietly: so many steps on from what's set
+         goto   they can't be stepped through quietly (each step does something real), but setinfo.js names them:
+                step on until the setting says the one that was chosen
+         go     setinfo.js has its own way of setting it (Picture sharpness: one try, then "Keep this?")
+       A setting whose choices aren't known either way does what OK always did. */
     window.nhSheetChoices = i => {
       if (!NH.sheet || mode !== 'settings') return;
       sSel = Math.max(0, Math.min(i, sRows.length - 1));
       const r = sRows[sSel];
       if (!r || !r.cycle) return;
-      let inf = {}; try { inf = setInfoFor(r, String(r.value())); } catch (e) {}
+      const val = String(r.value());
+      let inf = {}; try { inf = setInfoFor(r, val); } catch (e) {}
       const canon = (inf.opts || []).map(x => x.l), note = l => ((inf.opts || []).find(x => x.l === l) || {}).n || '';
-      let o = null, opts = null, cur = 0;
-      if (r.edit || !r.ok || r.okLabel || String(r.ok).replace(/\s/g, '').includes('cycle')) { try { o = settingsChoices(r); } catch (e) {} }
-      if (o && o.length >= (r.edit ? 1 : 3)) {
+      const says = (v, l) => v === l || v.indexOf(l + ' ') === 0;
+      let o = null, opts = null, cur = 0, how = 'steps';
+      if (!inf.go) { try { o = settingsChoices(r); } catch (e) {} }
+      if (o && o.length >= (r.edit ? 1 : 2)) {
         // (in the list's own order when it's known, not starting from whatever is set)
-        const list = canon.length === o.length && o.every(l => canon.includes(l)) ? canon : o;
-        opts = list.map(l => ({ l, n: note(l), steps: o.indexOf(l) })); cur = list.indexOf(o[0]);
-      } else if (!o && inf.ordered && inf.cur >= 0) {
-        // (too long to step through and back: its order is known, so each choice is so many steps on)
-        const n = canon.length;
-        opts = canon.map((l, j) => ({ l, n: note(l), steps: (j - inf.cur + n) % n })); cur = inf.cur;
+        // ("On · last 30 min" is its "On")
+        const at = canon.map(l => o.findIndex(v => says(v, l)));
+        if (canon.length === o.length && at.every(k => k >= 0) && new Set(at).size === o.length) { opts = canon.map((l, j) => ({ l, n: note(l), steps: at[j] })); cur = at.indexOf(0); }
+        else { opts = o.map((l, k) => ({ l, n: '', steps: k })); cur = 0; }
+      } else if (canon.length >= 2 && canon.some(l => says(val, l))) {
+        how = inf.go ? 'go' : 'goto';
+        opts = canon.map(l => ({ l, n: note(l), steps: 0 })); cur = canon.findIndex(l => says(val, l));
       }
       if (!opts) { if (r.edit) opts = []; else { settingsKey('ok'); return; } }       // (only typing: the screen starts it itself)
       if (r.edit) opts.push({ l: inf.typeLabel || 'Type your own…', n: '', steps: -2 });
       else if (r.ok && r.okLabel) opts.push({ l: r.okLabel, n: '', steps: -1 });
+      NH.choice = { label: r.label, how, opts, cur };
       B.nhSheetChoices(JSON.stringify({ i: sSel, label: r.label, about: inf.about || '', opts, cur }));
     };
-    window.nhSheetPick = (i, steps) => {
+    window.nhSheetPick = (i, j) => {
       if (!NH.sheet) return;
-      const r = sRows[i];
-      if (!r) return;
+      const r = sRows[i], c = NH.choice;
+      if (!r || !c || c.label !== r.label || !c.opts[j]) return;
       sSel = i;
-      if (steps < 0) { if (r.ok) r.ok(); }
-      else if (r.cycle) {
-        if (steps > 1) settingsQuiet(() => { for (let n = 0; n < steps - 1; n++) r.cycle(1); });
-        if (steps > 0) r.cycle(1);
+      const o = c.opts[j], says = (v, l) => v === l || v.indexOf(l + ' ') === 0;
+      if (o.steps === -1) { if (r.ok) r.ok(); }
+      else if (o.steps === -2 || j === c.cur) { /* typing is the screen's; the one that's set stays */ }
+      else if (c.how === 'go') { try { setInfoFor(r, String(r.value())).go(j, c.cur); } catch (e) {} }
+      else if (c.how === 'goto') {
+        if (/\bB\.(?!ai)|icPack|renderScale|homeButton|hudToggle|location\.reload|refreshSettings/.test(String(r.cycle))) {
+          // (each step is real: step on until it says the one chosen)
+          for (let n = 0; n < c.opts.length + 1 && !says(String(r.value()), o.l); n++) r.cycle(1);
+        } else {
+          // (a list too long to go round: quietly on to the one chosen and a step back, then the last step for real)
+          let k = 0;
+          settingsQuiet(() => { while (k < 60 && !says(String(r.value()), o.l)) { r.cycle(1); k++; } if (k) r.cycle(-1); });
+          if (k) r.cycle(1);
+        }
       }
+      else {
+        if (o.steps > 1) settingsQuiet(() => { for (let n = 0; n < o.steps - 1; n++) r.cycle(1); });
+        if (o.steps > 0) r.cycle(1);
+      }
+      NH.choice = null;
       refreshSettings();
     };
     window.nhSheetEdit = (i, v) => {

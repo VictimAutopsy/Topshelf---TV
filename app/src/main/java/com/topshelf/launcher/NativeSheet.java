@@ -27,8 +27,8 @@ import java.util.List;
  *     them; ▶ or OK goes into the settings, ◀ or Back comes out;
  *   - OK on a setting with several choices: the sections shrink to a strip of icons, the settings move over and a
  *     panel pops out on the right with what the setting does and its choices (▲▼, OK chooses, Back closes it).
- *     Nothing is changed with ◀ ▶ (he didn't want to step through choices sideways); a setting with two choices
- *     flips on OK.
+ *     Nothing is changed with ◀ ▶ or in place (he didn't want to step through choices): two choices get the
+ *     panel too.
  * On Air it's edge to edge and solid; the other looks keep their own panel around the same layout.
  * On a narrow screen it's a glass sheet on the right.
  *
@@ -655,12 +655,12 @@ final class NativeSheet extends FrameLayout {
         JSONObject r = data.optJSONObject(sel);
         if (r.optBoolean("head")) return;
         if (choosing) {
-            // the choice you're on: the page sets it (so many steps on from what's set; -1 its own action, -2 typing)
+            // the choice you're on: the page sets it (-2 is typing, which is this screen's)
             JSONObject o = chOpts.optJSONObject(chSel);
             int row = chRow, steps = o == null ? 0 : o.optInt("steps", 0);
             closeChooser(true);
             if (steps == -2) { if (row < data.length() && data.optJSONObject(row).optJSONObject("edit") != null) { sel = row; startEdit(row); } }
-            else if (steps != 0) h.page("window.nhSheetPick && nhSheetPick(" + row + "," + steps + ")");
+            else h.page("window.nhSheetPick && nhSheetPick(" + row + "," + chSel + ")");
             return;
         }
         if (pane && r.optBoolean("cycle")) { h.page("window.nhSheetChoices && nhSheetChoices(" + sel + ")"); return; }

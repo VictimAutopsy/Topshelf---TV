@@ -4,7 +4,7 @@
    on a setting with several choices (NativeSheet; nhSheetChoices in nativehome.js):
      about  a sentence or two in plain words (only what the code really does)
      opts   its choices, when they're a fixed list: labels, or [label, note] pairs, or a function giving them
-     how    what the remote does on it, when that isn't the usual "◀ ▶ to change"
+     go     its own way of setting choice j (from cur), for a setting that mustn't be stepped through
      pv     'look' shows a small sample of the look
    Keyed by the row's label; SET_INFO_MATCH is for labels that change (a count in them).
    A setting with nothing here still shows its name and what it's set to.
@@ -15,7 +15,7 @@ const SET_INFO = {
   // ---------------------------------------------------------------- Home › Photos
   'Photos from': { about: 'Where the photos behind Home come from: one of the built-in collections, Bing\'s photo of the day, or any subreddit.',
     opts: () => Array.from(new Set(Object.keys(PHOTO_SOURCES).concat([S.sub], S.subs || SUB_PRESETS))).map(srcLabel),
-    ordered: true, typeLabel: 'Type a subreddit…' },
+    typeLabel: 'Type a subreddit…' },
   'Reddit account': { about: 'Reddit sometimes refuses to hand photos to visitors who aren\'t signed in. Signing in on Reddit\'s own page lets TopShelf read it as you. TopShelf never sees or keeps your password.',
     how: 'OK to sign in or out' },
   'Show': { about: 'Which of a subreddit\'s posts the photos are taken from.', opts: () => SORTS.map(x => x[1]) },
@@ -40,7 +40,8 @@ const SET_INFO = {
   'Home screen': { about: 'Which version of Home runs. Android is the smooth one; the web page is the older version, kept in case something goes wrong. Changing it reloads TopShelf.',
     opts: ['Android (smooth)', 'Web page (older)'] },
   // ---------------------------------------------------------------- Home › Apps
-  'Icon pack': { about: 'Draws your apps\' icons from an icon pack installed on this device. None uses each app\'s own icon.' },
+  'Icon pack': { about: 'Draws your apps\' icons from an icon pack installed on this device. None uses each app\'s own icon.',
+    opts: () => typeof icPacks === 'function' && icPacks().length ? ['None'].concat(icPacks().map(p => p.label)) : [] },
   'Reset custom icons': { about: 'Puts back the original icon for every app you gave your own picture.', how: 'OK to reset' },
   'Reset app order': { about: 'Puts your apps back in their original order.', how: 'OK to reset' },
   // ---------------------------------------------------------------- Home › Clock & weather
@@ -75,10 +76,11 @@ const SET_INFO = {
   'Live TV guide (EPG)': { about: 'Where the programme guide comes from. Left empty, the guide your playlist names is used.' },
   'Refresh Live TV': { about: 'Loads your channels and the guide again now.', how: 'OK to refresh' },
   'Channel preview': { about: 'Plays the channel you rest on in the guide, beside its details.', opts: ON_OFF },
-  'Pause & rewind': { about: 'Keeps the last 30 minutes of the channel you\'re watching, so you can pause it and go back.' },
+  'Pause & rewind': { about: 'Keeps the last 30 minutes of the channel you\'re watching, so you can pause it and go back.', opts: ['On', 'Off'] },
   'Turn on to Live TV': { about: 'When the TV turns on: go straight back to the channel you were watching, or always start on Home.' },
   'Live TV plays in': { about: 'Which player shows live channels: TopShelf\'s own, or another app.', opts: ['TopShelf', 'Another app'] },
-  'Live TV video': { about: 'How TopShelf\'s own player shows live video. The TV\'s player is the smooth one; the web page is the older way.' },
+  'Live TV video': { about: 'How TopShelf\'s own player shows live video. The TV\'s player is the smooth one; the web page is the older way.',
+    opts: ['TV\'s player', 'Web page'] },
   'Channel groups': { about: 'Choose which of your playlist\'s groups show in the guide.', how: 'OK to open' },
   'Channel group order': { about: 'The order groups are listed in. To move one, hold OK on it in the guide and choose Move.', how: 'OK puts back the playlist\'s order' },
   'Hidden channels': { about: 'Channels you\'ve hidden from the guide. To hide one, hold OK on it in the guide.' },
@@ -91,18 +93,20 @@ const SET_INFO = {
   'Red zone alerts': { about: 'An alert when your team gets inside the 20-yard line. Game alerts have to be on.' },
   'Yahoo Fantasy': { about: 'Connects your Yahoo Fantasy Football team, for alerts about your players. If Yahoo refuses access, you can pick your players yourself instead.', how: 'OK to open' },
   'Fantasy players': { about: 'Pick your fantasy players yourself.', how: 'OK to open' },
-  'Fantasy scoring': { about: 'How catches score in your league.' },
+  'Fantasy scoring': { about: 'How catches score in your league.', opts: [['Half PPR', 'Yahoo\'s default'], ['PPR', 'a point a catch'], ['Standard', 'no points a catch']] },
   // ================================================================ Screen & sleep
   'Screensaver': { about: 'After this long without a button press, Home fades to just the photo and the time. Any button brings everything back.',
     opts: () => SAVER_TIMES.map(x => x[1]) },
   'Bedtime': { about: 'From the time you pick until 6 AM, the screen gets warmer and dimmer, the screensaver starts sooner, and Live TV turns itself off after an hour unless you\'ve set a sleep timer.',
     opts: () => BED_TIMES.map(x => x[1]), cur: () => BED_TIMES.findIndex(x => x[0] === bedStart()) },
   'Picture sharpness': { about: 'How sharply TopShelf draws its own screens. Lower is smoother. Video keeps its full quality either way.',
-    opts: () => RSCALES.map(x => x[1]) },
+    opts: () => RSCALES.map(x => x[1]),
+    // (one try, then its own "Keep this sharpness?": not stepped through)
+    go: (j, cur) => renderScaleStep(j - cur) },
   'Screen': { about: 'What the TV reports as its screen size and refresh rate. There\'s nothing to change here.' },
   // ================================================================ Remote & phone
   'Home button': { about: 'Makes the remote\'s Home button open TopShelf. It works through the Accessibility setting named “TopShelf home button”.', how: 'OK to set it up' },
-  'Keep TopShelf ready': { about: 'Keeps TopShelf running in the background, so Home comes straight back.' },
+  'Keep TopShelf ready': { about: 'Keeps TopShelf running in the background, so Home comes straight back.', opts: ['On', 'Off'] },
   'Phone & TV link': { about: 'Links TopShelf on your phone to this TV, so the phone can be its remote and set things up. Only phones you\'ve linked are obeyed.', how: 'OK to open' },
   'Ring doorbell': { about: 'Shows a card on the TV when someone rings your Ring doorbell. Your Ring password isn\'t kept.', how: 'OK to open' },
   // ================================================================ System
@@ -129,13 +133,14 @@ const SET_INFO = {
 const SET_BRIEF = { 'Home': 'Photos, look, apps and clock', 'Movies & TV': 'Sources, trailers and playback', 'Live TV': 'Service, channels and recordings' };
 const SET_INFO_MATCH = [
   [/^TMDB key/, { about: 'Your own key from themoviedb.org. With it, Movies and TV Shows have more rows.' }],
+  [/^Fantasy · /, { about: 'Whether this kind of news about your fantasy players gets an alert.', opts: ON_OFF }],
   [/hidden app/i, { about: 'Apps you\'ve hidden from Home. This brings all of them back at once.', how: 'OK to show them all' }],
 ];
 /** what the detail panel needs for a row: { about, opts: [{ l, n }], cur, how, pv } */
 function setInfoFor(r, value) {
   let x = SET_INFO[r.label];
   if (!x) { const m = SET_INFO_MATCH.find(e => e[0].test(r.label)); x = m ? m[1] : null; }
-  const out = { about: '', opts: [], cur: -1, how: '', pv: '', ordered: !!(x && x.ordered), typeLabel: (x && x.typeLabel) || '' };
+  const out = { about: '', opts: [], cur: -1, how: '', pv: '', go: (x && x.go) || null, typeLabel: (x && x.typeLabel) || '' };
   if (x) {
     out.about = x.about || ''; out.pv = x.pv || '';
     let o = []; try { o = typeof x.opts === 'function' ? x.opts() : x.opts || []; } catch (e) {}
