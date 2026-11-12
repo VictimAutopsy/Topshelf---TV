@@ -1205,9 +1205,9 @@ function buildAllSettings() {
           if (!r.url) { toast(`${lkTvName()} isn't on your home network right now (or needs an update)`); return; }
           if (B.openWeb) B.openWeb(r.url); else toast('Open ' + r.url + ' in your browser');
         } }] : []),
-    ...(IS_TV && B.addonsOpen ? [{ label: 'Addons', value: () => { try { const i = JSON.parse(B.addonsInfo()); return i.count ? `${i.on} on${i.count > i.on ? ' · ' + (i.count - i.on) + ' off' : ''}${i.streams ? ' · streams' : ''}` : 'None yet'; } catch (e) { return ''; } },
+    ...(B.addonsOpen ? [{ label: 'Addons', value: () => { try { const i = JSON.parse(B.addonsInfo()); return i.count ? `${i.on} on${i.count > i.on ? ' · ' + (i.count - i.on) + ' off' : ''}${i.streams ? ' · streams' : ''}` : 'None yet'; } catch (e) { return ''; } },
       chevron: true, ok: () => { closeSettings(); setTimeout(() => B.addonsOpen(), 250); } }] : []),
-    ...(!IS_TV && typeof lkOn === 'function' && lkOn() ? [{ label: 'Addons', value: () => `On ${lkTvName()} · add and manage`, chevron: true, ok: async () => {
+    ...(!IS_TV && typeof lkOn === 'function' && lkOn() ? [{ label: 'Addons on the TV', value: () => `On ${lkTvName()} · add and manage`, chevron: true, ok: async () => {
           toast(`Asking ${lkTvName()}…`);
           const r = await lkSend({ type: 'addons' });
           if (!r) return;
@@ -1344,7 +1344,7 @@ const SET_SECTIONS = [
     ['Clock & weather', ['Clock', 'Home widgets', 'Weather', 'Temperature']] ] },
   { name: 'Movies & TV', about: 'Look, where titles come from, trailers and playback', groups: [
     ['Look', ['Movies & TV look', 'Movie & TV poster URL']],
-    ['Sources', ['Addons', 'Trakt', /^TMDB key/]],
+    ['Sources', ['Addons', 'Addons on the TV', 'Trakt', /^TMDB key/]],
     ['Trailers', ['Trailer previews', 'Trailer starts after', 'Header trailer', 'Trailer sound', 'Ambient light on trailers', 'Trailer outro']],
     ['Playback', ['Continue watching', 'Next episode', 'Subtitle size', 'Subtitle background', 'Match frame rate']] ] },
   { name: 'Live TV', about: 'Your service, watching, channels and recordings', groups: [

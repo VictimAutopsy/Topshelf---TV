@@ -1857,7 +1857,7 @@ final class NativeHome extends FrameLayout {
             return;
         }
         if (vodPlayingNow()) { if (vodPlayer.focusAt(x, y) == null) okPress(); return; }
-        if (addonsOpenNow()) { okPress(); return; }
+        if (addonsOpenNow()) { if (phone) addonsView.tapAt(x, y); else okPress(); return; }
         if (titleOpenNow()) { if ("ok".equals(titleView.focusAt(x, y))) okPress(); return; }
         if (gameOpenNow()) return;
         if (mode.equals("sheet") && sheet != null) { int r = sheet.focusAt(x, y); if (r == 1) ok(); else if (r < 0) back(); return; }

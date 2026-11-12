@@ -1049,7 +1049,8 @@ final class NativeVod extends FrameLayout {
             labels.add("Remove from Continue watching"); acts.add(new Runnable() { @Override public void run() { Progress.hide(getContext(), m.optString("video")); } });
             labels.add("Clear all of Continue watching…"); acts.add(new Runnable() { @Override public void run() { h.clearContinue(); } });
         }
-        labels.add("Open in Nuvio"); acts.add(new Runnable() { @Override public void run() { openNuvio(m); } });
+        if (!h.phone) { labels.add("Open in Nuvio"); acts.add(new Runnable() { @Override public void run() { openNuvio(m); } }); }
+        else if (labels.isEmpty() || !labels.get(0).equals("Choose a stream")) { labels.add(0, "Open"); acts.add(0, new Runnable() { @Override public void run() { h.openTitle(m); } }); }
         if (h.linkOn) { labels.add("Open on your other TV"); acts.add(new Runnable() { @Override public void run() {
             h.page("lkSend({type:'open',what:'title',m:" + m.toString() + "}).then(r=>{if(r)toast('Sent to '+lkTvName())})");
         } }); }
@@ -1085,6 +1086,9 @@ final class NativeVod extends FrameLayout {
         collapse(true);
         // with stream addons installed: the title's own page here (details, episodes, the streams to choose from)
         if (Addons.get(getContext()).anyStreams()) { h.openTitle(m); return; }
+        /* a phone never hands a title to Nuvio or Stremio: its own page opens, and without a stream addon yet it
+           says where to add one */
+        if (h.phone) { h.openTitle(m); h.toast("To play here, add your stream addon in Settings › Movies & TV › Addons"); return; }
         openNuvio(m);
     }
     private void openNuvio(JSONObject m) {

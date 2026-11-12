@@ -81,7 +81,40 @@ final class AddonsView extends FrameLayout {
         LinearLayout.LayoutParams bl = new LinearLayout.LayoutParams(LayoutParams.WRAP_CONTENT, LayoutParams.WRAP_CONTENT); bl.topMargin = h.px(1.6f);
         side.addView(back, bl);
         addView(side, h.at(h.SW - 5 - 30, 15.6f, h.px(30), LayoutParams.WRAP_CONTENT));
-        if (!h.act.isTv()) side.setVisibility(GONE);        // (on the phone itself, a code to scan from a phone is no use)
+        if (!h.act.isTv()) {
+            /* On the phone itself a code to scan is no use: a button opens the same page in the phone's own browser,
+               served by this TopShelf to itself. Its addons are the phone's own (the TV keeps its own list). */
+            side.setVisibility(GONE);
+            sub.setText("The same addons Nuvio and Stremio use, kept on this phone. Add your debrid addon here and movies and shows play in TopShelf's own player.");
+            addBtn = h.text(h.fSemi, 1.5f, Color.WHITE); addBtn.setText("Add addons"); addBtn.setGravity(Gravity.CENTER);
+            GlassPanel.onButton(addBtn, 2.6f * R, 0, 0);
+            doneBtn = h.text(h.fSemi, 1.5f, Color.WHITE); doneBtn.setText("Done"); doneBtn.setGravity(Gravity.CENTER);
+            boolean air = GlassPanel.look.equals("air");
+            doneBtn.setBackground(GlassPanel.buttonBg(false, 2.6f * R, Ui.WHITE_20)); doneBtn.setTextColor(GlassPanel.buttonText(false));
+            doneBtn.setAllCaps(air); doneBtn.setLetterSpacing(air ? .06f : 0f);
+            float bw = (h.SW - 8 - 1.2f) / 2f, by = h.SH - 9.4f;
+            addView(addBtn, h.at(4, by, h.px(bw), h.px(5.4f)));
+            addView(doneBtn, h.at(4 + bw + 1.2f, by, h.px(bw), h.px(5.4f)));
+            LayoutParams ll = (LayoutParams) listV.getLayoutParams(); ll.topMargin += h.px(h.TOP); ll.height = h.px(by - 1.2f) - ll.topMargin; listV.setLayoutParams(ll);
+            for (View v : new View[] { t, sub, count }) { LayoutParams l0 = (LayoutParams) v.getLayoutParams(); l0.topMargin += h.px(h.TOP); v.setLayoutParams(l0); }
+        }
+    }
+    private TextView addBtn, doneBtn;
+    /** the page for adding addons, in this phone's browser */
+    private void addHere() {
+        MainActivity a = h.act;
+        if (a.link == null || a.link.port() == 0) { h.toast("TopShelf couldn't open its addons page just now. Close TopShelf and open it again."); return; }
+        h.bridge.openWeb("http://127.0.0.1:" + a.link.port() + "/addons?here=1&k=" + Addons.get(getContext()).newSetupKey());
+    }
+    /** a finger (phones): the buttons, or an addon (its options) */
+    void tapAt(float x, float y) {
+        if (addBtn != null && h.hit(addBtn, x, y, .3f)) { addHere(); return; }
+        if (doneBtn != null && h.hit(doneBtn, x, y, .3f)) { close(); return; }
+        if (!h.hit(listV, x, y, 0)) return;
+        int i = listV.rowAt(h.local(listV, x, y)[1]);
+        if (i < 0 || i >= list.length()) return;
+        sel = i; listV.invalidate();
+        menu();
     }
 
     void open() {
@@ -165,6 +198,7 @@ final class AddonsView extends FrameLayout {
             ts.setTypeface(h.fReg); ts.setTextSize(1f * R);
             tc.setTypeface(h.fSemi); tc.setTextSize(.85f * R); tc.setTextAlign(Paint.Align.CENTER);
         }
+        int rowAt(float y) { return (int) Math.floor((y + scroll) / rowH); }
         void reveal() {
             float y = sel * rowH, vh = getHeight();
             if (y < scroll) scroll = y; else if (y + rowH > scroll + vh) scroll = y + rowH - vh;
@@ -173,7 +207,7 @@ final class AddonsView extends FrameLayout {
             int w = getWidth();
             if (list.length() == 0) {
                 ts.setColor(Ui.WHITE_60);
-                c.drawText("Scan the code on the right with your phone to add your first addon.", R, 2 * R, ts);
+                c.drawText(h.phone ? "No addons yet. Tap Add addons below." : "Scan the code on the right with your phone to add your first addon.", R, 2 * R, ts);
                 return;
             }
             for (int i = 0; i < list.length(); i++) {

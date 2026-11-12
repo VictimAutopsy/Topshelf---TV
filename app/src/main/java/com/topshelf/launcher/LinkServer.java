@@ -390,7 +390,12 @@ final class LinkServer {
             ByteArrayOutputStream bo = new ByteArrayOutputStream(); byte[] buf = new byte[8192]; int n;
             while ((n = in.read(buf)) > 0) bo.write(buf, 0, n);
             in.close();
-            return bo.toString("UTF-8");
+            String page = bo.toString("UTF-8");
+            // (opened on the phone itself, for the phone's own addons: its words say so)
+            if (path.contains("here=1")) page = page.replace("On the TV, choose", "Choose").replace("Add to the TV", "Add to TopShelf").replace("Open Nuvio on the TV", "Open Nuvio")
+                    .replace("not on the TV, not anywhere", "not on this phone, not anywhere").replace("Added on the TV.", "Added.").replace("Copied to the TV.", "Copied.")
+                    .replace("The TV gave an odd answer", "TopShelf gave an odd answer").replace("<h2>On the TV <span", "<h2>On this phone <span");
+            return page;
         }
         JSONObject in = body.isEmpty() ? new JSONObject() : new JSONObject(body);
         if (!a.setupOk(in.optString("k"))) throw new Exception("This link has expired — scan the code on the TV again.");
