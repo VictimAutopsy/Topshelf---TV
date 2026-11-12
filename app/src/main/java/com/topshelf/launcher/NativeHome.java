@@ -2281,6 +2281,16 @@ final class NativeHome extends FrameLayout {
                 : "1.  Scan the code with your phone (on the same Wi-Fi as the TV).\n2.  Follow the steps on your phone: create a free Yahoo app, then sign in.\n3.  That's it — alerts appear here during games.");
         fyQr.setImageBitmap(qrBitmap(url));
         fyUrl.setText("Or type this on your phone:  " + url);
+        /* Trakt, when the TV already has your Trakt app's details (signing in again after it expired): the sign-in
+           starts by itself, so the code for trakt.tv/activate is on this screen straight away and the QR code is
+           only needed if Trakt won't give this app a code. (It used to start only from the phone's page.) */
+        if (trk && act.trakt != null && act.trakt.hasApp() && !act.trakt.connected() && act.trakt.userCode.isEmpty()) {
+            final Trakt tk = act.trakt;
+            new Thread(new Runnable() { @Override public void run() {
+                String e = tk.startSignIn();
+                if (!e.isEmpty()) Diag.ev("trakt: couldn't start the sign-in from the TV (" + e + ")");
+            } }, "trakt-start").start();
+        }
         setupRefresh();
         fySetup.setVisibility(VISIBLE); fySetup.bringToFront();
         fySetup.setAlpha(0f); fySetup.animate().alpha(1f).setDuration(Ui.BASE).start();
