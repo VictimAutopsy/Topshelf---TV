@@ -115,6 +115,7 @@ final class Trakt {
     }
     String setupUrl() {
         if (act.link == null || act.link.port() == 0 || LinkServer.localIp().isEmpty()) return "";
+        Diag.ev("trakt: a setup code was made (port " + act.link.port() + ")");
         return "http://" + LinkServer.localIp() + ":" + act.link.port() + "/trakt?k=" + newSetupKey();
     }
     boolean setupOk(String k) { return k != null && !setupKey.isEmpty() && setupKey.equals(k) && System.currentTimeMillis() < setupUntil; }
@@ -230,7 +231,12 @@ final class Trakt {
 
     private void saveTokens(JSONObject t) {
         prefs.edit().putString(P + "access", t.optString("access_token")).putString(P + "refresh", t.optString("refresh_token"))
-                .putLong(P + "exp", System.currentTimeMillis() + Math.max(600, t.optLong("expires_in", 86400) - 600) * 1000L).remove(P + "err").apply();
+                .putLong(P + "exp", System.currentTimeMillis() + Math.max(600, t.optLong("expires_in", 86400) - 600) * 1000L).remove(P + "err")
+                /* written before going on (it was left to be written a moment later). Trakt gives a new renewal key each
+                   day and the old one stops working at once: if TopShelf was closed in that moment (an update installing,
+                   say) the new key was lost and Trakt signed it out. That's the likely cause of "sign-in expired" on 8 Nov,
+                   a day of many updates. */
+                .commit();
     }
     private synchronized String token() throws Exception {
         if (!connected()) throw new Exception("not connected to Trakt");

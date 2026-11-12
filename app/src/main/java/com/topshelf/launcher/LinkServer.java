@@ -39,8 +39,12 @@ final class LinkServer {
 
     private final MainActivity act;
     private final SharedPreferences prefs;
-    private final ExecutorService pool = new java.util.concurrent.ThreadPoolExecutor(3, 3, 0L, java.util.concurrent.TimeUnit.MILLISECONDS,
+    /* Up to twelve answered at once (was three, with the rest waiting in line: three slow ones, say a phone's
+       page waiting on Trakt or an addon, and a QR code's page never opened: "This site can't be reached"). */
+    private final ExecutorService pool = new java.util.concurrent.ThreadPoolExecutor(12, 12, 30L, java.util.concurrent.TimeUnit.SECONDS,
             new java.util.concurrent.LinkedBlockingQueue<Runnable>(), new java.util.concurrent.ThreadPoolExecutor.DiscardPolicy());   // (nothing taken after stop)
+    { ((java.util.concurrent.ThreadPoolExecutor) pool).allowCoreThreadTimeOut(true); }
+    private volatile long saidAt;
     private final Map<String, String[]> pending = new ConcurrentHashMap<>();   // pair id -> {code, name, time}
     private final SecureRandom rnd = new SecureRandom();
     private volatile long lastPairStart;
@@ -51,8 +55,10 @@ final class LinkServer {
     private NsdManager.RegistrationListener reg;
     volatile String serviceName;
 
+    private static volatile Context app;
     LinkServer(MainActivity act) {
         this.act = act;
+        app = act.getApplicationContext();
         this.prefs = act.getSharedPreferences(Bridge.PREFS, Context.MODE_PRIVATE);
     }
 
@@ -90,7 +96,8 @@ final class LinkServer {
                 port = p;
             } catch (Exception ignored) { }
         }
-        if (server == null) return;
+        if (server == null) { Diag.ev("link: couldn't listen on any port (setup pages and the phone link won't work)"); return; }
+        Diag.ev("link: listening on port " + port);
         advertise();
         while (!server.isClosed()) {
             try {
@@ -122,9 +129,30 @@ final class LinkServer {
 
     /** This device's address on the home network (for typing it in by hand). */
     static String localIp() {
+        /* The address on the Wi-Fi or cable the TV is really using. (It used to be the first private address of
+           any interface that was up, which on some devices is Wi-Fi Direct's or a VPN's: a QR code made from that
+           opens nothing on the phone.) */
+        try {
+            Context c = app;
+            android.net.ConnectivityManager cm = c == null ? null : (android.net.ConnectivityManager) c.getSystemService(Context.CONNECTIVITY_SERVICE);
+            if (cm != null) for (int pass = 0; pass < 2; pass++) for (android.net.Network n : cm.getAllNetworks()) {
+                android.net.NetworkCapabilities nc = cm.getNetworkCapabilities(n);
+                if (nc == null || nc.hasTransport(android.net.NetworkCapabilities.TRANSPORT_VPN)) continue;
+                // (the cable first, then Wi-Fi)
+                if (!nc.hasTransport(pass == 0 ? android.net.NetworkCapabilities.TRANSPORT_ETHERNET : android.net.NetworkCapabilities.TRANSPORT_WIFI)) continue;
+                android.net.LinkProperties lp = cm.getLinkProperties(n);
+                if (lp == null) continue;
+                for (android.net.LinkAddress la : lp.getLinkAddresses()) {
+                    InetAddress a = la.getAddress();
+                    if (a instanceof Inet4Address && !a.isLoopbackAddress() && a.isSiteLocalAddress()) return a.getHostAddress();
+                }
+            }
+        } catch (Throwable ignored) { }
         try {
             for (NetworkInterface ni : Collections.list(NetworkInterface.getNetworkInterfaces())) {
                 if (!ni.isUp() || ni.isLoopback()) continue;
+                String nm = String.valueOf(ni.getName());
+                if (nm.startsWith("p2p") || nm.startsWith("tun") || nm.startsWith("ppp") || nm.startsWith("dummy")) continue;
                 for (InetAddress a : Collections.list(ni.getInetAddresses())) {
                     if (a instanceof Inet4Address && !a.isLoopbackAddress() && a.isSiteLocalAddress()) return a.getHostAddress();
                 }
@@ -157,6 +185,12 @@ final class LinkServer {
             while (got < len) { int n = in.read(body, got, len - got); if (n < 0) break; got += n; }
             String res;
             int code = 200;
+            // (that a setup page was asked for goes in the report, without its key: when a QR code "can't be
+            // reached", this says whether the phone ever got through)
+            if (method.equals("GET") && !path.startsWith("/info") && System.currentTimeMillis() - saidAt > 2000) {
+                saidAt = System.currentTimeMillis();
+                Diag.ev("link: a page was asked for (" + path.replaceAll("[?#].*$", "") + ")");
+            }
             try {
                 res = route(method, path, new String(body, 0, got, "UTF-8"));
             } catch (SecurityException e) {
