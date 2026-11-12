@@ -62,6 +62,13 @@ final class NativeHome extends FrameLayout {
        bar along the bottom that stays up (the panes keep BOT rem clear above it). */
     boolean portrait;
     float BOT;
+    /* On a phone TopShelf isn't the launcher: it's an app for movies, shows, sports and Live TV. There are no apps
+       on its Home (no app bar, no All apps, nothing to open them with), and held upright its tabs are always a bar
+       along the bottom, whatever Settings › Home › Menu says (the side menu opened with a swipe from the left edge,
+       which is Android's own Back gesture). TOP is the room the camera cutout takes at the top, upright (rem). */
+    boolean phone;
+    float TOP;
+    private boolean sideWanted() { return !"top".equals(S.optString("nav", "side")) && !(phone && portrait); }
     /* Settings › Home › Menu: the side menu (glass down the left), or the tab bar across the top with the round
        buttons at the top right, as before */
     boolean side = true;
@@ -208,7 +215,7 @@ final class NativeHome extends FrameLayout {
     /* Without the app bar (Settings › App bar: Hidden, the default) Home is just the photo: "rest" is that state —
        nothing focused, ◀ ▶ change the photo, ▼ or OK opens the app drawer (which then holds every app), ▲ the bars. */
     private boolean rest = true;
-    private boolean noDock() { return !"classic".equals(homeStyle) || !S.optBoolean("dock", false); }
+    private boolean noDock() { return phone || !"classic".equals(homeStyle) || !S.optBoolean("dock", false); }
     private boolean inDock(int i) { return !noDock() && i < COLS; }
     private int drawerRow(int i) { return noDock() ? i / COLS : i / COLS - 1; }
     private float tileX(int i) { int cc = i % COLS; return inDock(i) ? M + cc * (TW + GAP_REM) : M - 3 + cc * (TW + GAP_REM); }
@@ -229,6 +236,7 @@ final class NativeHome extends FrameLayout {
     NativeHome(MainActivity act, Bridge bridge) {
         super(act);
         this.act = act; this.bridge = bridge;
+        phone = !act.isTv();
         prefs = act.getSharedPreferences(Bridge.PREFS, Context.MODE_PRIVATE);
         String lk = "glass";
         try { lk = lookPref(new JSONObject(prefs.getString("ui.settings", "{}"))); } catch (Exception ignored) { }
@@ -292,13 +300,14 @@ final class NativeHome extends FrameLayout {
         R = portrait ? W / 56f : Math.min(W / 120f, H / 67.5f);
         SW = W / R; SH = H / R;
         readSettings();
-        side = !"top".equals(S.optString("nav", "side"));
+        side = sideWanted();
+        TOP = phone && portrait ? act.cutoutTop() / R : 0;
         barStyle = side || portrait ? "classic" : barStylePref(S);
         homeStyle = homeStylePref(S);
         menuStyle = side ? menuStylePref(S) : "panel";
         menuHead = null; rowStart = -1; railOpen = false; nowHead = nowGame = nowCw = null;
         barExtras.clear(); cornerL = cornerR = null; barScrim = null;
-        COLS = portrait ? 3 : 5; GAP_REM = portrait ? 2.2f : 2.75f; BOT = portrait && !side ? 8.6f : 0;
+        COLS = portrait ? 3 : 5; GAP_REM = portrait ? 2.2f : 2.75f; BOT = portrait && !side ? (phone ? 11.4f : 8.6f) : 0;
         TW = portrait ? (SW - 7 - (COLS - 1) * GAP_REM) / COLS : TW_REM; TH = TW * 9 / 16f; PITCH = TH + 5.8f; DOCK_PANEL_H = TH + 3.6f;     // (no names under the dock's icons: just room for the focused one to grow)
         M = (SW - COLS * TW - (COLS - 1) * GAP_REM) / 2f;
         DOCK_PANEL_Y = SH - 2.8f - DOCK_PANEL_H - BOT; DOCK_Y = DOCK_PANEL_Y + 1.8f;
@@ -381,7 +390,7 @@ final class NativeHome extends FrameLayout {
         // --- Home's widgets, top left: the time, the weather, and what's on next (your team's game, a new episode)
         widgets = new LinearLayout(c);
         widgets.setOrientation(portrait ? LinearLayout.VERTICAL : LinearLayout.HORIZONTAL);
-        content.addView(widgets, at(3, side ? 3 : 9, LayoutParams.WRAP_CONTENT, LayoutParams.WRAP_CONTENT));
+        content.addView(widgets, at(3, (side ? 3 : 9) + TOP, LayoutParams.WRAP_CONTENT, LayoutParams.WRAP_CONTENT));
         buildWidgets();
 
         // --- Top Shelf row
@@ -469,20 +478,22 @@ final class NativeHome extends FrameLayout {
         tabsRow = new LinearLayout(c);
         tabsRow.setPadding(px(.55f), px(.55f), px(.55f), px(.55f));
         tabViews = new TextView[TAB_IDS.length];
+        final boolean thumb = phone && portrait;
         for (int i = 0; i < TAB_IDS.length; i++) {
-            TextView t = text(fSemi, portrait ? 1.3f : 1.35f, Ui.WHITE_75);
+            TextView t = text(fSemi, thumb ? 1.6f : portrait ? 1.3f : 1.35f, Ui.WHITE_75);
             t.setText(TAB_NAMES[i]);
             float tp = portrait ? 1.2f : 2.1f;
-            t.setPadding(px(tp), px(.95f), px(tp), px(.95f));
+            if (thumb) { t.setGravity(Gravity.CENTER); t.setSingleLine(true); t.setPadding(0, 0, 0, 0); }
+            else t.setPadding(px(tp), px(.95f), px(tp), px(.95f));
             t.setBackground(pill(Color.TRANSPARENT));
-            LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(LayoutParams.WRAP_CONTENT, LayoutParams.WRAP_CONTENT);
+            LinearLayout.LayoutParams lp = thumb ? new LinearLayout.LayoutParams(0, px(6.2f), 1) : new LinearLayout.LayoutParams(LayoutParams.WRAP_CONTENT, LayoutParams.WRAP_CONTENT);
             if (i > 0) lp.leftMargin = px(.3f);
             tabsRow.addView(t, lp);
             tabViews[i] = t;
         }
-        tabs.addView(tabsRow, new LayoutParams(LayoutParams.WRAP_CONTENT, LayoutParams.WRAP_CONTENT));
-        FrameLayout.LayoutParams tl = new FrameLayout.LayoutParams(LayoutParams.WRAP_CONTENT, LayoutParams.WRAP_CONTENT, (portrait ? Gravity.BOTTOM : Gravity.TOP) | Gravity.CENTER_HORIZONTAL);
-        if (portrait) tl.bottomMargin = px(2f); else tl.topMargin = px(2.3f);
+        tabs.addView(tabsRow, new LayoutParams(thumb ? LayoutParams.MATCH_PARENT : LayoutParams.WRAP_CONTENT, LayoutParams.WRAP_CONTENT));
+        FrameLayout.LayoutParams tl = new FrameLayout.LayoutParams(thumb ? px(SW - 4) : LayoutParams.WRAP_CONTENT, LayoutParams.WRAP_CONTENT, (portrait ? Gravity.BOTTOM : Gravity.TOP) | Gravity.CENTER_HORIZONTAL);
+        if (portrait) tl.bottomMargin = px(thumb ? 3f : 2f); else tl.topMargin = px(2.3f);      // (3 rem: above the strip Android's swipe-up-for-home takes)
         addView(tabs, tl);
 
         // --- top bar (round buttons, weather, clock)
@@ -492,7 +503,7 @@ final class NativeHome extends FrameLayout {
         topRow.setPadding(px(.55f), px(.55f), px(1.4f), px(.55f));
         topbar.addView(topRow, new LayoutParams(LayoutParams.WRAP_CONTENT, LayoutParams.WRAP_CONTENT));
         FrameLayout.LayoutParams bl = new FrameLayout.LayoutParams(LayoutParams.WRAP_CONTENT, LayoutParams.WRAP_CONTENT, Gravity.TOP | Gravity.RIGHT);
-        bl.topMargin = px(2.3f); bl.rightMargin = px(portrait ? 2.4f : 4.6f);
+        bl.topMargin = px(2.3f + TOP); bl.rightMargin = px(portrait ? 2.4f : 4.6f);
         addView(topbar, bl);
         tip = text(fMed, Ui.TEXT_S, Color.WHITE);
         tip.setShadowLayer(.6f * R, 0, .1f * R, Ui.BLACK_60);
@@ -744,7 +755,8 @@ final class NativeHome extends FrameLayout {
         boolean styled = !barStyle.equals("classic"), fl = barStyle.equals("float"), st = barStyle.equals("strip");
         topItems.clear(); topActs.clear();
         for (TextView t : tabViews) { topItems.add(t); topActs.add("tab"); }
-        String[] acts = withAsk(linkOn ? new String[] { "remote", "search", "photos", "settings" } : new String[] { "search", "photos", "settings" });
+        String[] acts = withAsk(phone ? (linkOn ? new String[] { "remote", "search", "settings" } : new String[] { "search", "settings" })
+                : linkOn ? new String[] { "remote", "search", "photos", "settings" } : new String[] { "search", "photos", "settings" });
         for (String a : acts) {
             ImageView b = new ImageView(getContext());
             HomeIcons ic = toolIcon(a);
@@ -839,7 +851,7 @@ final class NativeHome extends FrameLayout {
         }
         // your apps: the panel lists the first three; the rail and the card the first one (TizenTube, say)
         int na = 0, max = panel ? 3 : (rl || card) ? 1 : 0;
-        for (int i = 0; i < items.size() && na < max; i++) {
+        for (int i = 0; i < items.size() && na < max && !phone; i++) {
             App ap = items.get(i);
             if (ap.special) continue;
             if (na == 0) {
@@ -861,7 +873,8 @@ final class NativeHome extends FrameLayout {
         // the tools: rows (the panel, the rail), or one row of buttons at the foot (the card, the menu + what's on)
         if (rl || glance) tabsRow.addView(new View(c), new LinearLayout.LayoutParams(LayoutParams.MATCH_PARENT, 0, 1));
         else divider(tabsRow);
-        String[] acts = withAsk(linkOn ? new String[] { "search", "photos", "remote", "settings" } : new String[] { "search", "photos", "settings" });
+        String[] acts = withAsk(phone ? (linkOn ? new String[] { "search", "remote", "settings" } : new String[] { "search", "settings" })
+                : linkOn ? new String[] { "search", "photos", "remote", "settings" } : new String[] { "search", "photos", "settings" });
         if (panel || rl) {
             for (String a0 : acts) {
                 HomeIcons ic = toolIcon(a0);
@@ -874,7 +887,7 @@ final class NativeHome extends FrameLayout {
             row.setGravity(Gravity.CENTER_VERTICAL);
             rowStart = topItems.size();
             if (glance) {
-                for (int i = 0; i < items.size(); i++) {
+                for (int i = 0; i < items.size() && !phone; i++) {
                     App ap = items.get(i);
                     if (ap.special) continue;
                     TextView t = menuRow(ap.label, appMark(ap), row, new LinearLayout.LayoutParams(LayoutParams.WRAP_CONTENT, px(4.4f)));
@@ -1127,7 +1140,7 @@ final class NativeHome extends FrameLayout {
         }
         dock.setVisibility(noDock() ? GONE : VISIBLE);
         tshelf.setTranslationY(noDock() ? px(DOCK_PANEL_H) : 0);      // (no app bar: the Top Shelf row sits at the foot)
-        hint.setVisibility(items.size() > (noDock() ? 0 : COLS) ? VISIBLE : GONE);
+        hint.setVisibility(!phone && items.size() > (noDock() ? 0 : COLS) ? VISIBLE : GONE);
         focus = Math.max(0, Math.min(focus, items.size() - 1));
     }
 
@@ -1273,7 +1286,7 @@ final class NativeHome extends FrameLayout {
         shelfHint.animate().alpha(shelf && !saver ? 1f : 0f).setDuration(animate ? Ui.SLOW : 0).start();
         pause.animate().alpha(shelf && paused ? 1f : 0f).setDuration(Ui.MOVE).start();
         bigClock.animate().alpha(saver ? 1f : 0f).setDuration(animate ? Ui.SLOWER : 0).start();
-        hint.animate().alpha(!deep && !shelf && items.size() > (noDock() ? 0 : COLS) ? 1f : 0f).setDuration(Ui.SLIDE).start();
+        hint.animate().alpha(!phone && !deep && !shelf && items.size() > (noDock() ? 0 : COLS) ? 1f : 0f).setDuration(Ui.SLIDE).start();
         if (!deep) { drawerScroll = 0; drawerGrid.setTranslationY(0); }
         updateBars();          // (All apps: the bars step aside)
     }
@@ -1550,11 +1563,13 @@ final class NativeHome extends FrameLayout {
         if (mode.equals("move")) { moveItem(dir); return; }
         if (billboard != null && rest && tab.equals("home")) {
             if (billboard.move(dir)) return;
+            if (phone) return;
             if (dir == 'd') { rest = false; focus = Math.max(0, Math.min(focus, items.size() - 1)); applyFocus(true, ' '); }
             else enterTop();
             return;
         }
         if (noDock() && rest) {
+            if (phone) { if (dir == 'l' || dir == 'r') showPhoto(dir == 'l' ? -1 : 1); return; }
             if (dir == 'd') { rest = false; focus = Math.max(0, Math.min(focus, items.size() - 1)); applyFocus(true, ' '); }
             else if (dir == 'u') enterTop();                // (straight to the bars: no Continue watching row on Home)
             else if (dir == 'l' && side) enterTop();               // (left: the menu; right: the next photo)
@@ -1599,7 +1614,7 @@ final class NativeHome extends FrameLayout {
         if (onVod()) { vod.ok(); return; }
         if (billboard != null && rest && tab.equals("home")) { billboard.ok(); return; }
         if (gallery != null && rest && tab.equals("home") && gAct != null) { gAct.run(); return; }
-        if (noDock() && rest) { rest = false; applyFocus(true, ' '); return; }
+        if (noDock() && rest) { if (!phone) { rest = false; applyFocus(true, ' '); } return; }
         App a = items.get(focus);
         if (a.special) { page("openSettings()"); return; }
         TileView t = tiles.get(a.id);
@@ -2578,7 +2593,7 @@ final class NativeHome extends FrameLayout {
     void searchVoice() { searchOpen(""); bridge.voiceInput("Search TopShelf"); }
     void searchQuery(String q, boolean submit) { searchOpen(""); search.query(q, submit, false); }
     void searchShow(JSONObject o, boolean first) { findShowObj(o, first); }
-    List<App> appsForSearch() { return new ArrayList<>(items); }
+    List<App> appsForSearch() { List<App> l = new ArrayList<>(); for (App a : items) if (!phone || a.special) l.add(a); return l; }      // (a phone: no apps to find, only Settings)
     void launchFromSearch(App a) { if (a.special) { page("openSettings()"); return; } for (App x : items) if (x.id.equals(a.id)) { openApp(x); return; } openApp(a); }
     NativeVod vodForSearch() { return vod != null ? vod : vodM; }
     /** Live TV's channels and guide, for Search (made, but not shown, if Live TV hasn't been opened yet) */
@@ -3907,7 +3922,7 @@ final class NativeHome extends FrameLayout {
         if (!oldWx.equals(S.optString("wxLat") + S.optString("wxLon") + S.optString("wxUnit"))) main.post(wxLoad);
         applyWidgetPref(); refreshNext();
         // Settings › Home › Menu changed: Home is made again in the other style
-        if (side != !"top".equals(S.optString("nav", "side")) || (!side && !portrait && !barStyle.equals(barStylePref(S))) || !homeStyle.equals(homeStylePref(S)) || (side && !menuStyle.equals(menuStylePref(S))) || !GlassPanel.look.equals(lookPref(S))) { main.postDelayed(new Runnable() { @Override public void run() { act.recreate(); } }, 700); return; }
+        if (side != sideWanted() || (!side && !portrait && !barStyle.equals(barStylePref(S))) || !homeStyle.equals(homeStylePref(S)) || (side && !menuStyle.equals(menuStylePref(S))) || !GlassPanel.look.equals(lookPref(S))) { main.postDelayed(new Runnable() { @Override public void run() { act.recreate(); } }, 700); return; }
         if (!oldLook.equals(S.optString("vodLook", "shelves"))) { if (vodM != null) vodM.lookChanged(); if (vodS != null) vodS.lookChanged(); }
         // a TMDB key added or removed: Movies & TV Shows make their rows again (TMDB's rows come or go)
         if (!oldTmdb.equals(S.optString("tmdbKey", ""))) { if (vodM != null) vodM.addonsChanged(); if (vodS != null) vodS.addonsChanged(); }

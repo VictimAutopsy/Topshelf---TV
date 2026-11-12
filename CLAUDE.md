@@ -55,6 +55,10 @@ Quick compile check without building:
 - Settings on the TV (NativeSheet) is Chad's two-step design: sections in full, then inside one they shrink to icons and a
   detail panel says what the setting you're on does. Its words come from `assets/setinfo.js` (about, choices, how):
   only write what the code really does. Written so far: Home. A new setting gets an entry there too.
+- On a phone (`h.phone`, `!act.isTv()`) TopShelf is a standalone app for movies, shows, sports and Live TV, not a launcher:
+  no apps, app bar or All apps, and upright the tabs are always a full-width bar along the bottom (`h.BOT` rem to keep
+  clear above it, `h.TOP` rem for the camera cutout). Being redone for phones area by area (1.0.396: step 1 of 7); the
+  TV's screens must not change with it.
 - Diagnostics: `Diag.ev("...")`. Lines are scrubbed of keys and logins, but don't log full stream or addon links anyway.
 
 ## Working with Chad

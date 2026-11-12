@@ -978,6 +978,16 @@ public class MainActivity extends Activity {
         }
     }
 
+    /** how far the camera cutout reaches down from the top as the phone is held now (pixels; 0 without one). Asked of
+        the display itself, which already knows which way up it is when the screens are made again after a turn. */
+    @SuppressWarnings("deprecation")
+    float cutoutTop() {
+        try {
+            if (Build.VERSION.SDK_INT >= 29) { DisplayCutout dc = getWindowManager().getDefaultDisplay().getCutout(); if (dc != null) return dc.getSafeInsetTop(); return 0; }
+        } catch (Throwable ignored) { }
+        return safeT * getResources().getDisplayMetrics().density;
+    }
+
     /** Where the camera cutout is (CSS px), so the page keeps controls clear of it. */
     volatile float safeL, safeR, safeT, safeB;
 
