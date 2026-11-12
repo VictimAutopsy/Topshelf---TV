@@ -49,7 +49,7 @@ import java.util.Map;
  * are solid pictures with only their rounded edges clipped, and only the focused poster has a
  * shadow and glow.
  */
-final class NativeVod extends FrameLayout {
+final class NativeVod extends FrameLayout implements NativeHome.Free {
     /* Fading in, this pane is drawn piece by piece at the fading strength rather than into one picture
        first: its rows and pictures are still arriving as it fades, and each one spoilt that picture,
        so the whole screen was drawn twice a frame (switching tabs ran at about 20 frames a second). */
@@ -158,9 +158,9 @@ final class NativeVod extends FrameLayout {
         return null;
     }
     /** a finger down: whatever was still gliding stops under it */
-    void touchDown() { if (fling != null) fling.forceFinished(true); dragBegun = false; dragRow = null; }
+    @Override public void touchDown() { if (fling != null) fling.forceFinished(true); dragBegun = false; dragRow = null; }
     /** a finger sliding (it went down at x0, y0): the page up and down, the row under it sideways. False: not here. */
-    boolean drag(char axis, float x0, float y0, float dPx) {
+    @Override public boolean drag(char axis, float x0, float y0, float dPx) {
         if (!free || rows.isEmpty()) return false;
         if (!dragBegun) { dragBegun = true; dragRow = axis == 'h' ? rowAt(y0) : null; }
         if (axis == 'v') { pageY -= dPx / R; applyPage(); }
@@ -171,7 +171,7 @@ final class NativeVod extends FrameLayout {
         return true;
     }
     /** the finger let go at this speed (pixels a second): it glides on and slows, as lists on a phone do */
-    void dragEnd(char axis, float v) {
+    @Override public void dragEnd(char axis, float v) {
         if (!free || !dragBegun) return;
         dragBegun = false;
         if (fling == null) fling = new android.widget.OverScroller(getContext());

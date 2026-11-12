@@ -1715,10 +1715,21 @@ final class NativeHome extends FrameLayout {
        flick. A tap at the very top brings the tabs back while they're tucked away. */
     private float tDownX, tDownY, tLastX, tLastY, tAcc;
     private boolean tDragging, tLongFired, tFromTop, tFree;
-    /** the screen under the finger that slides freely with it (Movies, TV Shows), when nothing is open over it */
-    private NativeVod freeNow() {
-        if (!phone || !onVod() || isLive() || isSports() || !(mode.equals("grid") || mode.equals("top"))) return null;
-        if (saver || titleOpenNow() || vodPlayingNow() || addonsOpenNow() || gameOpenNow() || fySetupOpen() || launchOv.getVisibility() == VISIBLE) return null;
+    /** a screen that slides freely under a finger on a phone (and glides on after a flick) instead of taking the remote's steps */
+    interface Free {
+        /** a finger went down: whatever was gliding stops */
+        void touchDown();
+        /** the finger (down at x0, y0) slid dPx more along its axis ('h' or 'v'); false: not taken, the steps apply */
+        boolean drag(char axis, float x0, float y0, float dPx);
+        /** it let go at v pixels a second */
+        void dragEnd(char axis, float v);
+    }
+    /** the screen under the finger that slides freely with it (Home, Movies, TV Shows, a title's page), when nothing is open over it */
+    private Free freeNow() {
+        if (!phone || !(mode.equals("grid") || mode.equals("top"))) return null;
+        if (saver || vodPlayingNow() || addonsOpenNow() || gameOpenNow() || fySetupOpen() || launchOv.getVisibility() == VISIBLE) return null;
+        if (titleOpenNow()) return titleView;
+        if (!onVod() || isLive() || isSports()) return null;
         return vod;
     }
     private char tAxis;
@@ -1750,6 +1761,7 @@ final class NativeHome extends FrameLayout {
                 if (vodM != null) vodM.touchDown();
                 if (vodS != null) vodS.touchDown();
                 if (vodH != null) vodH.touchDown();
+                if (titleView != null) titleView.touchDown();
                 if (tVel != null) tVel.recycle();
                 tVel = android.view.VelocityTracker.obtain(); tVel.addMovement(e);
                 main.removeCallbacks(tLong); main.postDelayed(tLong, 460);
@@ -1768,7 +1780,7 @@ final class NativeHome extends FrameLayout {
                     if (tFromTop && tAxis == 'v' && dy > 0 && barsHidden && !titleOpenNow() && !vodPlayingNow() && !(isLive() && live.fullNow()) && !mode.equals("sheet") && !mode.equals("find") && !mode.equals("dialog")) { enterTop(); tLongFired = true; break; }
                 }
                 if (tDragging) {
-                    NativeVod fv = freeNow();
+                    Free fv = freeNow();
                     if (fv != null && fv.drag(tAxis, tDownX, tDownY, tAxis == 'h' ? x - tLastX : y - tLastY)) { tFree = true; tLastX = x; tLastY = y; break; }
                     float step = px(tStep(tAxis));
                     tAcc += tAxis == 'h' ? x - tLastX : y - tLastY;
@@ -1785,7 +1797,7 @@ final class NativeHome extends FrameLayout {
                 if (tLongFired) break;
                 if (!tDragging) { tap(x, y); break; }
                 if (tFree) {
-                    NativeVod fv = freeNow();
+                    Free fv = freeNow();
                     float v = 0;
                     if (tVel != null) { tVel.computeCurrentVelocity(1000); v = tAxis == 'h' ? tVel.getXVelocity() : tVel.getYVelocity(); }
                     if (fv != null) fv.dragEnd(tAxis, v);

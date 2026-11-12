@@ -34,8 +34,35 @@ import java.util.TreeSet;
  * for a show its seasons and episodes; and the streams every installed addon finds for it, grouped by addon in
  * the order the addons are listed — OK on one plays it in TopShelf's player (carrying on where you left off).
  */
-final class TitleView extends FrameLayout {
+final class TitleView extends FrameLayout implements NativeHome.Free {
     private final NativeHome h;
+
+    /* ------------------------------------------------------------------ a phone: the page under your finger
+       The page slides up and down freely, each row (episodes, cast, videos, more like this, reviews) sideways by
+       itself, the list of streams up and down, and all of them glide on after a flick. (On the TV the page follows
+       the highlight; a phone has a finger instead.) The title's own page only: a person's page still moves in steps. */
+    private android.widget.OverScroller fling; private String dragT, flingT;
+    @Override public void touchDown() { if (fling != null) fling.forceFinished(true); dragT = null; }
+    @Override public boolean drag(char axis, float x0, float y0, float dPx) {
+        if (!h.phone) return false;
+        if (dragT == null) { dragT = panel.dragTarget(axis, h.local(panel, x0, y0)[1]); if (dragT == null) dragT = "-"; }
+        if (dragT.equals("-")) return false;
+        if (!dragT.isEmpty()) panel.setPos(dragT, panel.pos(dragT) - dPx);
+        scheduleTrailer();
+        return true;
+    }
+    @Override public void dragEnd(char axis, float v) {
+        if (dragT == null || dragT.isEmpty() || dragT.equals("-")) { dragT = null; return; }
+        if (fling == null) fling = new android.widget.OverScroller(getContext());
+        flingT = dragT; dragT = null;
+        fling.fling(0, Math.round(panel.pos(flingT)), 0, -Math.round(v), 0, 0, 0, Math.round(panel.max(flingT)));
+        removeCallbacks(glide); postOnAnimation(glide);
+    }
+    private final Runnable glide = new Runnable() { @Override public void run() {
+        if (fling == null || flingT == null || !shownNow() || !fling.computeScrollOffset()) return;
+        panel.setPos(flingT, fling.getCurrY());
+        if (!fling.isFinished()) postOnAnimation(this);
+    } };
     private final float R;
     private final ImageView bg, logo;
     private final TextView title, meta, desc, hint;
@@ -1357,7 +1384,43 @@ final class TitleView extends FrameLayout {
             tq.setTypeface(h.fSemi); tq.setTextAlign(Paint.Align.CENTER);
             ts.setTypeface(h.fSemi); ts.setTextSize(.78f * R); ts.setLetterSpacing(.1f);
         }
-        void resetScroll() { seasonOff = 0; epScroll = epScrollT = strScroll = strScrollT = 0; dim = 0; pageY = pageYT = 0; castScroll = castScrollT = 0; }
+        void resetScroll() { seasonOff = 0; epScroll = epScrollT = strScroll = strScrollT = 0; dim = 0; pageY = pageYT = 0; castScroll = castScrollT = 0; freeY = 0; }
+        // ---- a phone: what a slide of the finger moves, and how far each thing can go (px)
+        private float freeY, strMax;
+        /** "page", "str" (the streams), "ep", "cast", a row's name; "" when the slide moves nothing here; null: not this page's to take */
+        String dragTarget(char axis, float ly) {
+            if (person != null || reviewOpen >= 0 || trFull) return null;
+            if (streamsScreen()) return axis == 'v' ? "str" : "";
+            if (axis == 'v') return "page";
+            float y = ly + pageY, best = -1; String in = "";
+            for (Map.Entry<String, Float> e : tops().entrySet()) if (!e.getKey().equals("end") && e.getValue() <= y && e.getValue() > best) { best = e.getValue(); in = e.getKey(); }
+            return in.equals("seasons") ? "ep" : in.equals("cast") || in.equals("videos") || in.equals("similar") || in.equals("reviews") ? in : "";
+        }
+        float pos(String t) { return t.equals("page") ? pageY : t.equals("str") ? strScroll : t.equals("ep") ? epScroll : t.equals("cast") ? castScroll : rs(t).scroll; }
+        float max(String t) {
+            float vw = getWidth() - 10 * R;
+            switch (t) {
+                case "page": return Math.max(0, tops().get("end") - (getHeight() - 6f * R));
+                case "str": return strMax;
+                case "ep": return Math.max(0, eps.size() * (cardW + cardGap) - cardGap - vw);
+                case "cast": return Math.max(0, cast().size() * (castD + castGap) - castGap - vw);
+                case "videos": return Math.max(0, videos().size() * 27.8f * R - 1.8f * R - vw);
+                case "similar": return Math.max(0, similar.size() * 15.1f * R - 1.6f * R - vw);
+                case "reviews": return Math.max(0, reviews.size() * (cw(40) + 1.6f * R) - 1.6f * R - vw);
+            }
+            return 0;
+        }
+        void setPos(String t, float v) {
+            v = Math.max(0, Math.min(max(t), v));
+            switch (t) {
+                case "page": freeY = pageY = pageYT = v; break;
+                case "str": strScroll = strScrollT = v; break;
+                case "ep": epScroll = epScrollT = v; break;
+                case "cast": castScroll = castScrollT = v; break;
+                default: RowState r = rs(t); r.scroll = r.scrollT = v;
+            }
+            invalidate();
+        }
         private final float castD = 9.5f * R, castGap = 3.2f * R;
         void revealCast() {
             float vw = getWidth() - 10 * R, pitch = castD + castGap; if (vw <= 0) return;
@@ -1440,6 +1503,7 @@ final class TitleView extends FrameLayout {
                 if (zk.equals("about")) want = Math.min(want, Math.max(0, tp.get("end") - (hh - 6f * R)));
                 if (zk.equals("cast") && !series) want = Math.max(0, tp.get("cast") + 21f * R - (hh - 5f * R));
             }
+            if (h.phone) want = Math.min(freeY, Math.max(0, tp.get("end") - (hh - 6f * R)));     // (a phone: where the finger left it)
             pageYT = Math.max(0, want);
             boolean moving = false;
             if (Math.abs(pageY - pageYT) > .5f) { pageY += (pageYT - pageY) * .22f; moving = true; } else pageY = pageYT;
@@ -1630,6 +1694,7 @@ final class TitleView extends FrameLayout {
         }
         /** keeps a row's chosen item in view */
         private void reveal(RowState r, float pitch, float itemW, int w) {
+            if (h.phone) return;         // (a phone: rows stay where the finger left them)
             float vw = w - 10 * R, x = r.sel * pitch;
             if (x < r.scrollT) r.scrollT = x; else if (x + itemW > r.scrollT + vw) r.scrollT = x + itemW - vw;
         }
@@ -1697,7 +1762,7 @@ final class TitleView extends FrameLayout {
         private void drawReviews(Canvas c, int w, float top) {
             header(c, "Reviews", top);
             RowState r = rs("reviews"); boolean on = zone.equals("reviews");
-            float iw = 40 * R, ih = 15 * R, pitch = iw + 1.6f * R, y = top + 4f * R;
+            float iw = cw(40), ih = 15 * R, pitch = iw + 1.6f * R, y = top + 4f * R;
             reveal(r, pitch, iw, w);
             for (int i = 0; i < reviews.size(); i++) {
                 float x = 5 * R + i * pitch - r.scroll;
@@ -2227,7 +2292,9 @@ final class TitleView extends FrameLayout {
             float[] tops = new float[l.size()];
             for (int i = 0; i < l.size(); i++) { tops[i] = yy; float ch2 = cardH(l.get(i)); if (i == strSel) { selTop = yy; selBot = yy + ch2; } yy += ch2 + 1f * R; }
             float vh = py1 - 1.2f * R - ly0;
-            if (selTop < strScrollT) strScrollT = selTop; else if (selBot > strScrollT + vh) strScrollT = selBot - vh;
+            strMax = Math.max(0, yy - 1f * R - vh);
+            if (h.phone) strScrollT = Math.max(0, Math.min(strMax, strScrollT));       // (a phone: the list is where the finger left it)
+            else if (selTop < strScrollT) strScrollT = selTop; else if (selBot > strScrollT + vh) strScrollT = selBot - vh;
             if (Math.abs(strScroll - strScrollT) > .5f) { strScroll += (strScrollT - strScroll) * .25f; postInvalidateOnAnimation(); } else strScroll = strScrollT;
             c.save(); c.clipRect(px0, ly0 - .4f * R, px1, py1 - .5f * R);
             int best = -1;
