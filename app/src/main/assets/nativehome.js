@@ -257,6 +257,13 @@ if (NH.on) {
       if (!r || !c || c.label !== r.label || !c.opts[j]) return;
       sSel = i;
       const o = c.opts[j], says = (v, l) => v === l || v.indexOf(l + ' ') === 0;
+      if (c.how === 'menu') {
+        // (a menu's own action; it may open a menu further in, which becomes the panel in its turn)
+        NH.choice = null;
+        const a = c.acts[j];
+        setTimeout(() => { try { if (a) a(); } finally { if (!NH.choice) refreshSettings(); } }, 0);
+        return;
+      }
       if (o.steps === -1) { if (r.ok) r.ok(); }
       else if (o.steps === -2 || j === c.cur) { /* typing is the screen's; the one that's set stays */ }
       else if (c.how === 'go') { try { setInfoFor(r, String(r.value())).go(j, c.cur); } catch (e) {} }
@@ -531,6 +538,19 @@ if (NH.on) {
   if (B.nhMenu && typeof showMenu === 'function') {
     const sm0 = showMenu;
     showMenu = function (entries, anchor, title) {
+      /* a menu a setting opens (Look, Voice, Continue watching's "Clear all"…) is the panel that pops out beside
+         Settings on the TV, like every other setting's choices: not the old menu in the middle of the screen */
+      if (NH.on && IS_TV && NH.sheet && mode === 'settings' && B.nhSheetChoices && entries && entries.length) {
+        const r = sRows[sSel] || {}, lab = entries.map(e => String(e[1])), tick = /^✓\s*/;
+        let inf = {}; try { inf = setInfoFor(r, String(r.value ? r.value() : '')); } catch (e) {}
+        // (when its choices are written up in setinfo.js, in the same order: their names and notes)
+        const canon = inf.opts || [], known = canon.length === lab.length && canon.every((c, k) => lab[k].indexOf(c.l) >= 0);
+        const own = !title || String(title).indexOf(r.label) === 0;          // (the setting's own menu, not one further in)
+        const opts = lab.map((l, k) => ({ l: known ? canon[k].l : l.replace(tick, ''), n: known ? canon[k].n : '', steps: 0 }));
+        const cur = lab.findIndex(l => tick.test(l));
+        NH.choice = { label: r.label, how: 'menu', acts: entries.map(e => e[2]), opts, cur };
+        try { B.nhSheetChoices(JSON.stringify({ i: sSel, label: own ? r.label : String(title), about: own ? inf.about || '' : '', opts, cur })); return; } catch (e) {}
+      }
       if (NH.on && NH.owner === 'native' && entries && entries.length) {
         NH.menuActs = entries.map(e => e[2]);
         try { B.nhMenu(JSON.stringify({ title: title ? String(title) : '', labels: entries.map(e => String(e[1])) })); return; } catch (e) {}

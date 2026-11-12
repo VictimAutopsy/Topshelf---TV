@@ -59,7 +59,7 @@ final class NativeSheet extends FrameLayout {
     /* the panel of choices: open for row chRow, on its choice chSel */
     private boolean choosing;
     private int chRow = -1, chSel, chCur = -1;
-    private String chLabel = "", chAbout = "";
+    private String chLabel = "", chAbout = "", chRowLabel = "";
     private JSONArray chOpts = new JSONArray();
 
     private final NativeHome h;
@@ -258,6 +258,7 @@ final class NativeSheet extends FrameLayout {
         // (a setting that's only typed into has the one "choice": straight to typing)
         if (opts.length() == 1 && opts.optJSONObject(0).optInt("steps") == -2) { int row = o.optInt("i", sel); if (row < data.length() && data.optJSONObject(row).optJSONObject("edit") != null) { sel = row; startEdit(row); } return; }
         chRow = o.optInt("i", sel); chLabel = o.optString("label"); chAbout = o.optString("about");
+        chRowLabel = chRow < data.length() ? data.optJSONObject(chRow).optString("label") : "";
         chOpts = opts; chCur = o.optInt("cur", -1); chSel = Math.max(0, chCur);
         choosing = true; focusLeft = false;
         applyPane(true);
@@ -465,7 +466,7 @@ final class NativeSheet extends FrameLayout {
         fitHeight();
         style(!rebuilt);
         // (the rows changed under an open panel of choices: it's closed)
-        if (choosing && (chRow >= data.length() || !chLabel.equals(data.optJSONObject(chRow).optString("label")))) choosing = false;
+        if (choosing && (chRow >= data.length() || !chRowLabel.equals(data.optJSONObject(chRow).optString("label")))) choosing = false;
         applyPane(shown);
     }
 
