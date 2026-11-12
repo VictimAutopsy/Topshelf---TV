@@ -2236,6 +2236,9 @@ final class NativeHome extends FrameLayout {
     private String setupKind = "fantasy";
     private TextView suTitle, suSteps;
     /** a QR code for setting something up on your phone (Yahoo Fantasy, Google Drive) */
+    private String traktLocalUrl = "", traktQrFor = "";
+    /** a code set out for reading across a room: "5055 CC52" */
+    private static String spaced(String code) { return code.length() == 8 ? code.substring(0, 4) + " " + code.substring(4) : code; }
     void setupShow(String kind) {
         setupKind = kind;
         boolean drive = kind.equals("drive");
@@ -2281,6 +2284,7 @@ final class NativeHome extends FrameLayout {
                 : "1.  Scan the code with your phone (on the same Wi-Fi as the TV).\n2.  Follow the steps on your phone: create a free Yahoo app, then sign in.\n3.  That's it — alerts appear here during games.");
         fyQr.setImageBitmap(qrBitmap(url));
         fyUrl.setText("Or type this on your phone:  " + url);
+        traktLocalUrl = trk ? url : ""; traktQrFor = url;
         /* Trakt, when the TV already has your Trakt app's details (signing in again after it expired): the sign-in
            starts by itself, so the code for trakt.tv/activate is on this screen straight away and the QR code is
            only needed if Trakt won't give this app a code. (It used to start only from the phone's page.) */
@@ -2311,8 +2315,18 @@ final class NativeHome extends FrameLayout {
             if (act.trakt == null) return;
             JSONObject st = act.trakt.status();
             boolean ok = st.optBoolean("connected");
+            /* With a code from Trakt, the QR code is Trakt's own page with the code already filled in (no typing it,
+               where a zero is easily taken for the letter O, and nothing to do with the home network); without
+               one it's the set-up page on the TV again. */
+            String code = ok ? "" : act.trakt.userCode;
+            String want = code.isEmpty() ? traktLocalUrl : act.trakt.verifyUrl.replaceAll("/+$", "") + "/" + code;
+            if (!want.isEmpty() && !want.equals(traktQrFor)) {
+                traktQrFor = want;
+                fyQr.setImageBitmap(qrBitmap(want));
+                fyUrl.setText(code.isEmpty() ? "Or type this on your phone:  " + want : "The code is digits 0–9 and letters A–F only. It lasts about ten minutes.");
+            }
             fyState.setText(ok ? "✓  Connected" + (st.optString("user").isEmpty() ? "" : " as " + st.optString("user"))
-                    : !act.trakt.userCode.isEmpty() ? "On your phone, go to " + act.trakt.verifyUrl.replace("https://", "") + " and enter  " + act.trakt.userCode
+                    : !code.isEmpty() ? "Scan the code with your phone's camera, or go to " + act.trakt.verifyUrl.replace("https://", "") + " and enter   " + spaced(code)
                     : act.trakt.setupState.isEmpty() ? "Waiting for your phone…" : act.trakt.setupState + "…");
             fyState.setTextColor(ok ? 0xFF3CCF7A : 0xFFB9A8FF);
             if (ok) page("typeof refreshSettings === 'function' && refreshSettings()");

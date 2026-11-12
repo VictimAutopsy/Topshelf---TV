@@ -149,6 +149,7 @@ final class Trakt {
                 JSONObject o = new JSONObject(post(API + "/oauth/device/code", new JSONObject().put("client_id", prefs.getString(P + "id", "")).toString(), false));
                 if (o.optString("user_code").isEmpty()) return;
                 userCode = o.optString("user_code"); verifyUrl = o.optString("verification_url", "https://trakt.tv/activate");
+                Diag.ev("trakt: Trakt gave a code for " + verifyUrl.replace("https://", "") + " (" + userCode.length() + " characters, good for " + o.optLong("expires_in", 0) + " s)");
                 final String dc = o.optString("device_code");
                 final long interval = Math.max(5, o.optLong("interval", 5)) * 1000L, until = System.currentTimeMillis() + o.optLong("expires_in", 600) * 1000L;
                 final int gen = ++pollGen;
@@ -191,6 +192,7 @@ final class Trakt {
             JSONObject o = new JSONObject(post(API + "/oauth/device/code", new JSONObject().put("client_id", prefs.getString(P + "id", "")).toString(), false));
             if (o.optString("user_code").isEmpty()) return "Trakt didn't accept that Client ID.";
             userCode = o.optString("user_code"); verifyUrl = o.optString("verification_url", "https://trakt.tv/activate");
+                Diag.ev("trakt: Trakt gave a code for " + verifyUrl.replace("https://", "") + " (" + userCode.length() + " characters, good for " + o.optLong("expires_in", 0) + " s)");
             setupState = "Enter the code " + userCode + " at " + verifyUrl.replace("https://", "");
             final String dc = o.optString("device_code");
             final long interval = Math.max(5, o.optLong("interval", 5)) * 1000L, until = System.currentTimeMillis() + o.optLong("expires_in", 600) * 1000L;
@@ -214,6 +216,7 @@ final class Trakt {
                 if (code == 400) continue;                         // still waiting for you
                 if (code == 429) { wait += 2000; continue; }
                 if (code != 200 && pkce()) { Diag.ev("trakt: TV code refused " + code); userCode = ""; refreshUi(); return; }
+                if (code != 200) Diag.ev("trakt: waiting for the code ended with " + code);
                 if (code != 200) { setupState = code == 418 ? "You chose not to allow it — start again" : code == 410 ? "The code expired — start again" : "Trakt said " + code + " — start again"; userCode = ""; refreshUi(); return; }
                 saveTokens(new JSONObject(body));
                 userCode = "";
