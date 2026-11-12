@@ -53,7 +53,7 @@ final class HomeImages {
             if (l != null) { l.add(done); return; }
             l = new ArrayList<>(); l.add(done); waiting.put(key, l);
         }
-        pool.execute(new Runnable() { @Override public void run() {
+        exec(new Runnable() { @Override public void run() {
             Bitmap out = null;
             try {
                 if (maker != null) out = maker.make();
@@ -124,5 +124,12 @@ final class HomeImages {
         finally { if (c != null) c.disconnect(); }
     }
 
-    void run(Runnable r) { pool.execute(r); }
+    void run(Runnable r) { exec(r); }
+
+    /** work for the picture threads; dropped once dispose() has shut them down (a screen that was just closed can
+     *  still have a step queued on the main thread that asks for a picture: 1.0.394 crashed on that) */
+    private void exec(Runnable r) {
+        if (pool.isShutdown()) return;
+        try { pool.execute(r); } catch (java.util.concurrent.RejectedExecutionException e) { /* shut down meanwhile */ }
+    }
 }
