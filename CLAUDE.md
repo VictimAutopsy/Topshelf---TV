@@ -52,9 +52,13 @@ Quick compile check without building:
 - Colours, small text sizes and timings come from the shared steps in `Ui.java` (`Ui.WHITE_60`, `Ui.TEXT_M`, `Ui.SLIDE`…): use the
   nearest step, not a new number. `python3 tools/tokens.py <file.java>` swaps a file's literals for them. Every screen
   has been through it (1.0.386); text drawn on a canvas (Sports, Standings, parts of the title page) still has its own sizes.
-- Settings on the TV (NativeSheet) is Chad's two-step design: sections in full, then inside one they shrink to icons and a
-  detail panel says what the setting you're on does. Its words come from `assets/setinfo.js` (about, choices, how):
-  only write what the code really does. Written so far: Home. A new setting gets an entry there too.
+- Settings on the TV (NativeSheet) is Chad's design: the sections in full down the left with the chosen one's settings
+  beside them. OK on a setting with three or more choices pops a panel out on the right (the sections shrink to icons)
+  with what it does and its choices: ▲▼ and OK choose, Back closes. Nothing changes with ◀ ▶ on a TV (he didn't want
+  to step through choices sideways); two choices flip on OK. The panel's words come from `assets/setinfo.js`: only
+  write what the code really does, and give a new setting an entry there too.
+- The flight recorder only counts a frame as late when it's in a run of frames (the one before it under 60 ms earlier):
+  lone redraws report long times that aren't stutter. Numbers from before 1.0.410 over-count for that reason.
 - On a phone (`h.phone`, `!act.isTv()`) TopShelf is a standalone app for movies, shows, sports and Live TV, not a launcher:
   no apps, app bar or All apps, and upright the tabs are always a full-width bar along the bottom (`h.BOT` rem to keep
   clear above it, `h.TOP` rem for the camera cutout). Movies and TV Shows slide freely under a finger there (`NativeHome.Free`: `touchDown`, `drag`, `dragEnd`, implemented by `NativeVod` and `TitleView`; screens without it still get the remote's steps from `NativeHome.touch`), and upright the screen is 46 rem wide. A phone is browsed upright only (Chad chose it); a movie, episode or channel full screen turns it sideways (`h.videoTurn`), and Home is not made again for that turn. The phone's Home is a `NativeVod` page too (`vodH`, `home` flag: featured title with Watch now / More details, Continue watching, rows of movies and shows), not the photo Home. A phone never hands a title to Nuvio or Stremio (Chad: it should work like the TV, with his debrid addon): it keeps its own addons, added from Settings › Addons › Add addons, which opens the addons page in the phone's browser from its own LinkServer (`/addons?here=1`). Being redone for phones area by area (1.0.406: step 4 of 7, title pages slide freely but their canvas text is still TV-sized; next: Live TV, Sports/Search/Settings, the player); the

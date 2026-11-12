@@ -50,6 +50,7 @@ final class Flight {
        was a guess.) */
     private static final Map<String, long[]> slow = new HashMap<>();
     private static long slowSaid;
+    private static volatile long lastIntended;
     /** the parts of making a frame, in the order they happen, in plain words */
     private static final int[] PART = { FrameMetrics.UNKNOWN_DELAY_DURATION, FrameMetrics.INPUT_HANDLING_DURATION, FrameMetrics.ANIMATION_DURATION,
             FrameMetrics.LAYOUT_MEASURE_DURATION, FrameMetrics.DRAW_DURATION, FrameMetrics.SYNC_DURATION, FrameMetrics.COMMAND_ISSUE_DURATION, FrameMetrics.SWAP_BUFFERS_DURATION };
@@ -148,6 +149,14 @@ final class Flight {
                         long ns = m.getMetric(FrameMetrics.TOTAL_DURATION);
                         String sc = cur.isEmpty() ? "other" : cur;
                         boolean missed = SelfCheck.late(m, refresh);
+                        /* Only a frame in a run of frames can stutter. One drawn by itself (a clock ticking, a still
+                           page redrawn a few times a second) reports a long time just because nothing came before
+                           it: on 11 Nov these were 13,000 of the title page's "slow" frames, at 4 frames a second,
+                           and nearly all of the player's. They're counted as frames but never as late. */
+                        long iv = m.getMetric(FrameMetrics.INTENDED_VSYNC_TIMESTAMP);
+                        boolean moving = lastIntended != 0 && iv - lastIntended < 60_000_000L;
+                        lastIntended = iv;
+                        if (!moving) { missed = false; ns = 0; }
                         synchronized (L) {
                             roll();
                             long[] f = arr(frames, sc, 3);

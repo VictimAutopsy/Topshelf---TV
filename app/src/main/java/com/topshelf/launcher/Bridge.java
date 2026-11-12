@@ -740,6 +740,7 @@ public class Bridge {
     @JavascriptInterface public void nhLivePlay(final String u) { nh(new Runnable() { @Override public void run() { act.nativeHome().livePlayUrl(u); } }); }
     @JavascriptInterface public void nhTabTop(final String id) { nh(new Runnable() { @Override public void run() { act.nativeHome().showTabTop(id); } }); }
     @JavascriptInterface public void nhSheet(final String json) { nh(new Runnable() { @Override public void run() { act.nativeHome().sheetShow(json); } }); }
+    @JavascriptInterface public void nhSheetChoices(final String json) { nh(new Runnable() { @Override public void run() { act.nativeHome().sheetChoices(json); } }); }
     @JavascriptInterface public void nhFind(final String json) { nh(new Runnable() { @Override public void run() { act.nativeHome().findShow(json); } }); }
     // Search is the app's own: the page (the phone's keyboard, the mic's words) hands it what to look for
     @JavascriptInterface public void nhSearchOpen(final String q) { nh(new Runnable() { @Override public void run() { act.nativeHome().searchOpen(q); } }); }

@@ -2584,6 +2584,11 @@ final class NativeHome extends FrameLayout {
     }
     void appResumed() { Diag.ev("app back"); if (live != null) live.appResumed(); wakeToLive(0); main.postDelayed(new Runnable() { @Override public void run() { fyNext(); } }, 1500); }
     /** Settings, from the page (shows it, or hands it new rows) */
+    /** a setting's choices, for the panel that pops out beside Settings */
+    void sheetChoices(String json) {
+        if (sheet == null || !sheet.shownNow()) return;
+        try { sheet.choices(new JSONObject(json)); } catch (Exception e) { }
+    }
     void sheetShow(String json) {
         if (sheet == null || !sheet.shownNow()) Diag.ev("settings opened");
         JSONObject o;

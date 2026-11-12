@@ -22,11 +22,13 @@ import java.util.ArrayList;
 import java.util.List;
 
 /**
- * Settings, drawn by Android. On a TV it's a full screen in two steps (Chad's design, 1.0.394):
- *   1. choosing a section: the sections down the left with their icons, names and a line about each, and the
- *      chosen one's settings shown beside them;
- *   2. inside a section (▶ or OK): the sections shrink to a strip of icons, the settings move over, and a detail
- *      panel on the right says what the setting you're on does and lists its choices. ◀ or Back comes out.
+ * Settings, drawn by Android. On a TV it's a full screen (Chad's design, 1.0.394, the panel as a menu 1.0.410):
+ *   - the sections down the left with their icons, names and a line about each, the chosen one's settings beside
+ *     them; ▶ or OK goes into the settings, ◀ or Back comes out;
+ *   - OK on a setting with several choices: the sections shrink to a strip of icons, the settings move over and a
+ *     panel pops out on the right with what the setting does and its choices (▲▼, OK chooses, Back closes it).
+ *     Nothing is changed with ◀ ▶ (he didn't want to step through choices sideways); a setting with two choices
+ *     flips on OK.
  * On Air it's edge to edge and solid; the other looks keep their own panel around the same layout.
  * On a narrow screen it's a glass sheet on the right.
  *
@@ -54,6 +56,11 @@ final class NativeSheet extends FrameLayout {
     private LinearLayout head, detail, dOpts;
     private FrameLayout dPreview;
     private String detailSig = "";
+    /* the panel of choices: open for row chRow, on its choice chSel */
+    private boolean choosing;
+    private int chRow = -1, chSel, chCur = -1;
+    private String chLabel = "", chAbout = "";
+    private JSONArray chOpts = new JSONArray();
 
     private final NativeHome h;
     private final float R;
@@ -205,7 +212,7 @@ final class NativeSheet extends FrameLayout {
         the detail panel (you're inside one). Sets every part's place for that step. */
     private void applyPane(boolean animate) {
         if (!pane) return;
-        final boolean rail = !focusLeft;
+        final boolean rail = choosing;
         if (railNow == (rail ? 1 : 0)) { styleLeft(); drawDetail(); return; }
         boolean first = railNow < 0;
         railNow = rail ? 1 : 0;
@@ -243,69 +250,70 @@ final class NativeSheet extends FrameLayout {
         }
     }
 
-    /** the detail panel's words for the setting you're on */
+    /** the page hands over a setting's choices (OK was pressed on it): the panel pops out with them */
+    void choices(JSONObject o) {
+        if (!pane || o == null) return;
+        JSONArray opts = o.optJSONArray("opts");
+        if (opts == null || opts.length() == 0) return;
+        // (a setting that's only typed into has the one "choice": straight to typing)
+        if (opts.length() == 1 && opts.optJSONObject(0).optInt("steps") == -2) { int row = o.optInt("i", sel); if (row < data.length() && data.optJSONObject(row).optJSONObject("edit") != null) { sel = row; startEdit(row); } return; }
+        chRow = o.optInt("i", sel); chLabel = o.optString("label"); chAbout = o.optString("about");
+        chOpts = opts; chCur = o.optInt("cur", -1); chSel = Math.max(0, chCur);
+        choosing = true; focusLeft = false;
+        applyPane(true);
+    }
+    private void closeChooser(boolean animate) {
+        if (!choosing) return;
+        choosing = false;
+        applyPane(animate);
+    }
+    /** the panel: what the setting does, then its choices; the one that's set has its mark filled */
     private void drawDetail() {
-        if (!pane || detail == null || focusLeft) return;
-        JSONObject d = sel < data.length() ? data.optJSONObject(sel) : null;
-        if (d == null || d.optBoolean("head")) return;
-        JSONArray opts = d.optJSONArray("opts");
-        String value = d.optString("value"), ab = d.optString("about"), how = d.optString("how"), pv = d.optString("pv");
-        String sg = d.optString("label") + '|' + value + '|' + ab + '|' + how + '|' + pv + '|' + (opts == null ? "" : opts.toString()) + '|' + d.optInt("cur", -1);
+        if (!pane || detail == null || !choosing) return;
+        String sg = chLabel + '|' + chAbout + '|' + chOpts.toString() + '|' + chCur + '|' + chSel;
         if (sg.equals(detailSig)) return;
         detailSig = sg;
-        dTitle.setText(d.optString("label"));
-        // (a setting nobody has written up yet still says what it's set to)
-        String body = !ab.isEmpty() ? ab : value.isEmpty() ? "" : "Now: " + value;
-        dAbout.setText(body); dAbout.setVisibility(body.isEmpty() ? GONE : VISIBLE);
-        dNote.setText(how); dNote.setVisibility(how.isEmpty() ? GONE : VISIBLE);
-        boolean look = pv.equals("look");
-        dPreview.setVisibility(look ? VISIBLE : GONE);
-        if (look && dPreview.getChildCount() == 0) {
-            // a small sample of the look that's on: a title and its button
-            GradientDrawable g = new GradientDrawable(GradientDrawable.Orientation.LEFT_RIGHT, new int[] { 0xFF27323B, 0xFF12161B, 0xFF2B2320 });
-            g.setCornerRadius(GlassPanel.corner(1.2f * R)); g.setStroke(Math.max(1, h.px(.1f)), Ui.WHITE_12);
-            dPreview.setBackground(g);
-            TextView t = h.text(air ? SportsLook.heavy() : h.fSemi, 2.6f, Color.WHITE); t.setText(air ? "TITLE" : "Title");
-            LayoutParams tl = new LayoutParams(LayoutParams.WRAP_CONTENT, LayoutParams.WRAP_CONTENT, Gravity.BOTTOM | Gravity.LEFT); tl.leftMargin = h.px(1.9f); tl.bottomMargin = h.px(5.2f);
-            dPreview.addView(t, tl);
-            TextView b = h.text(h.fSemi, Ui.TEXT_M, Color.WHITE); b.setText("▶  Resume");
-            GlassPanel.onButton(b, h.px(1.3f), h.px(1.3f), h.px(.55f));
-            LayoutParams btl = new LayoutParams(LayoutParams.WRAP_CONTENT, LayoutParams.WRAP_CONTENT, Gravity.BOTTOM | Gravity.LEFT); btl.leftMargin = h.px(1.9f); btl.bottomMargin = h.px(1.7f);
-            dPreview.addView(b, btl);
-        }
+        dTitle.setText(chLabel);
+        dAbout.setText(chAbout); dAbout.setVisibility(chAbout.isEmpty() ? GONE : VISIBLE);
+        dNote.setText("OK to choose  ·  Back to close");
+        dPreview.setVisibility(GONE);
         dOpts.removeAllViews();
-        int n = opts == null ? 0 : opts.length(), cur = d.optInt("cur", -1);
-        if (n == 0) return;
-        // (a long list shows the part around the one that's chosen)
-        int max = look ? 6 : 9, from = n <= max ? 0 : Math.max(0, Math.min(cur - max / 2, n - max)), to = Math.min(n, from + max);
-        int line = air ? 0xFF1F1F25 : Ui.WHITE_12;
+        int n = chOpts.length();
+        // (a long list shows the part around the one you're on)
+        int max = 9, from = n <= max ? 0 : Math.max(0, Math.min(chSel - max / 2, n - max)), to = Math.min(n, from + max);
+        int line = air ? 0xFF1F1F25 : Ui.WHITE_12, st = GlassPanel.selText();
+        if (from > 0) dOpts.addView(moreLine("▲  " + from + " more"));
         for (int i = from; i < to; i++) {
-            JSONObject o = opts.optJSONObject(i); if (o == null) continue;
-            boolean on = i == cur;
+            JSONObject o = chOpts.optJSONObject(i); if (o == null) continue;
+            boolean on = i == chSel, set = i == chCur;
             LinearLayout row = new LinearLayout(getContext()); row.setGravity(Gravity.CENTER_VERTICAL); row.setMinimumHeight(h.px(4.5f));
-            row.setBackground(new RowBg(0, line, Math.max(1, h.px(.1f))));
+            row.setPadding(h.px(1.4f), 0, h.px(air ? 2.2f : 1.4f), 0);
+            if (!on) row.setBackground(new RowBg(0, line, Math.max(1, h.px(.1f))));
+            else if (air) row.setBackground(new GlassPanel.Cut(GlassPanel.selFill()));
+            else { GradientDrawable g = new GradientDrawable(); g.setCornerRadius(GlassPanel.selRadius(1.5f * R)); g.setColor(GlassPanel.selFill()); row.setBackground(g); }
             View mark = new View(getContext());
             GradientDrawable mg = new GradientDrawable(); mg.setCornerRadius(GlassPanel.corner(.7f * R));
-            if (on) mg.setColor(GlassPanel.selFill()); else mg.setStroke(Math.max(1, h.px(.16f)), Ui.WHITE_50);
+            if (set) mg.setColor(on ? st : GlassPanel.selFill()); else mg.setStroke(Math.max(1, h.px(.16f)), on ? st : Ui.WHITE_50);
             mark.setBackground(mg);
             row.addView(mark, new LinearLayout.LayoutParams(h.px(1.4f), h.px(1.4f)));
-            TextView nm = h.text(h.fMed, Ui.TEXT_XL, on ? Color.WHITE : Ui.WHITE_85); nm.setSingleLine(true); nm.setEllipsize(TextUtils.TruncateAt.END);
+            TextView nm = h.text(on ? h.fSemi : h.fMed, Ui.TEXT_XL, on ? st : set ? Color.WHITE : Ui.WHITE_85); nm.setSingleLine(true); nm.setEllipsize(TextUtils.TruncateAt.END);
             nm.setText(o.optString("l"));
             LinearLayout.LayoutParams nl = new LinearLayout.LayoutParams(0, LayoutParams.WRAP_CONTENT, 1); nl.leftMargin = h.px(1.4f);
             row.addView(nm, nl);
             String note = o.optString("n");
             if (!note.isEmpty()) {
-                TextView nt = h.text(h.fReg, Ui.TEXT_M, Ui.WHITE_50); nt.setSingleLine(true); nt.setText(note);
+                TextView nt = h.text(h.fReg, Ui.TEXT_M, on ? (st & 0x00FFFFFF) | 0xD9000000 : Ui.WHITE_50); nt.setSingleLine(true); nt.setText(note);
                 LinearLayout.LayoutParams ntl = new LinearLayout.LayoutParams(LayoutParams.WRAP_CONTENT, LayoutParams.WRAP_CONTENT); ntl.leftMargin = h.px(1.2f);
                 row.addView(nt, ntl);
             }
             dOpts.addView(row, new LinearLayout.LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT));
         }
-        if (to - from < n) {
-            TextView more = h.text(h.fReg, Ui.TEXT_M, Ui.WHITE_50); more.setText("and " + (n - (to - from)) + " more");
-            more.setPadding(0, h.px(1f), 0, 0);
-            dOpts.addView(more);
-        }
+        if (to < n) dOpts.addView(moreLine("▼  " + (n - to) + " more"));
+    }
+    private TextView moreLine(String t) {
+        TextView more = h.text(h.fReg, Ui.TEXT_M, Ui.WHITE_50); more.setText(t);
+        more.setPadding(h.px(1.4f), h.px(.7f), 0, h.px(.7f));
+        return more;
     }
 
     private static int iconFor(String name) {
@@ -413,7 +421,7 @@ final class NativeSheet extends FrameLayout {
         Runnable gone = new Runnable() { @Override public void run() {
             if (shown) return;
             setVisibility(GONE);
-            focusLeft = true; curSec = -1; curSub = "";          // (opening again starts on the sections)
+            focusLeft = true; curSec = -1; curSub = ""; choosing = false;         // (opening again starts on the sections)
             applyPane(false);
         } };
         if (pane) panel.animate().translationX(h.px(3)).alpha(0f).setDuration(Ui.BASE).setInterpolator(TileView.EASE).withEndAction(gone).start();
@@ -456,6 +464,8 @@ final class NativeSheet extends FrameLayout {
         if (editing >= 0 && editing < rowViews.size()) fill(editing);
         fitHeight();
         style(!rebuilt);
+        // (the rows changed under an open panel of choices: it's closed)
+        if (choosing && (chRow >= data.length() || !chLabel.equals(data.optJSONObject(chRow).optString("label")))) choosing = false;
         applyPane(shown);
     }
 
@@ -531,7 +541,7 @@ final class NativeSheet extends FrameLayout {
         if (!l.contentEquals(r.label.getText())) r.label.setText(l);
         String v = r.d.optString("value");
         boolean cur = i == sel && editing < 0 && !(pane && focusLeft);
-        if (r.d.optBoolean("cycle") && !v.isEmpty() && cur) v = "‹  " + v + "  ›";
+        if (!pane && r.d.optBoolean("cycle") && !v.isEmpty() && cur) v = "‹  " + v + "  ›";       // (on a TV, OK opens its choices)
         if (!v.contentEquals(r.value.getText())) r.value.setText(v);
     }
 
@@ -597,7 +607,16 @@ final class NativeSheet extends FrameLayout {
             return true;
         }
         if (data.length() == 0) return true;
-        if (pane && k == 'l' && curSub.isEmpty() && !(sel < data.length() && data.optJSONObject(sel).optBoolean("cycle"))) { setFocusLeft(true); return true; }
+        if (choosing) {
+            // in the panel of choices: ▲▼ move, ◀ closes it
+            int n = chOpts.length();
+            if (k == 'u' && chSel > 0) { chSel--; drawDetail(); }
+            else if (k == 'd' && chSel < n - 1) { chSel++; drawDetail(); }
+            else if (k == 'l') closeChooser(true);
+            return true;
+        }
+        if (pane && k == 'l') { if (curSub.isEmpty()) setFocusLeft(true); return true; }
+        if (pane && k == 'r') return true;
         if (k == 'u' || k == 'd') {
             // (stepping over the group headings)
             for (int n = 0; n < data.length(); n++) { sel = (sel + (k == 'd' ? 1 : -1) + data.length()) % data.length(); if (!data.optJSONObject(sel).optBoolean("head")) break; }
@@ -613,7 +632,7 @@ final class NativeSheet extends FrameLayout {
     int focusAt(float x, float y) {
         if (!h.hit(panel, x, y, 0) || (back.getVisibility() == VISIBLE && h.hit(back, x, y, .6f))) return -1;
         if (pane) for (int i = 0; i < secViews.size(); i++) if (h.hit(secViews.get(i), x, y, 0)) {
-            leftSel = i; focusLeft = true; applyPane(true); style(true); askSoon(0); return 0;
+            leftSel = i; focusLeft = true; choosing = false; applyPane(true); style(true); askSoon(0); return 0;
         }
         if (pane && focusLeft) { focusLeft = false; applyPane(true); }
         for (int i = 0; i < rowViews.size(); i++) {
@@ -635,6 +654,16 @@ final class NativeSheet extends FrameLayout {
         if (data.length() == 0) return;
         JSONObject r = data.optJSONObject(sel);
         if (r.optBoolean("head")) return;
+        if (choosing) {
+            // the choice you're on: the page sets it (so many steps on from what's set; -1 its own action, -2 typing)
+            JSONObject o = chOpts.optJSONObject(chSel);
+            int row = chRow, steps = o == null ? 0 : o.optInt("steps", 0);
+            closeChooser(true);
+            if (steps == -2) { if (row < data.length() && data.optJSONObject(row).optJSONObject("edit") != null) { sel = row; startEdit(row); } }
+            else if (steps != 0) h.page("window.nhSheetPick && nhSheetPick(" + row + "," + steps + ")");
+            return;
+        }
+        if (pane && r.optBoolean("cycle")) { h.page("window.nhSheetChoices && nhSheetChoices(" + sel + ")"); return; }
         if (r.optJSONObject("edit") != null) { startEdit(sel); return; }
         View v = rowViews.get(sel).v;
         v.animate().scaleX(.99f).scaleY(.99f).setDuration(80).withEndAction(new Runnable() { @Override public void run() {
@@ -646,7 +675,8 @@ final class NativeSheet extends FrameLayout {
     void back() {
         if (editing >= 0) { endEdit(false); return; }
         if (pane) {
-            if (focusLeft) h.page("closeSettings()");
+            if (choosing) closeChooser(true);
+            else if (focusLeft) h.page("closeSettings()");
             else if (!curSub.isEmpty()) h.page("settingsBack()");
             else setFocusLeft(true);
             return;

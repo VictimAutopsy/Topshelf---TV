@@ -217,6 +217,43 @@ if (NH.on) {
       SET.sub = null; SET.sec = i; sSel = 0;
       buildSettings(); drawSettings();
     };
+    /* OK on a setting (TV): its choices, for the panel that pops out. A setting with two choices, or one whose
+       choices can't be listed, does what OK always did (flips, steps on, or runs its action). */
+    window.nhSheetChoices = i => {
+      if (!NH.sheet || mode !== 'settings') return;
+      sSel = Math.max(0, Math.min(i, sRows.length - 1));
+      const r = sRows[sSel];
+      if (!r || !r.cycle) return;
+      let inf = {}; try { inf = setInfoFor(r, String(r.value())); } catch (e) {}
+      const canon = (inf.opts || []).map(x => x.l), note = l => ((inf.opts || []).find(x => x.l === l) || {}).n || '';
+      let o = null, opts = null, cur = 0;
+      if (r.edit || !r.ok || r.okLabel || String(r.ok).replace(/\s/g, '').includes('cycle')) { try { o = settingsChoices(r); } catch (e) {} }
+      if (o && o.length >= (r.edit ? 1 : 3)) {
+        // (in the list's own order when it's known, not starting from whatever is set)
+        const list = canon.length === o.length && o.every(l => canon.includes(l)) ? canon : o;
+        opts = list.map(l => ({ l, n: note(l), steps: o.indexOf(l) })); cur = list.indexOf(o[0]);
+      } else if (!o && inf.ordered && inf.cur >= 0) {
+        // (too long to step through and back: its order is known, so each choice is so many steps on)
+        const n = canon.length;
+        opts = canon.map((l, j) => ({ l, n: note(l), steps: (j - inf.cur + n) % n })); cur = inf.cur;
+      }
+      if (!opts) { if (r.edit) opts = []; else { settingsKey('ok'); return; } }       // (only typing: the screen starts it itself)
+      if (r.edit) opts.push({ l: inf.typeLabel || 'Type your own…', n: '', steps: -2 });
+      else if (r.ok && r.okLabel) opts.push({ l: r.okLabel, n: '', steps: -1 });
+      B.nhSheetChoices(JSON.stringify({ i: sSel, label: r.label, about: inf.about || '', opts, cur }));
+    };
+    window.nhSheetPick = (i, steps) => {
+      if (!NH.sheet) return;
+      const r = sRows[i];
+      if (!r) return;
+      sSel = i;
+      if (steps < 0) { if (r.ok) r.ok(); }
+      else if (r.cycle) {
+        if (steps > 1) settingsQuiet(() => { for (let n = 0; n < steps - 1; n++) r.cycle(1); });
+        if (steps > 0) r.cycle(1);
+      }
+      refreshSettings();
+    };
     window.nhSheetEdit = (i, v) => {
       if (!NH.sheet) return;
       const r = sRows[i];
