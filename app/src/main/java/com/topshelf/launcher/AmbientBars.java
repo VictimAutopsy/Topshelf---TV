@@ -67,17 +67,24 @@ final class AmbientBars extends View {
         topT = botT = 0; top = bot = 0; invalidate();
     }
 
-    /* read with the screen's own rhythm: every second refresh (30 a second), or every fourth if reading
-       turns out slow on this TV (so the rest of Home stays smooth) */
+    /* Read with the screen's own rhythm: every second refresh (30 a second), or every eighth if reading turns
+       out slow on this TV. Reading the trailer's picture holds up everything else on screen while it lasts: on
+       the Streamer about 35 ms, two or three refreshes, and at every fourth refresh (as it was) that was a hitch
+       twelve times a second all through a trailer, the commonest pause in the reports. The light eases between
+       readings anyway, so fewer of them look the same.
+       And never while you're moving about: a press holds the readings off for a moment, so what you move never
+       waits on them (the light keeps its last colours meanwhile). */
+    private static volatile long holdUntil;
+    static void hold() { holdUntil = android.os.SystemClock.uptimeMillis() + 700; }
     private int frames, reads, every = 2; private long readNs, statAt; private boolean statLogged;
     private final android.view.Choreographer.FrameCallback frame = new android.view.Choreographer.FrameCallback() {
         @Override public void doFrame(long t) {
             if (!on) return;
-            if (++frames % every == 0) {
+            if (++frames % every == 0 && android.os.SystemClock.uptimeMillis() >= holdUntil) {
                 long r0 = System.nanoTime();
                 read();
                 readNs += System.nanoTime() - r0; reads++;
-                if (reads == 30) every = readNs / reads > 6_000_000L ? 4 : 2;
+                if (reads == 30) every = readNs / reads > 6_000_000L ? 8 : 2;
                 if (!statLogged && System.nanoTime() - statAt > 10_000_000_000L && reads > 0) {
                     statLogged = true;
                     Diag.ev("featured: ambient light reads " + Math.round(reads / ((System.nanoTime() - statAt) / 1e9)) + " a second, " + String.format(java.util.Locale.US, "%.1f", readNs / reads / 1e6) + " ms each");
@@ -101,7 +108,8 @@ final class AmbientBars extends View {
         // the bars are what every recent frame had (at least ~3% each, about the same top and bottom)
         int mt = SH, mb = SH;
         for (int i = 0; i < histN; i++) { mt = Math.min(mt, hist[i * 2]); mb = Math.min(mb, hist[i * 2 + 1]); }
-        boolean bars = histN >= hist.length / 2 && mt >= 8 && mb >= 8 && Math.abs(mt - mb) <= 8;
+        // (about two seconds of readings, however often they come)
+        boolean bars = histN >= (every >= 8 ? 14 : hist.length / 2) && mt >= 8 && mb >= 8 && Math.abs(mt - mb) <= 8;
         float nt = bars ? mt / (float) SH : 0, nb = bars ? mb / (float) SH : 0;
         // into the screen's terms (the picture may be scaled to fill: the same scaling as the video)
         if (bars) {
@@ -173,11 +181,12 @@ final class AmbientBars extends View {
 
     @Override protected void onDraw(Canvas c) {
         boolean moving = false;
+        float ease = every >= 8 ? .3f : .65f;          // (readings further apart: the colours glide between them)
         if (Math.abs(top - topT) > .001f) { top += (topT - top) * .12f; moving = true; } else top = topT;
         if (Math.abs(bot - botT) > .001f) { bot += (botT - bot) * .12f; moving = true; } else bot = botT;
         for (int i = 0; i < ZONES * 3; i++) {
-            if (Math.abs(cTop[i] - cTopT[i]) > .5f) { cTop[i] += (cTopT[i] - cTop[i]) * .65f; moving = true; } else cTop[i] = cTopT[i];
-            if (Math.abs(cBot[i] - cBotT[i]) > .5f) { cBot[i] += (cBotT[i] - cBot[i]) * .65f; moving = true; } else cBot[i] = cBotT[i];
+            if (Math.abs(cTop[i] - cTopT[i]) > .5f) { cTop[i] += (cTopT[i] - cTop[i]) * ease; moving = true; } else cTop[i] = cTopT[i];
+            if (Math.abs(cBot[i] - cBotT[i]) > .5f) { cBot[i] += (cBotT[i] - cBot[i]) * ease; moving = true; } else cBot[i] = cBotT[i];
         }
         // brightness: the light sinks with a dark scene and flares with a flash (the flash fades over ~half a second)
         if (lumShown >= 0) { if (Math.abs(lumShown - lum) > .5f) { lumShown += (lum - lumShown) * .3f; moving = true; } else lumShown = lum; }

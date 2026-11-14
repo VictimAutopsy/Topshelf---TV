@@ -1473,6 +1473,7 @@ final class NativeHome extends FrameLayout {
            every key, so the remote's volume did nothing during a movie), power, the TV's input and app keys */
         if (systemKey(code)) return false;
         lastKey = SystemClock.uptimeMillis();
+        AmbientBars.hold();
         // the doorbell's card (Ring): OK full screen, Back closes (before anything else, even a movie playing)
         if (doorbellView != null && doorbellView.shownNow() && (code == KeyEvent.KEYCODE_BACK || code == KeyEvent.KEYCODE_DPAD_CENTER || code == KeyEvent.KEYCODE_ENTER)) {
             if (!down) { if (code == KeyEvent.KEYCODE_BACK) doorbellView.back(); else doorbellView.ok(); }
@@ -1753,6 +1754,7 @@ final class NativeHome extends FrameLayout {
             return false;
         }
         lastKey = SystemClock.uptimeMillis();
+        AmbientBars.hold();
         switch (a) {
             case android.view.MotionEvent.ACTION_DOWN:
                 tDownX = tLastX = x; tDownY = tLastY = y; tAcc = 0; tAxis = 0; tDragging = false; tLongFired = false;
