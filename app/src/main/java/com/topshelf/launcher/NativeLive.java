@@ -55,7 +55,7 @@ import java.util.Set;
  * are painted once into one solid picture, and the guide grid is drawn by one view in one pass.
  * Multiview (several channels at once) is still the page's.
  */
-final class NativeLive extends FrameLayout {
+final class NativeLive extends FrameLayout implements NativeHome.Free {
     /* Fading in, this pane is drawn piece by piece at the fading strength rather than into one picture
        first: its rows and pictures are still arriving as it fades, and each one spoilt that picture,
        so the whole screen was drawn twice a frame (switching tabs ran at about 20 frames a second). */
@@ -1013,6 +1013,9 @@ final class NativeLive extends FrameLayout {
             liftAnim.start();
         }
         /** keep the chosen category in view (smoothly) */
+        float maxScroll() { return Math.max(0, cats.size() * itemPx + 2 * padY - getHeight()); }
+        void slide(float d) { slideTo(scroll - d); }
+        void slideTo(float y) { if (anim != null) anim.cancel(); scroll = target = Math.max(0, Math.min(y, maxScroll())); invalidate(); }
         void reveal() {
             float viewH = getHeight() > 0 ? getHeight() : (GUIDE_H - CAT_TOP + .5f) * R;
             float top = padY + cat * itemPx, to = target;
@@ -1146,6 +1149,42 @@ final class NativeLive extends FrameLayout {
         else play(ch, false);
     }
 
+    // ---------------------------------------------------------------- a finger on a phone: the guide and the groups slide with it
+    private android.widget.OverScroller fling;
+    private int dragWhat = -1, flingWhat;          // -1 not decided yet, 0 not ours (the remote's steps), 1 the guide, 2 the groups
+    @Override public void touchDown() { if (fling != null) fling.forceFinished(true); dragWhat = -1; }
+    @Override public boolean drag(char axis, float x0, float y0, float dPx) {
+        if (!shown || full || zap || moving || recCat() || empty.getVisibility() == VISIBLE) return false;
+        if (dragWhat < 0) {
+            if (dPx == 0) return true;               // (which way it's going isn't known yet)
+            dragWhat = 0;
+            if (zone.equals("cats")) { if (axis == 'v' && h.hit(catView, x0, y0, 0)) dragWhat = 2; }
+            else if (!list.isEmpty() && h.hit(guide, x0, y0, 0)) {
+                // sliding right when the guide is already at its start still brings the groups out
+                if (!(axis == 'h' && dPx > 0 && guide.sx <= 1)) dragWhat = 1;
+            }
+        }
+        if (dragWhat == 1) { guide.slide(axis, dPx); return true; }
+        if (dragWhat == 2) { catView.slide(dPx); return true; }
+        return false;
+    }
+    @Override public void dragEnd(char axis, float v) {
+        int what = dragWhat; dragWhat = -1;
+        if (what <= 0 || !shown) return;
+        if (fling == null) fling = new android.widget.OverScroller(getContext());
+        flingWhat = what;
+        if (what == 1) fling.fling(Math.round(guide.sx), Math.round(guide.sy), axis == 'h' ? -Math.round(v) : 0, axis == 'v' ? -Math.round(v) : 0,
+                0, Math.round(guide.maxX()), 0, Math.round(guide.maxY()));
+        else fling.fling(0, Math.round(catView.scroll), 0, -Math.round(v), 0, 0, 0, Math.round(catView.maxScroll()));
+        removeCallbacks(glide); postOnAnimation(glide);
+    }
+    private final Runnable glide = new Runnable() { @Override public void run() {
+        if (fling == null || !shown || full || !fling.computeScrollOffset()) return;
+        if (flingWhat == 1) guide.slideTo(fling.getCurrX(), fling.getCurrY());
+        else catView.slideTo(fling.getCurrY());
+        if (!fling.isFinished()) postOnAnimation(this);
+    } };
+
     /* a finger (phones): "ok" when OK should act on what was tapped (a channel: it plays; a category: it opens;
        anything while watching full screen: the controls), "done" when choosing it was all, null for nothing */
     String focusAt(float x, float y) {
@@ -1181,6 +1220,15 @@ final class NativeLive extends FrameLayout {
         int i = (int) Math.floor((ly - guide.head + guide.sy) / guide.rowPx);
         if (i < 0 || i >= list.size()) return null;
         if (!zone.equals("guide")) { zone = "guide"; drawCats(); }
+        if (h.phone) {
+            // (the guide may have been slid on to later: what's chosen is what's under the finger, so it stays put)
+            float lx = h.local(guide, x, y)[0];
+            long at = base + (long) ((Math.max(lx, guide.chw + 1) - guide.chw + guide.sx) / guide.perMs);
+            long nt = Math.max(System.currentTimeMillis(), Math.min(at, end() - 1));
+            boolean moved = i != row;
+            if (moved || nt != t) { row = i; t = nt; guide.invalidate(); drawInfo(); if (moved) schedulePreview(); }
+            return "ok";
+        }
         if (i != row) { row = i; afterRowMove(); }
         return "ok";
     }
@@ -3211,6 +3259,11 @@ final class NativeLive extends FrameLayout {
             clampScroll();
             invalidate();
         }
+        float maxX() { return Math.max(0, totalW() - (getWidth() - chw)); }
+        float maxY() { return Math.max(0, list.size() * rowPx - (getHeight() - head)); }
+        /** under a finger: time across, channels down */
+        void slide(char axis, float d) { slideTo(axis == 'h' ? sx - d : sx, axis == 'h' ? sy : sy - d); }
+        void slideTo(float x, float y) { if (anim != null) anim.cancel(); sx = x; sy = y; clampScroll(); invalidate(); }
         private void clampScroll() {
             float maxX = Math.max(0, totalW() - (getWidth() - chw)), maxY = Math.max(0, list.size() * rowPx - (getHeight() - head));
             sx = Math.max(0, Math.min(sx, maxX)); sy = Math.max(0, Math.min(sy, maxY));

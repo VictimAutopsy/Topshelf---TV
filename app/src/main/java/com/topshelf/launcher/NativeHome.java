@@ -1725,11 +1725,12 @@ final class NativeHome extends FrameLayout {
         /** it let go at v pixels a second */
         void dragEnd(char axis, float v);
     }
-    /** the screen under the finger that slides freely with it (Home, Movies, TV Shows, a title's page), when nothing is open over it */
+    /** the screen under the finger that slides freely with it (Home, Movies, TV Shows, a title's page, Live TV's guide), when nothing is open over it */
     private Free freeNow() {
         if (!phone || !(mode.equals("grid") || mode.equals("top"))) return null;
         if (saver || vodPlayingNow() || addonsOpenNow() || gameOpenNow() || fySetupOpen() || launchOv.getVisibility() == VISIBLE) return null;
         if (titleOpenNow()) return titleView;
+        if (onVod() && isLive()) return live;
         if (!onVod() || isLive() || isSports()) return null;
         return vod;
     }
@@ -1764,6 +1765,7 @@ final class NativeHome extends FrameLayout {
                 if (vodS != null) vodS.touchDown();
                 if (vodH != null) vodH.touchDown();
                 if (titleView != null) titleView.touchDown();
+                if (live != null) live.touchDown();
                 if (tVel != null) tVel.recycle();
                 tVel = android.view.VelocityTracker.obtain(); tVel.addMovement(e);
                 main.removeCallbacks(tLong); main.postDelayed(tLong, 460);
