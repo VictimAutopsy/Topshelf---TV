@@ -71,6 +71,7 @@ final class NativeLive extends FrameLayout implements NativeHome.Free {
     /* while the top bars are away (in the guide), the preview grows up into their space: same bottom, flush right, up to the top.
        (A phone held upright: the preview runs across the top, the channel's details under it, then the guide.) */
     private float PV_W = 36.3f, PV_H = 36.3f * 9 / 16f, PV_Y = 6.3f, BIG_H = PV_Y + PV_H, BIG_W = BIG_H * 16 / 9f;
+    private float PV_TOP;          // (a phone held upright: the preview starts below the camera cutout)
     private static final int ID0 = 1000000;
 
     private final NativeHome h;
@@ -122,7 +123,7 @@ final class NativeLive extends FrameLayout implements NativeHome.Free {
     private final FrameLayout fs;                 // full-screen layer (banner, channel list, info)
     private Tune pvTune, fsTune;
     /** the preview's place: top right, flush with the screen's right edge */
-    private LayoutParams pvLp() { int w = h.px(BIG_W), hh = h.px(BIG_H); LayoutParams l = new LayoutParams(w, hh); l.leftMargin = W - w; l.topMargin = 0; return l; }
+    private LayoutParams pvLp() { int w = h.px(BIG_W), hh = h.px(BIG_H); LayoutParams l = new LayoutParams(w, hh); l.leftMargin = W - w; l.topMargin = h.px(PV_TOP); return l; }
     /* How big the preview is: 0 = its usual size under the top bars, 1 = grown into their space while they're away. */
     private float grow; private ValueAnimator growAnim; private final RectF pvRect = new RectF();
     void barsHidden(boolean hidden) {
@@ -138,7 +139,7 @@ final class NativeLive extends FrameLayout implements NativeHome.Free {
     }
     /** the preview's box right now (screen px) */
     private RectF pvBox() {
-        float w = (PV_W + (BIG_W - PV_W) * grow) * R, hh = w * 9 / 16f, b = BIG_H * R;
+        float w = (PV_W + (BIG_W - PV_W) * grow) * R, hh = w * 9 / 16f, b = (PV_TOP + BIG_H) * R;
         pvRect.set(W - w, b - hh, W, b);
         return pvRect;
     }
@@ -229,7 +230,7 @@ final class NativeLive extends FrameLayout implements NativeHome.Free {
     NativeLive(NativeHome host) {
         super(host.getContext());
         h = host; R = host.R; W = host.W; H = host.H; SW = host.SW; SH = host.SH;
-        if (h.portrait) { PV_W = BIG_W = SW; PV_H = BIG_H = SW * 9 / 16f; PV_Y = 0; GUIDE_X = GP_X; GUIDE_Y = BIG_H + 15.5f; }
+        if (h.portrait) { PV_TOP = h.TOP; PV_W = BIG_W = SW; PV_H = BIG_H = SW * 9 / 16f; PV_Y = 0; GUIDE_X = GP_X; GUIDE_Y = PV_TOP + BIG_H + 15.5f; }
         GUIDE_H = SH - GUIDE_Y - h.BOT;               // (runs to the bottom edge, like the rows on the other tabs)
         setClipChildren(false);
         android.content.Context c = getContext();
@@ -289,7 +290,7 @@ final class NativeLive extends FrameLayout implements NativeHome.Free {
         iHint.setLetterSpacing(.02f);
         LinearLayout.LayoutParams hl2 = new LinearLayout.LayoutParams(LayoutParams.WRAP_CONTENT, LayoutParams.WRAP_CONTENT); hl2.topMargin = h.px(.9f);
         info.addView(iHint, hl2);
-        if (h.portrait) addView(info, h.at(3, BIG_H + 1.2f, h.px(SW - 6), h.px(14f)));
+        if (h.portrait) addView(info, h.at(3, PV_TOP + BIG_H + 1.2f, h.px(SW - 6), h.px(14f)));
         else addView(info, h.at(5, 9.4f, h.px(Math.min(80, SW - BIG_W - 5 - 1f)), h.px(16.4f)));
 
         // the guide grid
@@ -1793,7 +1794,7 @@ final class NativeLive extends FrameLayout implements NativeHome.Free {
                    scaled; at rest it sits at its exact size, unscaled (a scaled video plane at rest seemed to
                    upset how the TV puts the screen together: shifted or mirrored pictures, black boxes). */
                 if (growing()) {
-                    int w = h.px(BIG_W), x = W - w, y = 0, hh = h.px(BIG_H);
+                    int w = h.px(BIG_W), x = W - w, y = h.px(PV_TOP), hh = h.px(BIG_H);
                     np.layout("pv", Math.round(x * k), Math.round(y * k), Math.round(w * k), Math.round(hh * k), 0, 0);
                     np.setPvScale((PV_W + (BIG_W - PV_W) * grow) / BIG_W);
                 } else {
@@ -3224,6 +3225,9 @@ final class NativeLive extends FrameLayout implements NativeHome.Free {
         private final Map<String, StaticLayout> names = new HashMap<>();
         private final Set<String> asked = new HashSet<>();
         private final float rowPx, head, chw, cellH, perMs, padL;
+        /* a phone held upright: the channel's tile is its number and logo only (its name is in the details above the
+           guide), so the shows get most of the width; a channel without a logo has its name there instead */
+        private final boolean slim = h.phone && h.portrait;
         private Shader liveShader;
         private final Soft raiseSh = new Soft(1f * R, 1.8f * R, Ui.BLACK_70), barGlow = new Soft(.11f * R, .5f * R, 0x8CE0352B), nowGlow = new Soft(.8f * R, .8f * R, 0x80E0352B);
 
@@ -3231,7 +3235,7 @@ final class NativeLive extends FrameLayout implements NativeHome.Free {
             super(c);
             // the channel tiles start at the screen's left edge, their contents line up with the rest of the tab
             padL = GUIDE_X * R;
-            rowPx = ROWH * R; head = HEAD * R; chw = padL + CHW * R; cellH = (ROWH - .4f) * R; perMs = PER_HOUR * R / 3600000f;
+            rowPx = ROWH * R; head = HEAD * R; chw = padL + (slim ? 9.4f : CHW) * R; cellH = (ROWH - .4f) * R; perMs = PER_HOUR * R / 3600000f;
             tTitle.setTypeface(h.fSemi); tTitle.setTextSize(1.12f * R); tTitle.setColor(Color.WHITE);
             tSmall.setTypeface(h.fReg); tSmall.setTextSize(.92f * R); tSmall.setColor(Ui.WHITE_60);
             tNum.setTypeface(h.fReg); tNum.setTextSize(.92f * R); tNum.setColor(Ui.WHITE_60); tNum.setTextAlign(Paint.Align.RIGHT);
@@ -3393,21 +3397,26 @@ final class NativeLive extends FrameLayout implements NativeHome.Free {
                 tNum.setTextSize(.92f * R);
                 float nw = tNum.measureText(num), room = 3.4f * R;
                 if (nw > room) tNum.setTextSize(Math.max(.6f * R, .92f * R * room / nw));
-                c.drawText(num, cx + 2.6f * R, cy + .32f * R, tNum);
-                float lx = cx + 3.3f * R;
                 Bitmap lg = logoFor(ch);
+                boolean nameOnly = slim && lg == null;
+                if (!nameOnly) c.drawText(num, cx + 2.6f * R, cy + .32f * R, tNum);
+                float lx = cx + 3.3f * R;
                 if (lg != null) {
                     float bw = 3.4f * R, bh = 2.5f * R, s = Math.min(bw / lg.getWidth(), bh / lg.getHeight());
                     float dw = lg.getWidth() * s, dh = lg.getHeight() * s;
                     rf.set(lx + (bw - dw) / 2, cy - dh / 2, lx + (bw + dw) / 2, cy + dh / 2);
                     c.drawBitmap(lg, null, rf, LOGO_P);
-                } else {
+                } else if (!nameOnly) {
                     fill.setColor(Ui.WHITE_12); rf.set(lx, cy - 1.25f * R, lx + 3.4f * R, cy + 1.25f * R); c.drawRoundRect(rf, .6f * R, .6f * R, fill);
                     tTitle.setTextAlign(Paint.Align.CENTER); c.drawText(ch.n.isEmpty() ? "" : ch.n.substring(0, 1), lx + 1.7f * R, cy + tTitle.getTextSize() * .35f, tTitle); tTitle.setTextAlign(Paint.Align.LEFT);
                 }
-                float tx = lx + 3.4f * R + .7f * R;
+                float tx = nameOnly ? cx : lx + 3.4f * R + .7f * R;
                 boolean fav = favs.contains(ch.u);
                 float tw = chw - .6f * R - tx - .9f * R - (fav ? 1.4f * R : 0);
+                if (slim && !nameOnly) {
+                    if (fav) { tSmall.setColor(0xFFFFD60A); c.drawText("★", chw - .6f * R - 1.4f * R, y + 1.5f * R, tSmall); tSmall.setColor(Ui.WHITE_60); }
+                    continue;
+                }
                 StaticLayout sl = names.get(ch.u + "|" + (int) tw);
                 if (sl == null) {
                     sl = new StaticLayout(ch.n, 0, ch.n.length(), tName, Math.max(1, (int) tw), Layout.Alignment.ALIGN_NORMAL, 1.05f, 0, false, TextUtils.TruncateAt.END, Math.max(1, (int) tw));
