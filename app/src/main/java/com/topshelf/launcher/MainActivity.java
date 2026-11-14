@@ -54,6 +54,7 @@ public class MainActivity extends Activity {
     static final String HOST = "topshelf.local";
     static final String ORIGIN = "https://" + HOST + "/";
 
+    private static int made;
     private WebView web;
     private FrameLayout root;
     private Bridge bridge;
@@ -64,6 +65,9 @@ public class MainActivity extends Activity {
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         startMark("screen being made");
+        // (why a screen is made more than once in a launch: each costs a whole start-up's work)
+        made++;
+        if (made > 1) Diag.ev("screen: made again (number " + made + " this launch" + (savedInstanceState != null ? ", Android had taken the last one back" : "") + ")");
         applyOrientation();
         readLaunchChannel(getIntent());
         if (isAsk(getIntent())) pendingAsk = getIntent();
@@ -1236,6 +1240,7 @@ public class MainActivity extends Activity {
 
     @Override
     protected void onDestroy() {
+        Diag.ev("screen: closed (" + (isFinishing() ? "it was finished" : isChangingConfigurations() ? "the device's settings changed" : "Android took it back") + ")");
         try { if (nplayer != null) nplayer.stop(); } catch (Throwable ignored) { }
         // (if Android makes the screen again in the same process, the new one starts its own: two doorbell connections
         // with the same identity would keep pushing each other off)

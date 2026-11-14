@@ -122,8 +122,8 @@ final class NativeSheet extends FrameLayout {
         back = h.text(h.fMed, Ui.TEXT_M, Ui.WHITE_60);
         head.addView(back);
         title = h.text(pane && air ? SportsLook.heavy() : h.fSemi, pane && air ? 3.6f : 2.6f, Color.WHITE);
-        if (pane && air) { title.setAllCaps(true); title.setLetterSpacing(.03f); } else title.setLetterSpacing(-.02f);
         title.setSingleLine(true); title.setEllipsize(TextUtils.TruncateAt.END);
+        if (pane && air) { title.setAllCaps(true); title.setLetterSpacing(.03f); } else title.setLetterSpacing(-.02f);       // (after "one line", which undoes capitals)
         LinearLayout.LayoutParams tl = new LinearLayout.LayoutParams(LayoutParams.WRAP_CONTENT, LayoutParams.WRAP_CONTENT); tl.topMargin = h.px(.4f);
         head.addView(title, tl);
         about = h.text(h.fReg, Ui.TEXT_XL, Ui.WHITE_60); about.setSingleLine(true); about.setEllipsize(TextUtils.TruncateAt.END);
@@ -488,7 +488,7 @@ final class NativeSheet extends FrameLayout {
                     v.addView(tick, tkl);
                 }
                 TextView l = h.text(pane && air ? SportsLook.cond() : h.fSemi, pane ? Ui.TEXT_M : Ui.TEXT_S, pane ? Ui.WHITE_75 : Ui.WHITE_60);
-                l.setLetterSpacing(pane ? .14f : .1f); l.setAllCaps(true); l.setSingleLine(true);
+                l.setLetterSpacing(pane ? .14f : .1f); l.setSingleLine(true); l.setAllCaps(true);          // (in this order: one line first, or it undoes the capitals)
                 v.addView(l, new LinearLayout.LayoutParams(0, LayoutParams.WRAP_CONTENT, 1));
                 TextView val = h.text(h.fMed, Ui.TEXT_S, 0), ch = h.text(h.fMed, Ui.TEXT_S, 0);
                 val.setVisibility(GONE); ch.setVisibility(GONE);
@@ -496,7 +496,7 @@ final class NativeSheet extends FrameLayout {
                 rowViews.add(new Row(v, l, val, ch));
                 continue;
             }
-            boolean sec = d.optBoolean("chev");
+            boolean sec = d.optBoolean("chev") && !pane;          // (on a TV a setting that opens a list looks like the others in its card)
             LinearLayout v = new LinearLayout(getContext());
             v.setGravity(Gravity.CENTER_VERTICAL);
             v.setPadding(h.px(pane ? 1.75f : 1.4f), h.px(sec ? 1.35f : 1f), h.px(pane ? 1.75f : 1.4f), h.px(sec ? 1.35f : 1f));
@@ -516,7 +516,7 @@ final class NativeSheet extends FrameLayout {
             v.addView(val, vl);
             TextView ch = h.text(h.fSemi, 1.6f, Ui.WHITE_60);
             ch.setText("›");
-            ch.setVisibility(sec ? VISIBLE : GONE);
+            ch.setVisibility(d.optBoolean("chev") ? VISIBLE : GONE);
             LinearLayout.LayoutParams cl = new LinearLayout.LayoutParams(LayoutParams.WRAP_CONTENT, LayoutParams.WRAP_CONTENT); cl.leftMargin = h.px(.6f);
             v.addView(ch, cl);
             LinearLayout.LayoutParams rl = new LinearLayout.LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT);
