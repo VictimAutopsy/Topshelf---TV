@@ -68,6 +68,11 @@ Quick compile check without building:
   `Skel.block()` with `Skel.tone()` on a canvas, asking for the next frame while it loads). No emoji on screen: they
   come in the TV's own cartoon style. Draw a `HomeIcons` icon instead (`HomeIcons.at()` on a canvas,
   `HomeIcons.before()` in a TextView); ⚠ and ☁ are written with `\uFE0E` after them so they stay plain text signs.
+- The guide's GAME tag (Chad picked it from mock-ups, 1.0.432): a show carrying one of his teams' games gets a small blue tag
+  before its title (filled while the game is on, an outline before), and while it's on the tile's second line is the
+  score and period in place of the times. `SportsData.guideGames` finds the shows (same matching as Sports' "Watch on…"),
+  `NativeLive.askGames` asks every 30 s while the guide is up. He likes the guide's layout and look as they are: he turned
+  down a picture-first redesign and three new looks.
 - Diagnostics: `Diag.ev("...")`. Lines are scrubbed of keys and logins, but don't log full stream or addon links anyway.
 
 ## Working with Chad

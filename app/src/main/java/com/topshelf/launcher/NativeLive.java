@@ -422,6 +422,7 @@ final class NativeLive extends FrameLayout {
         drawAll();
         main().removeCallbacks(pulse); pulse.run();
         main().removeCallbacks(minute); main().postDelayed(minute, 30000);
+        askGames();
         if (glassLight != null) h.setTabGlass(glassLight, glassFrost);
         schedulePreview();
         resume();
@@ -576,8 +577,29 @@ final class NativeLive extends FrameLayout {
             main().postDelayed(this, 120);
         }
     };
+    /* Your teams' games in the guide: the show carrying one gets a GAME tag, and while the game is on its tile
+       shows the score where the times were. "channel|the show's start" → the game's id (its score is read from
+       Sports each time it's drawn, so it's the latest one). Asked when the guide opens and every 30 seconds. */
+    private Map<String, String> gameMarks = new HashMap<>();
+    private void askGames() {
+        if (!shown || full) return;
+        try { h.sportsData().guideGames(new SportsData.GuideGames() { @Override public void found(List<Object[]> hits) {
+            Map<String, String> m = new HashMap<>();
+            for (Object[] x : hits) {
+                SportsData.Ev e = (SportsData.Ev) x[0]; SportsData.Hit hit = (SportsData.Hit) x[1];
+                // the show it's in: the listing that matched, else whatever that channel has on just after the start
+                long[] p = null;
+                try { p = progAt(hit.ch, hit.prog != null ? (Long) hit.prog[0] + 60000L : e.at + 10 * 60000L); } catch (Throwable ignored) { }
+                if (p != null) m.put(hit.ch.u + "|" + p[0], e.id);
+            }
+            if (!m.equals(gameMarks)) Diag.ev("guide: game tags on " + m.size() + (m.size() == 1 ? " show" : " shows"));
+            gameMarks = m;
+            if (shown && !full) guide.invalidate();
+        } }); } catch (Throwable ignored) { }
+    }
     private final Runnable minute = new Runnable() { @Override public void run() {
         if (!shown) return;
+        askGames();
         if (rebase()) guide.build();
         guide.invalidate();
         drawInfo();
@@ -3295,7 +3317,9 @@ final class NativeLive extends FrameLayout {
                     String title = xx.get(j)[0].isEmpty() ? "Untitled" : xx.get(j)[0];
                     boolean bell = state == 1 && remHas(ch.u, se[0]);
                     recMark = recMarks.contains(ch.u + "|" + se[0]);
+                    gameMark = state == 0 || gameMarks.isEmpty() ? null : gameMarks.get(ch.u + "|" + se[0]);
                     cell(c, y, se[0], se[1], title, fmtShort(se[0]) + " – " + fmtShort(se[1]), state, f, leftT, bell, now);
+                    gameMark = null;
                 }
                 if (endT - gapFrom > 60000L) gap(c, y, gapFrom, endT, leftT, now);
             }
@@ -3386,6 +3410,28 @@ final class NativeLive extends FrameLayout {
             c.restore();
         }
 
+        /** "PHI 17 · DAL 14 · Q3 6:12" for a game that's on, "… · FINAL" once it's over, "" before it starts */
+        private String score(SportsData.Ev g) {
+            if (g.teams.size() != 2 || g.state.equals("pre")) return "";
+            SportsData.Team a = g.teams.get(0), b = g.teams.get(1);
+            if (a.score.isEmpty() && b.score.isEmpty()) return "";
+            String when = (g.per + " " + g.clock).trim();
+            return (a.abbr.isEmpty() ? a.name : a.abbr) + " " + a.score + "  ·  " + (b.abbr.isEmpty() ? b.name : b.abbr) + " " + b.score + (when.isEmpty() ? "" : "  ·  " + when);
+        }
+        /** the GAME tag before a show's title: filled while the game is on, an outline before; returns the room it took */
+        private final Paint tagP = new Paint(Paint.ANTI_ALIAS_FLAG); private final TextPaint tTag = new TextPaint(Paint.ANTI_ALIAS_FLAG);
+        private float gameTag(Canvas c, float x, float cy, boolean on, int alpha) {
+            tTag.setTypeface(h.fSemi); tTag.setTextSize(.78f * R); tTag.setLetterSpacing(.05f);
+            float tw = tTag.measureText("GAME"), pw = tw + 1.1f * R, ph = 1.35f * R;
+            rf.set(x, cy - ph / 2, x + pw, cy + ph / 2);
+            if (on) { tagP.setStyle(Paint.Style.FILL); tagP.setColor(0xFF1A5FD0); tTag.setColor(Color.WHITE); }
+            else { float sw = Math.max(1.5f, .1f * R); tagP.setStyle(Paint.Style.STROKE); tagP.setStrokeWidth(sw); tagP.setColor(0xFF8CC2FF); tTag.setColor(0xFF8CC2FF); rf.inset(sw / 2, sw / 2); }
+            tagP.setAlpha(alpha); tTag.setAlpha(alpha);
+            c.drawRoundRect(rf, .5f * R, .5f * R, tagP);
+            c.drawText("GAME", x + (pw - tw) / 2, cy + tTag.getTextSize() * .36f, tTag);
+            return pw + .55f * R;
+        }
+
         /** how far into a show that's on now: a thin red bar along the tile's bottom (like the hero's) */
         private void liveBar(Canvas c, float x0, float x1, float y, long s, long e, long now) {
             float frac = Math.max(.02f, Math.min(1f, (now - s) / (float) Math.max(1, e - s)));
@@ -3423,7 +3469,7 @@ final class NativeLive extends FrameLayout {
         /** one programme */
         /* The show you're on is drawn last, raised: it grows a little, lifts, and casts a shadow, like a
            card picked up off the page (no glow). The lift eases in each time the focus moves. */
-        private boolean pendF, drawingF; private float pY; private long pS, pE, pLeft, pNow; private String pTitle, pSub; private int pState; private boolean pBell, pRec, recMark;
+        private boolean pendF, drawingF; private float pY; private long pS, pE, pLeft, pNow; private String pTitle, pSub; private int pState; private boolean pBell, pRec, recMark; private String gameMark, pGame;
         private String focusKey = ""; private float lift = 1f; private ValueAnimator liftAnim;
         private void drawPendingFocus(Canvas c) {
             if (!pendF) return;
@@ -3438,9 +3484,9 @@ final class NativeLive extends FrameLayout {
                 liftAnim.start();
             }
             drawingF = true;
-            recMark = pRec;
+            recMark = pRec; gameMark = pGame;
             cell(c, pY, pS, pE, pTitle, pSub, pState, true, pLeft, pBell, pNow);
-            drawingF = false;
+            drawingF = false; gameMark = null;
         }
 
         /* A title cut to fit its tile: worked out once per text and width (to the nearest few pixels), not again on
@@ -3459,7 +3505,7 @@ final class NativeLive extends FrameLayout {
             return v;
         }
         private void cell(Canvas c, float y, long s, long e, String title, String sub, int state, boolean f, long leftT, boolean bell, long now) {
-            if (f && !drawingF) { pendF = true; pY = y; pS = s; pE = e; pTitle = title; pSub = sub; pState = state; pLeft = leftT; pBell = bell; pRec = recMark; pNow = now; return; }
+            if (f && !drawingF) { pendF = true; pY = y; pS = s; pE = e; pTitle = title; pSub = sub; pState = state; pLeft = leftT; pBell = bell; pRec = recMark; pGame = gameMark; pNow = now; return; }
             long endT = end();
             float x0 = chw + (Math.max(s, base) - base) * perMs - sx, x1 = chw + (Math.min(e, endT) - base) * perMs - sx - .4f * R;
             if (x1 <= x0) return;
@@ -3486,7 +3532,9 @@ final class NativeLive extends FrameLayout {
                 c.drawRoundRect(rf, r, r, fill);
             }
             float wRem = (x1 - x0) / R;
-            if (wRem <= 4 && !bell && !recMark) return;
+            SportsData.Ev game = null;
+            if (gameMark != null) try { game = h.sportsData().find(gameMark); } catch (Throwable ignored) { }
+            if (wRem <= 4 && !bell && !recMark && game == null) return;
             // a long show that began before the left edge: its title slides into view
             // (measured from where the tile is drawn from: a show that began before the guide's start is drawn from its start)
             long sv = Math.max(s, base);
@@ -3500,9 +3548,15 @@ final class NativeLive extends FrameLayout {
             float bx = tx;
             if (bell) { float bs = tTitle.getTextSize(); HomeIcons.at(c, HomeIcons.BELL, bx + bs * .5f, ty - bs * .36f, bs * 1.1f, 0xFFFFD60A); bx += bs * 1.45f; }
             if (recMark) { recDot.setColor(0xFFFF453A); float rr = .42f * R; c.drawCircle(bx + rr, ty - tTitle.getTextSize() * .36f, rr, recDot); bx += 2 * rr + .55f * R; }
+            boolean onNow = game != null && state == 2 && game.state.equals("in");
+            if (game != null) bx += gameTag(c, bx, ty - tTitle.getTextSize() * .36f, onNow, f ? 255 : alpha);
             if (wRem > 4) {
                 c.drawText(fit(title, tTitle, Math.max(1, x1 - bx - 1f * R)), bx, ty, tTitle);
+                // a game that's on (or just over while its show still is): the score where the times were
+                String sc = game != null && state == 2 ? score(game) : "";
+                if (!sc.isEmpty()) { sub = sc; tSmall.setTypeface(h.fMed); tSmall.setColor(Color.WHITE); }
                 c.drawText(fit(sub, tSmall, Math.max(1, avail)), tx, ty + .25f * R + tSmall.getTextSize(), tSmall);
+                if (!sc.isEmpty()) tSmall.setTypeface(h.fReg);
             }
             c.restore();
             tTitle.setAlpha(255); tSmall.setColor(Ui.WHITE_60);

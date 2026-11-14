@@ -1118,6 +1118,40 @@ final class SportsData {
             main.post(new Runnable() { @Override public void run() { cb.found(g); } });
         } });
     }
+    interface GuideGames { void found(List<Object[]> hits); }
+    /** for the guide's GAME tag: your teams' games that are on, about to be (the guide's twelve hours) or just over,
+        each with the channels showing it — {Ev, Hit} pairs (main thread in, answer on the main thread). The scores
+        are asked again first when the Sports tab isn't doing it: as often as the tab would (every 25 seconds
+        while a game is on, otherwise every 4 minutes; see loadLeague). */
+    void guideGames(final GuideGames cb) {
+        if (prefs.length() == 0) readPrefs();
+        if (!anyTeams() || leagues().isEmpty()) { cb.found(new ArrayList<Object[]>()); return; }
+        Runnable go = new Runnable() { @Override public void run() {
+            index();
+            final List<Ev> mine = new ArrayList<>();
+            long now = System.currentTimeMillis();
+            Set<String> seen = new HashSet<>();
+            for (String id : leagues()) for (Ev e : list(id)) {
+                if (e.card || e.teams.size() != 2 || !favGame(e) || !seen.add(e.id)) continue;
+                boolean near = e.state.equals("in") || (e.state.equals("pre") && e.at > now - 3600000L && e.at < now + 12 * 3600000L && !OFF.matcher(e.detail).find())
+                        || (e.state.equals("post") && now - e.at < 5 * 3600000L);
+                if (near) mine.add(e);
+            }
+            if (mine.isEmpty()) { cb.found(new ArrayList<Object[]>()); return; }
+            work.execute(new Runnable() { @Override public void run() {
+                final List<Object[]> out = new ArrayList<>();
+                try {
+                    for (Ev e : mine) for (Hit x : match(e)) {
+                        // a listing that names the teams, a channel named after the game, or the game's own network (not a look-alike name)
+                        if (x.prog != null || (x.why.equals("event") && x.score >= 2.5) || (x.why.equals("network") && x.score >= 3)) out.add(new Object[] { e, x });
+                    }
+                } catch (Throwable ignored) { }
+                main.post(new Runnable() { @Override public void run() { cb.found(out); } });
+            } });
+        } };
+        if (on) go.run(); else loadAll(false, true, go);
+    }
+
     /** Watch: straight to the channel that's showing it, or the game's menu when none is found */
     void watch(final Ev e) {
         index();
