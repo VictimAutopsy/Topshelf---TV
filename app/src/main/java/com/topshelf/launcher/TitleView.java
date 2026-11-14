@@ -1617,7 +1617,7 @@ final class TitleView extends FrameLayout implements NativeHome.Free {
             if (descL != null) { c.save(); c.translate(x, 30.2f * R); descL.draw(c); c.restore(); }
             // awards
             String aw = f.optString("awards");
-            if (!aw.isEmpty()) { small.setTextSize(1.45f * R); small.setColor(0xFFF6C344); c.drawText(TextUtils.ellipsize("🏆  " + aw, small, cw(68), TextUtils.TruncateAt.END).toString(), x, 40.3f * R, small); }
+            if (!aw.isEmpty()) { small.setTextSize(1.45f * R); small.setColor(0xFFF6C344); HomeIcons.at(c, HomeIcons.TROPHY, x + .8f * R, 39.8f * R, 1.7f * R, 0xFFF6C344); c.drawText(TextUtils.ellipsize(aw, small, cw(68) - 2.4f * R, TextUtils.TruncateAt.END).toString(), x + 2.4f * R, 40.3f * R, small); }
             // buttons
             float by = 42.3f * R, extra = 0;
             List<String> bs = buttons();
@@ -1874,7 +1874,18 @@ final class TitleView extends FrameLayout implements NativeHome.Free {
             float x = 5 * R, sy = top;
             boolean fz = zone.equals("seasons");
             small.setTextSize(2f * R); small.setColor(Color.WHITE);
-            if (seasons.isEmpty()) { small.setTextSize(1.6f * R); small.setColor(Ui.WHITE_60); c.drawText(full == null ? "Loading episodes…" : "No episodes listed", x, sy + 2.2f * R, small); }
+            if (seasons.isEmpty() && full == null) {
+                // the episodes are on their way: the shapes of a season's name and its first few episodes
+                p.setColor(Skel.tone());
+                Skel.block(c, p, rf, x, sy, 9 * R, 3.6f * R, 1.8f * R);
+                for (int i = 0; i < 4; i++) {
+                    float cx = 5 * R + i * (cardW + cardGap), cy = top + 5.6f * R;
+                    Skel.block(c, p, rf, cx, cy, cardW, cardH, 1.2f * R);
+                    Skel.block(c, p, rf, cx, cy + cardH + 1.2f * R, cardW * .7f, 1.2f * R, .4f * R);
+                    Skel.block(c, p, rf, cx, cy + cardH + 3f * R, cardW * .45f, 1f * R, .4f * R);
+                }
+                postInvalidateOnAnimation();
+            } else if (seasons.isEmpty()) { small.setTextSize(1.6f * R); small.setColor(Ui.WHITE_60); c.drawText("No episodes listed", x, sy + 2.2f * R, small); }
             th.setTextSize(1.6f * R);
             /* The season names scroll sideways when there are more than fit (the chosen one always in view),
                beside the ratings strip when there is one. */

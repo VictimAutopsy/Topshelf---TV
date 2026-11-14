@@ -1997,9 +1997,9 @@ final class NativeLive extends FrameLayout {
         if (!epName.trim().isEmpty()) when = epName.trim() + "  ·  " + when;
         iWhen.setText(when);
         String d = r.optString("desc");
-        if (st.equals("failed") || !r.optString("err").isEmpty()) d = "⚠ " + r.optString("err") + (d.isEmpty() ? "" : "\n" + d);
+        if (st.equals("failed") || !r.optString("err").isEmpty()) d = "⚠\uFE0E " + r.optString("err") + (d.isEmpty() ? "" : "\n" + d);
         else if (r.optInt("drops") > 0) d = "The channel dropped " + r.optInt("drops") + (r.optInt("drops") == 1 ? " time" : " times") + " while recording (there may be a skip there).\n" + d;
-        if (!Recorder.hasData(r) && !r.optString("dir").isEmpty() && (st.equals("done"))) d = "⚠ The files aren't here — is the USB drive plugged in?\n" + d;
+        if (!Recorder.hasData(r) && !r.optString("dir").isEmpty() && (st.equals("done"))) d = "⚠\uFE0E The files aren't here — is the USB drive plugged in?\n" + d;
         iDesc.setText(d); iDesc.setVisibility(d.trim().isEmpty() ? GONE : VISIBLE);
         iHint.setText(Recorder.hasData(r) ? (r.optLong("pos") > r.optLong("from") + 30000 ? "OK · Resume  ·  hold OK · More" : "OK · Play  ·  hold OK · More") : "hold OK · More");
     }
@@ -2158,7 +2158,7 @@ final class NativeLive extends FrameLayout {
                     String epn = ((ex.length > 2 ? ex[2] : "") + " " + (ex.length > 1 ? ex[1] : "")).trim();
                     sub = r.optString("n") + "  ·  " + day(r.optLong("start")) + " " + fmt(r.optLong("start")) + (epn.isEmpty() ? "" : "  ·  " + epn)
                             + (r.optLong("bytes") > 0 ? "  ·  " + size(r.optLong("bytes")) : "")
-                            + (r.optBoolean("cloud") ? "  ·  ☁ On Google Drive" : !r.optString("cloudErr").isEmpty() ? "  ·  ☁ Upload waiting: " + r.optString("cloudErr") : r.optInt("cloudPieces") > 0 ? "  ·  ☁ Uploading" : "");
+                            + (r.optBoolean("cloud") ? "  ·  ☁\uFE0E On Google Drive" : !r.optString("cloudErr").isEmpty() ? "  ·  ☁\uFE0E Upload waiting: " + r.optString("cloudErr") : r.optInt("cloudPieces") > 0 ? "  ·  ☁\uFE0E Uploading" : "");
                     if (Recorder.hasData(r) && r.optLong("pos") > r.optLong("from") + 30000 && r.optLong("to") > r.optLong("from")) {
                         // how far you've watched
                         float pr = Math.min(1, (r.optLong("pos") - r.optLong("from")) / (float) (r.optLong("to") - r.optLong("from")));
@@ -3498,7 +3498,7 @@ final class NativeLive extends FrameLayout {
             c.save(); c.clipRect(x0, y, x1, y + cellH);
             float ty = y + .75f * R + tTitle.getTextSize();
             float bx = tx;
-            if (bell) { tTitle.setColor(0xFFFFD60A); c.drawText("🔔", bx, ty, tTitle); bx += tTitle.measureText("🔔 "); tTitle.setColor(Color.WHITE); }
+            if (bell) { float bs = tTitle.getTextSize(); HomeIcons.at(c, HomeIcons.BELL, bx + bs * .5f, ty - bs * .36f, bs * 1.1f, 0xFFFFD60A); bx += bs * 1.45f; }
             if (recMark) { recDot.setColor(0xFFFF453A); float rr = .42f * R; c.drawCircle(bx + rr, ty - tTitle.getTextSize() * .36f, rr, recDot); bx += 2 * rr + .55f * R; }
             if (wRem > 4) {
                 c.drawText(fit(title, tTitle, Math.max(1, x1 - bx - 1f * R)), bx, ty, tTitle);

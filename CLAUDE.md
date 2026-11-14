@@ -64,6 +64,10 @@ Quick compile check without building:
   no apps, app bar or All apps, and upright the tabs are always a full-width bar along the bottom (`h.BOT` rem to keep
   clear above it, `h.TOP` rem for the camera cutout). Movies and TV Shows slide freely under a finger there (`NativeHome.Free`: `touchDown`, `drag`, `dragEnd`, implemented by `NativeVod` and `TitleView`; screens without it still get the remote's steps from `NativeHome.touch`), and upright the screen is 46 rem wide. A phone is browsed upright only (Chad chose it); a movie, episode or channel full screen turns it sideways (`h.videoTurn`), and Home is not made again for that turn. The phone's Home is a `NativeVod` page too (`vodH`, `home` flag: featured title with Watch now / More details, Continue watching, rows of movies and shows), not the photo Home. A phone never hands a title to Nuvio or Stremio (Chad: it should work like the TV, with his debrid addon): it keeps its own addons, added from Settings › Addons › Add addons, which opens the addons page in the phone's browser from its own LinkServer (`/addons?here=1`). Being redone for phones area by area (1.0.406: step 4 of 7, title pages slide freely but their canvas text is still TV-sized; next: Live TV, Sports/Search/Settings, the player); the
   TV's screens must not change with it.
+- While something loads, show its shape, not "Loading…": `Skel` (a row of placeholder cards as a view, or
+  `Skel.block()` with `Skel.tone()` on a canvas, asking for the next frame while it loads). No emoji on screen: they
+  come in the TV's own cartoon style. Draw a `HomeIcons` icon instead (`HomeIcons.at()` on a canvas,
+  `HomeIcons.before()` in a TextView); ⚠ and ☁ are written with `\uFE0E` after them so they stay plain text signs.
 - Diagnostics: `Diag.ev("...")`. Lines are scrubbed of keys and logins, but don't log full stream or addon links anyway.
 
 ## Working with Chad

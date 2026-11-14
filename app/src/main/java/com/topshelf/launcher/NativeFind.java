@@ -242,7 +242,12 @@ final class NativeFind extends FrameLayout {
                 TextView n = h.text(h.fReg, Ui.TEXT_M, Ui.WHITE_60);
                 n.setText(so.optString("note"));
                 n.setPadding(h.px(PADX), h.px(.8f), h.px(PADX), 0);
-                if (!so.optString("note").isEmpty()) v.addView(n);
+                if ("Searching…".equals(so.optString("note"))) {
+                    // (results are on their way: the shapes of a row of them)
+                    Skel sk = new Skel(c, 6, h.px(10.4f), h.px(15.6f), h.px(GAP), h.px(1.1f), h.px(1), false);
+                    LinearLayout.LayoutParams skl = new LinearLayout.LayoutParams(sk.wide(), sk.tall()); skl.leftMargin = h.px(PADX); skl.topMargin = h.px(1f);
+                    v.addView(sk, skl);
+                } else if (!so.optString("note").isEmpty()) v.addView(n);
             } else {
                 s.strip = new FrameLayout(c);
                 s.strip.setClipChildren(false);
@@ -379,7 +384,7 @@ final class NativeFind extends FrameLayout {
         v.addView(lg, new LinearLayout.LayoutParams(h.px(4.6f), h.px(3.2f)));
         LinearLayout tx = new LinearLayout(c); tx.setOrientation(LinearLayout.VERTICAL);
         TextView b = h.text(h.fSemi, Ui.TEXT_M, Color.WHITE);
-        b.setText((it.optBoolean("bell") ? "🔔 " : "") + it.optString("label")); b.setSingleLine(true); b.setEllipsize(TextUtils.TruncateAt.END);
+        b.setText(it.optBoolean("bell") ? HomeIcons.before(HomeIcons.BELL, 0xFFFFD60A, b.getTextSize() * 1.05f, it.optString("label")) : it.optString("label")); b.setSingleLine(true); b.setEllipsize(TextUtils.TruncateAt.END);
         tx.addView(b);
         TextView sb = h.text(h.fReg, Ui.TEXT_XS, it.optBoolean("live") ? 0xFFFF6B60 : Ui.WHITE_60);
         sb.setText(it.optString("sub")); sb.setSingleLine(true); sb.setEllipsize(TextUtils.TruncateAt.END);

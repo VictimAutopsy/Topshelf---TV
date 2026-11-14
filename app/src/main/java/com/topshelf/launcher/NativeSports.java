@@ -642,6 +642,12 @@ final class NativeSports extends FrameLayout {
                 row.addView(t, h.at(PAD, .4f, LayoutParams.WRAP_CONTENT, LayoutParams.WRAP_CONTENT));
             }
             if (rows.get(i).length() == 0) {
+                if ("Loading…".equals(notes.get(i))) {
+                    // (the games are on their way: the shapes of their cards)
+                    Skel sk = new Skel(getContext(), 5, CW * R, CH * R, GAP * R, 1.6f * R, R, false);
+                    row.addView(sk, h.at(PAD, 3.4f, sk.wide(), sk.tall()));
+                    continue;
+                }
                 TextView n = h.text(h.fMed, Ui.TEXT_S, Ui.WHITE_60); n.setText(notes.get(i));
                 row.addView(n, h.at(PAD, 3.2f, LayoutParams.WRAP_CONTENT, LayoutParams.WRAP_CONTENT));
                 continue;
@@ -1132,7 +1138,7 @@ final class NativeSports extends FrameLayout {
         text(c, ellip(lg, cond, 1.1f, w - 2 * px - stw - 2 * R), cond, 1.1f, DIMTXT, px, y, Paint.Align.LEFT, .06f);
         text(c, st, cond, 1.2f, live ? LIVE_C : post ? DIMTXT : GOLD, w - px, y, Paint.Align.RIGHT, .04f);
         if (live) { p.setColor(LIVE_C); c.drawCircle(w - px - stw - .7f * R, y - .42f * R, .3f * R, p); }
-        else if (it.optBoolean("bell")) text(c, "🔔", h.fReg, .95f, GOLD, w - px - stw - .5f * R, y, Paint.Align.RIGHT, 0);
+        else if (it.optBoolean("bell")) HomeIcons.at(c, HomeIcons.BELL, w - px - stw - 1.1f * R, y - .34f * R, 1.15f * R, GOLD);
         // the two teams: logo, name, then the score (or the record before the game)
         int poss = it.optInt("poss", -1);
         for (int i = 0; i < 2; i++) {

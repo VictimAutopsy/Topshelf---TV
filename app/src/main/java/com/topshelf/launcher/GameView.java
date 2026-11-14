@@ -263,6 +263,7 @@ final class GameView extends FrameLayout {
 
     private final class Page extends View {
         private final Paint p = new Paint(Paint.ANTI_ALIAS_FLAG | Paint.FILTER_BITMAP_FLAG);
+        private final Paint skP = new Paint(Paint.ANTI_ALIAS_FLAG); private final android.graphics.RectF skR = new android.graphics.RectF();
         private final TextPaint tp = new TextPaint(Paint.ANTI_ALIAS_FLAG);
         Page(android.content.Context c) { super(c); }
 
@@ -281,7 +282,14 @@ final class GameView extends FrameLayout {
             float y = header(c, w);
             y = buttons(c, px, y, cw);
             if (sum == null) {
-                text(c, err.isEmpty() ? "Loading the game…" : "Couldn't load the game (" + err + ")", h.fMed, 1.5f, DIM, px, y + 4 * R, Paint.Align.LEFT, 0);
+                if (!err.isEmpty()) text(c, "Couldn't load the game right now", h.fMed, 1.5f, DIM, px, y + 4 * R, Paint.Align.LEFT, 0);
+                else {
+                    // the game is on its way: the shapes of its boxes
+                    skP.setColor(Skel.tone());
+                    float bw = (cw - 2 * R) / 2;
+                    for (int i = 0; i < 4; i++) Skel.block(c, skP, skR, px + (i % 2) * (bw + 2 * R), y + 2 * R + (i / 2) * 17 * R, bw, 15 * R, 1.2f * R);
+                    postInvalidateOnAnimation();
+                }
                 c.restore(); maxScroll = 0; return;
             }
             y += 2.4f * R;
@@ -323,7 +331,12 @@ final class GameView extends FrameLayout {
         /** the scoreboard across the top, split in the teams' colours; returns where the page goes on */
         private float header(Canvas c, int w) {
             float hh = 17 * R;
-            if (teams.size() < 2) { text(c, "Loading…", h.fMed, 1.5f, DIM, 4 * R, 8 * R, Paint.Align.LEFT, 0); return hh; }
+            if (teams.size() < 2) {
+                // (the two teams and the score, as shapes)
+                skP.setColor(Skel.tone());
+                Skel.block(c, skP, skR, 4 * R, 4 * R, 26 * R, 3 * R, .6f * R); Skel.block(c, skP, skR, 4 * R, 9 * R, 40 * R, 4.4f * R, .6f * R);
+                return hh;
+            }
             int c0 = teamCol(0), c1 = teamCol(1);
             p.setColor(c0); c.drawRect(0, 0, w, hh, p);
             Path sp = new Path(); sp.moveTo(w * .54f, 0); sp.lineTo(w, 0); sp.lineTo(w, hh); sp.lineTo(w * .46f, hh); sp.close();
