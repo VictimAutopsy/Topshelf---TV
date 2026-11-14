@@ -1140,7 +1140,9 @@ public class MainActivity extends Activity {
             if (d instanceof android.graphics.drawable.BitmapDrawable) { android.graphics.Bitmap bm = ((android.graphics.drawable.BitmapDrawable) d).getBitmap(); c.setImageDrawable(null); if (bm != null) bm.recycle(); }
         } }).start();
     }
-    private long startMs = -1;
+    /* once per process, not per screen: a screen made again later would otherwise count a second "fresh start"
+       timed from the process start (minutes) */
+    private static long startMs = -1;
     /* Each start from nothing, kept (the last 12) so a report shows how often it happens and why: the events
        themselves only cover the time since the last start. */
     private void noteStart(String lastStop) {
