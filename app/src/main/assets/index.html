@@ -1170,6 +1170,8 @@ function buildAllSettings() {
           [['Go back', () => { closeSettings(); toast('Getting the previous version…'); B.updInstall(UPD.latest.fallback.apk || 'TopShelf-fallback.apk'); }], ['Cancel', null]]); } },
     { label: 'Updates access token', value: () => typeof updInfo === 'function' && B.updInfo && updInfo().token ? 'Set ' + (updInfo().tokenHint || '') : 'Not set',
       edit: { wide: true, type: 'text', ph: 'GitHub fine-grained token (github_pat_…)', get: () => '', set: v => updSetToken(v) } },
+    { label: 'Remove updates access token', value: () => typeof updInfo === 'function' && B.updInfo && updInfo().token ? 'Set ' + (updInfo().tokenHint || '') : 'No token saved',
+      ok: () => updRemoveToken() },
     { label: 'Live TV video', value: () => typeof NV === 'undefined' || !IS_TV ? 'Web page' : S.liveEngine === 'web' ? 'Web page (older)' : NV.ok ? "TV's player" : "TV's player (unavailable)",
       cycle: () => { if (!IS_TV) return; S.liveEngine = S.liveEngine === 'web' ? 'tv' : 'web'; save(); try { B.nvSetOff(false); NV.ok = S.liveEngine !== 'web' && B.nvOk(); NV.fails = 0; NV.bad.clear(); } catch (e) {} if (LV.playing) { const ch = LV.playing, full = LV.full; lvStop(); lvPlay(ch, full); } } },
     { label: 'Channel preview', value: () => S.livePreview === false ? 'Off' : 'On',
@@ -1362,7 +1364,7 @@ const SET_SECTIONS = [
     ['', ['Home button', 'Keep TopShelf ready', 'Phone & TV link', 'Ring doorbell']],
     ['The TV, from your phone', ['Report a glitch on the TV', 'TV diagnostic report']] ] },
   { name: 'System', about: 'Updates, backup and help', groups: [
-    ['Updates', ['TopShelf updates', 'Go back to the previous version', 'Updates access token']],
+    ['Updates', ['TopShelf updates', 'Go back to the previous version', 'Updates access token', 'Remove updates access token']],
     ['Your settings', ['Backup & restore']],
     ['Help', ['Diagnostic report', 'Run a self-check', 'Report a glitch', 'Speed test']],
     ['Assistant', ['Anthropic API key', 'Claude model', 'Voice requests', 'Read answers aloud', 'Voice', 'Speaking speed', 'Ask from the remote']],

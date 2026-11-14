@@ -66,13 +66,19 @@ function updSetupSheet() {
 /* save the token here and, from the phone, on the TV too */
 async function updSetToken(v) {
   const t = String(v || '').trim();
+  // (an empty box never removes the token: that has its own setting, so backing out the wrong way can't break updates)
+  if (!t) return toast(updInfo().token ? 'Nothing typed, so your token is unchanged' : 'No token typed');
   B.updSetToken(t, null);
-  if (!t) return toast('Updates access token removed');
   if (!IS_TV && typeof lkOn === 'function' && lkOn()) {
     const r = await lkSend({ type: 'ghtoken', token: t });
     toast(r ? `Token saved here and on ${lkTvName()}` : 'Token saved on this phone (the TV didn\'t answer)');
   } else toast('Token saved');
   setTimeout(() => updCheck(true), 600);
+}
+function updRemoveToken() {
+  if (!updInfo().token) return toast('There\'s no token saved');
+  sheetOpen('Remove the updates access token?', `<p class="shsm">${IS_TV ? 'This TV' : 'This phone'} won't be able to fetch updates or send reports until a token is pasted in again.${IS_TV ? '' : ' The token on your TV stays as it is.'}</p>`,
+    [['Remove', () => { B.updSetToken('', null); toast('Updates access token removed'); if (typeof refreshSettings === 'function') refreshSettings(); }], ['Cancel', null]]);
 }
 function updLinkCmd(c) {
   if (!c.token) return '';

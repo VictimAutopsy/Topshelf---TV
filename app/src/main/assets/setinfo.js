@@ -112,7 +112,8 @@ const SET_INFO = {
   // ================================================================ System
   'TopShelf updates': { about: 'Checks for a newer TopShelf and installs it.', how: 'OK to check or install' },
   'Go back to the previous version': { about: 'Puts back the version before this one, for when this one is misbehaving.', how: 'OK to go back' },
-  'Updates access token': { about: 'The key that lets this TV fetch updates and send its reports.' },
+  'Updates access token': { about: 'The key that lets this TV fetch updates and send its reports. The box opens empty so the key isn\'t shown; leaving it empty changes nothing.' },
+  'Remove updates access token': { about: 'Takes the saved key off this device. Updates and reports stop until a key is pasted in again.', how: 'OK to remove' },
   'Backup & restore': { about: 'Saves all your settings to a file, or brings them back from one.', how: 'OK to open' },
   'Diagnostic report': { about: 'Runs a test of this TV and sends the results, so a problem can be tracked down.', how: 'OK to run it' },
   'Run a self-check': { about: 'TopShelf opens each of its own screens and checks them. It takes about a minute.', how: 'OK to start' },
