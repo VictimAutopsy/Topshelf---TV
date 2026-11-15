@@ -78,6 +78,8 @@ Quick compile check without building:
   "OK · Watch". Chad uses the On Air look (he calls it the news theme) and turned down bigger cards and a glass pill as
   blocking too much and not fitting it. Where it shows is his setting, Settings › Sports › Alert position (`S.alertPlace`):
   top right (default) or bottom middle. Mock up anything on screen in the look he uses.
+- Holding Back on Live TV's guide (0.6 s) goes full screen on the channel in the preview, or the highlighted one (Chad asked,
+  1.0.444): there Back acts on release (`NativeHome.backHold`, `NativeLive.holdBack`); a short press is Back as before.
 - Diagnostics: `Diag.ev("...")`. Lines are scrubbed of keys and logins, but don't log full stream or addon links anyway.
 
 ## Working with Chad

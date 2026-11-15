@@ -1426,6 +1426,18 @@ final class NativeLive extends FrameLayout implements NativeHome.Free {
         channelMenu();
     }
 
+    /** whether holding Back means full screen here: the guide (or the groups) is up, nothing else on top of it */
+    boolean holdsBack() { return shown && !full && !zap && !moving && !recCat() && (playing != null || !list.isEmpty()); }
+    /** Back held on the guide: full screen on the channel in the preview, or the highlighted one when none is playing */
+    void holdBack() {
+        if (!holdsBack()) return;
+        Ch ch = playing != null ? playing : row < list.size() ? list.get(row) : null;
+        if (ch == null) return;
+        Diag.ev("live: Back held, full screen");
+        if (zone.equals("cats")) { catSettle(); zone = "guide"; drawCats(); }
+        play(ch, true);
+    }
+
     boolean back() {
         if (full && statsView.shown) { statsView.close(); return true; }
         if (zap) { zapClose(); return true; }

@@ -1504,6 +1504,9 @@ final class NativeHome extends FrameLayout {
 
     private boolean okDown, okLong;
     private final Runnable okHold = new Runnable() { @Override public void run() { okLong = true; longPress(); } };
+    /* Back on Live TV's guide waits for its release: a press is Back as always, holding it goes full screen */
+    private boolean backDown, backLong;
+    private final Runnable backHold = new Runnable() { @Override public void run() { backLong = true; if (isLive()) live.holdBack(); } };
 
     boolean key(KeyEvent e) {
         if (!built) return false;
@@ -1548,6 +1551,19 @@ final class NativeHome extends FrameLayout {
                 boolean wasLong = okLong;
                 okDown = false; okLong = false;
                 if (!wasLong) ok();
+            }
+            return true;
+        }
+        if (code == KeyEvent.KEYCODE_BACK && (backDown || (down && isLive() && mode.equals("grid") && live.holdsBack()))) {
+            if (down) {
+                if (e.getRepeatCount() > 0 || backDown) return true;
+                backDown = true; backLong = false;
+                main.postDelayed(backHold, 600);
+            } else {
+                main.removeCallbacks(backHold);
+                boolean wasLong = backLong;
+                backDown = false; backLong = false;
+                if (!wasLong && !e.isCanceled()) back();
             }
             return true;
         }
