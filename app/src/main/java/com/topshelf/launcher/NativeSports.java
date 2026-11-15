@@ -120,48 +120,34 @@ final class NativeSports extends FrameLayout implements NativeHome.Free {
         @Override protected int sizeOf(String k, Bitmap b) { return b.getByteCount(); }
     };
 
-    /* A phone held upright (1.0.452): everything sits below the camera cutout; the score strip and the tabs stay at the
-       top (the tabs slide sideways when there are more than fit) and the rest — the scoreboard, your teams, the leagues,
-       the games — is one page that slides up and down under a finger, with the leagues and the games sliding sideways
-       in their rows. Nothing there takes the remote's steps except Standings, and the remote's ring isn't shown. */
+    /* A phone held upright has a page of its own (PhoneView, 1.0.454; Chad picked it from a sketch — the TV's layout,
+       stacked, didn't fit: the scoreboard's words ran into each other, your teams took a screen and the games sat under
+       the tab bar). The tabs stay on top (they slide sideways); under them one page slides up and down: the game that
+       matters as a compact scoreboard with its buttons, your teams as a row of small cards, the leagues as chips, and
+       the games as a list, one a row. No score strip, no remote's ring. The TV's pieces are still made, under it, but
+       not painted. Standings is as on the TV. */
     private final boolean thumb;
-    private float pageY, tabsX;
+    private PhoneView phone;
+    private float tabsX;
+    private boolean lastOk;
     private android.widget.OverScroller fling;
-    private int dragWhat = -1, flingWhat;          // 1 the tabs, 2 the page, 3 the leagues, 4 the games, 5 nothing; 0 not ours (Standings: the steps)
-    private View[] paged() { return new View[] { hero[0], hero[1], side, rail, rowsBox, setupTitle, setupSub }; }
-    private float pageMax() { return standings.shownNow() ? 0 : Math.max(0, h.px(ROWS_Y + ROW_H + h.BOT + 1f) + getPaddingTop() - H); }
-    private void setPage(float y) {
-        pageY = Math.max(0, Math.min(pageMax(), y));
-        for (View v : paged()) { v.animate().cancel(); v.setTranslationY(-pageY); }
-        if (heroTop >= 0) { hero[heroTop].setAlpha(1f); hero[1 - heroTop].setAlpha(0f); }          // (a scoreboard caught mid-fade)
-    }
-    private float tabsMax() { return Math.max(0, tabRow.getWidth() + (liveChip.getVisibility() == VISIBLE ? liveChip.getWidth() + h.px(1.2f) : 0) + 2 * h.px(PAD) - W); }
-    private float gamesMax() { return rows.isEmpty() ? 0 : Math.max(0, PAD * 2 + rows.get(0).length() * (CW + GAP) - GAP - SW); }
-    private void slideGames(float rem) {
-        FrameLayout strip = stripOf.get(0);
-        if (strip == null) return;
-        float sc = Math.max(0, Math.min(gamesMax(), rem));
-        scrolls.put(0, sc);
-        strip.animate().cancel(); strip.setTranslationX(-sc * R);
-        syncCards();
-    }
+    private int dragWhat = -1, flingWhat;          // 1 the tabs, 2 the page, 3 your teams, 4 the leagues, 5 nothing; 0 not ours (Standings: the steps)
+    private float tabsMax() { return Math.max(0, tabRow.getWidth() + (liveChip.getVisibility() == VISIBLE ? liveChip.getWidth() + h.px(1.2f) : 0) + 2 * h.px(1.2f) - W); }
     @Override public void touchDown() { if (fling != null) fling.forceFinished(true); dragWhat = -1; }
     @Override public boolean drag(char axis, float x0, float y0, float d) {
         if (!thumb || !shown) return false;
         if (dragWhat < 0) {
             if (d == 0) return true;
             dragWhat = 5;
-            if (axis == 'h' && h.hit(chrome, x0, y0, 0) && h.local(chrome, x0, y0)[1] > h.px(RIB_H)) dragWhat = 1;
+            if (axis == 'h' && h.hit(chrome, x0, y0, 0)) dragWhat = 1;
             else if (standings.shownNow()) dragWhat = 0;
-            else if (axis == 'v') dragWhat = 2;
-            else if (rail.getVisibility() == VISIBLE && h.hit(rail, x0, y0, 0)) dragWhat = 3;
-            else if (h.hit(rowsBox, x0, y0, 0) && stripOf.get(0) != null) dragWhat = 4;
+            else if (h.hit(phone, x0, y0, 0)) dragWhat = axis == 'v' ? 2 : phone.band(h.local(phone, x0, y0)[1]);
         }
         if (dragWhat == 0) return false;
         if (dragWhat == 1) { tabsX = Math.max(0, Math.min(tabsMax(), tabsX - d)); tline.setTranslationX(-tabsX); }
-        else if (dragWhat == 2) setPage(pageY - d);
-        else if (dragWhat == 3) rail.slideTo(rail.slideX - d);
-        else if (dragWhat == 4) slideGames(scroll(0) - d / R);
+        else if (dragWhat == 2) { phone.sy -= d; phone.invalidate(); }
+        else if (dragWhat == 3) { phone.teamsX -= d; phone.invalidate(); }
+        else if (dragWhat == 4) { phone.chipsX -= d; phone.invalidate(); }
         return true;
     }
     @Override public void dragEnd(char axis, float v) {
@@ -171,19 +157,436 @@ final class NativeSports extends FrameLayout implements NativeHome.Free {
         flingWhat = what;
         int vv = -Math.round(v);
         if (what == 1) fling.fling(Math.round(tabsX), 0, vv, 0, 0, Math.round(tabsMax()), 0, 0);
-        else if (what == 2) fling.fling(0, Math.round(pageY), 0, vv, 0, 0, 0, Math.round(pageMax()));
-        else if (what == 3) fling.fling(Math.round(rail.slideX), 0, vv, 0, 0, Math.round(rail.maxX()), 0, 0);
-        else fling.fling(Math.round(scroll(0) * R), 0, vv, 0, 0, Math.round(gamesMax() * R), 0, 0);
+        else if (what == 2) fling.fling(0, Math.round(phone.sy), 0, vv, 0, 0, 0, Math.round(phone.maxY()));
+        else if (what == 3) fling.fling(Math.round(phone.teamsX), 0, vv, 0, 0, Math.round(phone.teamsMax), 0, 0);
+        else fling.fling(Math.round(phone.chipsX), 0, vv, 0, 0, Math.round(phone.chipsMax), 0, 0);
         removeCallbacks(glide); postOnAnimation(glide);
     }
     private final Runnable glide = new Runnable() { @Override public void run() {
         if (fling == null || !shown || !fling.computeScrollOffset()) return;
         if (flingWhat == 1) { tabsX = fling.getCurrX(); tline.setTranslationX(-tabsX); }
-        else if (flingWhat == 2) setPage(fling.getCurrY());
-        else if (flingWhat == 3) rail.slideTo(fling.getCurrX());
-        else slideGames(fling.getCurrX() / R);
+        else if (flingWhat == 2) phone.sy = fling.getCurrY();
+        else if (flingWhat == 3) phone.teamsX = fling.getCurrX();
+        else phone.chipsX = fling.getCurrX();
+        phone.invalidate();
         if (!fling.isFinished()) postOnAnimation(this);
     } };
+
+    /* the page's pictures (the scoreboard, a team's card, a game's row), painted off the main thread like the TV's
+       cards and kept with them: first with the logos already here, then again once any missing logo has come */
+    private interface Pic { Bitmap make(); }
+    private final java.util.Set<String> picAsked = new java.util.HashSet<>();
+    private Bitmap pic(final String key, final Pic m) {
+        Bitmap b = cards.get(key);
+        if (b != null) return b;
+        if (!picAsked.add(key)) return null;
+        try { painter.execute(new Runnable() { @Override public void run() {
+            missing = false; offlineT.set(true);
+            Bitmap q = null;
+            try { q = m.make(); } catch (Throwable ignored) { } finally { offlineT.set(false); }
+            final boolean again = missing; final Bitmap quick = q;
+            main().post(new Runnable() { @Override public void run() {
+                if (quick != null) cards.put(key, quick);
+                if (!again && quick != null) picAsked.remove(key);          // (nothing could be painted: not asked for over and over)
+                if (phone != null) phone.invalidate();
+            } });
+            if (!again) return;
+            Bitmap o = null;
+            try { o = m.make(); } catch (Throwable ignored) { }
+            final Bitmap out = o;
+            main().post(new Runnable() { @Override public void run() { if (out != null) cards.put(key, out); picAsked.remove(key); if (phone != null) phone.invalidate(); } });
+        } }); } catch (Throwable ignored) { }
+        return null;
+    }
+    private static boolean isGame(JSONObject it) { JSONArray ts = it == null ? null : it.optJSONArray("teams"); return ts != null && ts.length() >= 2 && !it.optBoolean("fy") && !it.optBoolean("edit"); }
+    /** what's at a game's foot: {the words, "tv" when they're where to watch it} */
+    private String[] footOf(JSONObject it, boolean live, boolean post) {
+        String foot; boolean tvLine = false;
+        if (live && !it.optString("down").isEmpty()) foot = it.optString("down") + (it.optString("spot").isEmpty() ? "" : " · " + it.optString("spot"));
+        else if (live && it.has("outs")) foot = it.optInt("balls") + "–" + it.optInt("strikes") + " · " + it.optInt("outs") + (it.optInt("outs") == 1 ? " out" : " outs");
+        else { String tv = it.optString("tv"); foot = !it.optString("extra").isEmpty() && tv.isEmpty() ? it.optString("extra") : tv; tvLine = !tv.isEmpty(); }
+        if (post && foot.equals(it.optString("tv"))) { foot = ""; tvLine = false; }
+        if (post && foot.isEmpty()) foot = it.optString("day");
+        return new String[] { foot, tvLine ? "tv" : "" };
+    }
+    /** a game as one row of the list: the two teams with their scores (or records), and at the right the clock and where to watch */
+    private Bitmap paintRowP(JSONObject it, int w, int hh) {
+        JSONArray ts = it.optJSONArray("teams");
+        Bitmap out = Bitmap.createBitmap(w, hh, Bitmap.Config.ARGB_8888);
+        Canvas c = new Canvas(out);
+        Paint p = new Paint(Paint.ANTI_ALIAS_FLAG | Paint.FILTER_BITMAP_FLAG);
+        String state = it.optString("state");
+        boolean live = state.equals("in"), post = state.equals("post"), fight = it.optBoolean("card");
+        int[] cs = pairCols(ts, fight);
+        c.drawColor(GROUND);
+        if (live) { p.setColor(LIVE_C); c.drawRect(0, .6f * R, Math.max(3f, .36f * R), hh - .6f * R, p); }
+        p.setColor(EDGE); c.drawRect(0, hh - Math.max(1f, .06f * R), w, hh, p);
+        float px = 1.3f * R, colW = 11.8f * R, xS = w - colW - 1.4f * R;
+        int poss = it.optInt("poss", -1);
+        for (int i = 0; i < 2; i++) {
+            JSONObject t = ts.optJSONObject(i);
+            float cy = (2.4f + i * 3.05f) * R, d = 2.5f * R;
+            boolean dim = (post && !t.optBoolean("winner") && !fight) || (live && !lead(ts, i));
+            disc(c, p, t, cs[i], px + d / 2, cy, d);
+            float nx = px + d + .9f * R;
+            String sc = t.optString("score");
+            boolean showScore = !fight && (live || post) && !sc.isEmpty();
+            String right = showScore ? sc : fight && post && t.optBoolean("winner") ? "W" : t.optString("rec");
+            Typeface rf = showScore ? heavy : cond;
+            float rs = showScore ? 2.05f : 1.1f;
+            float rw = right.isEmpty() ? 0 : measure(right, rf, rs, 0) + 1f * R;
+            String nm = (t.optInt("rank") > 0 ? "#" + t.optInt("rank") + " " : "") + t.optString("name");
+            String shownN = ellip(nm, cond, 1.7f, xS - nx - rw - (t.optBoolean("fav") ? 1.5f * R : 0) - (poss == i ? 1.4f * R : 0));
+            text(c, shownN, cond, 1.7f, dim ? SUB : Color.WHITE, nx, cy + .6f * R, Paint.Align.LEFT, 0);
+            float ex = nx + measure(shownN, cond, 1.7f, 0) + .5f * R;
+            if (poss == i) { football(c, p, ex + .55f * R, cy, .55f * R); ex += 1.4f * R; }
+            if (t.optBoolean("fav")) text(c, "★", h.fSemi, 1.05f, GOLD, ex, cy + .45f * R, Paint.Align.LEFT, 0);
+            if (!right.isEmpty()) text(c, right, rf, rs, showScore ? (dim ? SUB : Color.WHITE) : right.equals("W") ? GOLD : DIMTXT, xS, cy + (showScore ? .72f : .42f) * R, Paint.Align.RIGHT, 0);
+        }
+        // at the right: the clock (or the start), then where to watch
+        String st = ellip(status(it).toUpperCase(java.util.Locale.US), cond, 1.2f, colW - 1.6f * R);
+        text(c, st, cond, 1.2f, live ? LIVE_C : post ? DIMTXT : GOLD, w - px, 2.85f * R, Paint.Align.RIGHT, .04f);
+        if (!live && it.optBoolean("bell")) HomeIcons.at(c, HomeIcons.BELL, w - px - measure(st, cond, 1.2f, .04f) - 1.1f * R, 2.85f * R - .4f * R, 1.1f * R, GOLD);
+        String[] ft = footOf(it, live, post);
+        if (!ft[0].isEmpty()) {
+            boolean tvLine = !ft[1].isEmpty(), on = tvLine && it.optBoolean("tvOn");
+            text(c, ellip(ft[0], on ? h.fSemi : h.fReg, 1.05f, colW), on ? h.fSemi : h.fReg, 1.05f, live && !tvLine ? (it.optBoolean("red") ? LIVE_C : SOFT) : on ? GREEN : DIMTXT, w - px, 4.75f * R, Paint.Align.RIGHT, 0);
+        }
+        Integer mine = playersIn.get(it.optString("k").split(":")[0]);
+        if (mine != null && mine > 0) text(c, "★ " + mine, h.fSemi, 1.05f, GOLD, w - px, 6.5f * R, Paint.Align.RIGHT, 0);
+        out.setHasAlpha(false);
+        return out;
+    }
+    /** where the scoreboard's buttons are (px, in the scoreboard's own box): {watch's left, watch's right (the same when there's none), the game page's left, its right, top, bottom} */
+    private float[] featBtns(JSONObject it, float w) {
+        float px = 1.6f * R, top = 17.4f * R, bh = 2.9f * R;
+        String tv = it.optString("tv");
+        boolean watch = it.optBoolean("tvOn") && !tv.isEmpty() && !"post".equals(it.optString("state"));
+        float pw = measure("GAME PAGE", h.fSemi, 1.1f, .05f) + 2.4f * R;
+        float ww = watch ? Math.min(measure(("Watch on " + tv).toUpperCase(java.util.Locale.US), h.fSemi, 1.1f, .05f) + 2.4f * R, w - 2 * px - pw - .8f * R) : 0;
+        float x1 = px + ww, x2 = x1 + (watch ? .8f * R : 0);
+        return new float[] { px, x1, x2, x2 + pw, top, top + bh };
+    }
+    /** the game that matters, compact: the clock and the league, the two teams with their scores, what's happening, and its buttons */
+    private Bitmap paintFeatP(JSONObject it, int w, int hh) {
+        JSONArray ts = it.optJSONArray("teams");
+        Bitmap out = Bitmap.createBitmap(w, hh, Bitmap.Config.ARGB_8888);
+        Canvas c = new Canvas(out);
+        Paint p = new Paint(Paint.ANTI_ALIAS_FLAG | Paint.FILTER_BITMAP_FLAG);
+        String state = it.optString("state"), sport = sportOf(it);
+        boolean live = state.equals("in"), post = state.equals("post"), fight = it.optBoolean("card");
+        int[] cs = pairCols(ts, fight);
+        float rad = SportsLook.card(1.4f * R), px = 1.6f * R;
+        c.drawColor(GROUND);
+        Path clip = new Path(); clip.addRoundRect(new RectF(0, 0, w, hh), rad, rad, Path.Direction.CW);
+        c.save(); c.clipPath(clip);
+        p.setColor(CARD); c.drawRect(0, 0, w, hh, p);
+        p.setColor(cs[0]); c.drawRect(0, 0, w / 2f, .5f * R, p);
+        p.setColor(cs[1]); c.drawRect(w / 2f, 0, w, .5f * R, p);
+        c.restore();
+        p.setStyle(Paint.Style.STROKE); p.setStrokeWidth(Math.max(1, (live ? .14f : .08f) * R)); p.setColor(live ? LIVE_C : EDGE);
+        c.drawRoundRect(new RectF(p.getStrokeWidth() / 2, p.getStrokeWidth() / 2, w - p.getStrokeWidth() / 2, hh - p.getStrokeWidth() / 2), rad, rad, p);
+        p.setStyle(Paint.Style.FILL);
+        // the clock, and the league
+        String st = (live ? "LIVE · " : "") + status(it).toUpperCase(java.util.Locale.US);
+        text(c, st, heavy, 1.3f, live ? LIVE_C : post ? DIMTXT : GOLD, px, 3.1f * R, Paint.Align.LEFT, .04f);
+        StringBuilder top = new StringBuilder(it.optString("lgName"));
+        if (it.optInt("week") > 0) top.append(" · Week ").append(it.optInt("week"));
+        text(c, ellip(top.toString().toUpperCase(java.util.Locale.US), cond, 1.1f, w - 2 * px - measure(st, heavy, 1.3f, .04f) - 1.5f * R), cond, 1.1f, DIMTXT, w - px, 3.05f * R, Paint.Align.RIGHT, .06f);
+        int poss = it.optInt("poss", -1);
+        for (int i = 0; i < 2; i++) {
+            JSONObject t = ts.optJSONObject(i);
+            float cy = (6.7f + i * 4.5f) * R, d = 3.7f * R;
+            boolean dim = (post && !t.optBoolean("winner") && !fight) || (live && !lead(ts, i));
+            disc(c, p, t, cs[i], px + d / 2, cy, d);
+            float nx = px + d + 1.1f * R;
+            String sc = t.optString("score");
+            boolean showScore = !fight && (live || post) && !sc.isEmpty();
+            float scW = showScore ? measure(sc, heavy, 3.3f, -.02f) + 1.2f * R : 0;
+            if (showScore) text(c, sc, heavy, 3.3f, dim ? SUB : Color.WHITE, w - px, cy + 1.15f * R, Paint.Align.RIGHT, -.02f);
+            String rec = t.optString("rec");
+            float recW = rec.isEmpty() ? 0 : measure(rec, h.fReg, 1.1f, 0) + .8f * R;
+            String nm = (t.optInt("rank") > 0 ? "#" + t.optInt("rank") + " " : "") + t.optString(fight ? "full" : "name");
+            String shownN = ellip(nm, cond, 2.25f, w - px - nx - scW - recW - (t.optBoolean("fav") ? 1.6f * R : 0) - (poss == i ? 1.6f * R : 0));
+            text(c, shownN, cond, 2.25f, dim ? SUB : Color.WHITE, nx, cy + .8f * R, Paint.Align.LEFT, 0);
+            float ex = nx + measure(shownN, cond, 2.25f, 0) + .7f * R;
+            if (!rec.isEmpty()) { text(c, rec, h.fReg, 1.1f, TER, ex, cy + .75f * R, Paint.Align.LEFT, 0); ex += recW; }
+            if (poss == i) { football(c, p, ex + .6f * R, cy + .1f * R, .6f * R); ex += 1.6f * R; }
+            if (t.optBoolean("fav")) text(c, "★", h.fSemi, 1.15f, GOLD, ex, cy + .7f * R, Paint.Align.LEFT, 0);
+        }
+        // what's happening, in a line (and the last play under it)
+        String d1 = "", d2 = ""; int d1c = SOFT;
+        Integer mine = playersIn.get(it.optString("k").split(":")[0]);
+        if (live) {
+            if (!it.optString("down").isEmpty()) { d1 = (it.optBoolean("red") ? "Red zone · " : "") + it.optString("down") + (it.optString("spot").isEmpty() ? "" : " · " + it.optString("spot")); if (it.optBoolean("red")) d1c = LIVE_C; }
+            else if (it.has("outs")) d1 = it.optInt("balls") + "–" + it.optInt("strikes") + " · " + it.optInt("outs") + (it.optInt("outs") == 1 ? " out" : " outs") + (it.optString("batter").isEmpty() ? "" : " · At bat " + it.optString("batter"));
+            else if (fight) d1 = it.optString("extra");
+            if (!it.optString("last").isEmpty()) { if (d1.isEmpty()) d1 = it.optString("last"); else d2 = "Last play: " + it.optString("last"); }
+        } else if (post) {
+            JSONObject wt = ts.optJSONObject(0).optBoolean("winner") ? ts.optJSONObject(0) : ts.optJSONObject(1).optBoolean("winner") ? ts.optJSONObject(1) : null;
+            d1 = it.optString("headline").isEmpty() ? (wt == null ? "Final" : wt.optString("name") + " win") : it.optString("headline");
+        } else {
+            String word = sport.equals("baseball") ? "First pitch" : sport.equals("hockey") ? "Puck drop" : sport.equals("basketball") ? "Tip-off" : fight ? "Main card" : "Kickoff";
+            long left = it.optLong("at") - System.currentTimeMillis();
+            if (left > 0 && left < 24 * 3600000L) d1 = word + (left < 3600000L ? " in " + Math.max(1, left / 60000) + " min" : " in " + left / 3600000L + " h " + (left % 3600000L) / 60000 + " min");
+            if (!it.optString("line").isEmpty()) d1 += (d1.isEmpty() ? "" : " · ") + it.optString("line");
+            d2 = it.optString("venue");
+        }
+        if (d2.isEmpty() && mine != null && mine > 0) d2 = "★ " + mine + " of your fantasy players in this game";
+        if (!d1.isEmpty()) text(c, ellip(d1, h.fMed, 1.15f, w - 2 * px), h.fMed, 1.15f, d1c, px, 14.4f * R, Paint.Align.LEFT, 0);
+        if (!d2.isEmpty()) text(c, ellip(d2, h.fReg, 1.1f, w - 2 * px), h.fReg, 1.1f, d2.startsWith("★") ? GOLD : TER, px, (d1.isEmpty() ? 14.4f : 16.1f) * R, Paint.Align.LEFT, 0);
+        // the buttons: watch (when it's on one of your channels), the game's page
+        float[] b = featBtns(it, w);
+        float br = SportsLook.card(.7f * R);
+        if (b[1] > b[0]) {
+            p.setColor(GlassPanel.selFill()); c.drawRoundRect(new RectF(b[0], b[4], b[1], b[5]), br, br, p);
+            String ws = ellip(("Watch on " + it.optString("tv")).toUpperCase(java.util.Locale.US), h.fSemi, 1.1f, b[1] - b[0] - 1.6f * R);
+            text(c, ws, h.fSemi, 1.1f, GlassPanel.selText(), (b[0] + b[1]) / 2, (b[4] + b[5]) / 2 + .42f * R, Paint.Align.CENTER, .05f);
+        }
+        p.setColor(0xFF27303A); c.drawRoundRect(new RectF(b[2], b[4], b[3], b[5]), br, br, p);
+        text(c, "GAME PAGE", h.fSemi, 1.1f, Color.WHITE, (b[2] + b[3]) / 2, (b[4] + b[5]) / 2 + .42f * R, Paint.Align.CENTER, .05f);
+        if (b[1] <= b[0] && !post) {
+            String tv = it.optString("tv");
+            text(c, ellip(tv.isEmpty() ? "No TV listing yet" : "On " + tv, h.fMed, 1.1f, w - px - b[3] - 1.2f * R), h.fMed, 1.1f, SOFT, b[3] + 1.2f * R, (b[4] + b[5]) / 2 + .42f * R, Paint.Align.LEFT, 0);
+        }
+        out.setHasAlpha(false);
+        return out;
+    }
+    /** one of your teams (or your fantasy team, or "follow your teams") as a small card: {name, what's happening} */
+    private String[] teamWords(Side s) {
+        if (s.kind.equals("team")) {
+            JSONObject t = s.team, g = s.game;
+            JSONObject o = g.optJSONArray("teams").optJSONObject(1 - s.idx);
+            String vs = (s.idx == 1 ? "vs " : "at ") + abbr(o), state = g.optString("state"), my = t.optString("score"), their = o.optString("score");
+            String st = state.equals("in") ? "Live · " + my + "–" + their + " " + vs : state.equals("post") ? (t.optBoolean("winner") ? "W " : o.optBoolean("winner") ? "L " : "") + my + "–" + their + " " + vs : g.optString("when") + " " + vs;
+            return new String[] { (t.optInt("rank") > 0 ? "#" + t.optInt("rank") + " " : "") + t.optString("name"), st, state };
+        }
+        if (s.kind.equals("fy")) {
+            JSONObject t = s.team;
+            if (t == null) return new String[] { "My fantasy team", "Tap to pick your players", "" };
+            int left = t.optInt("left"), pl = t.optInt("playing");
+            return new String[] { t.optString("name").isEmpty() ? "My fantasy team" : t.optString("name"), t.optString("pts") + " pts" + (pl > 0 ? " · " + pl + " playing" : left > 0 ? " · " + left + " to play" : ""), pl > 0 ? "in" : "pre" };
+        }
+        return new String[] { "Follow your teams", "Tap to pick your teams", "" };
+    }
+    private Bitmap paintTeamP(Side s, int w, int hh) {
+        Bitmap out = Bitmap.createBitmap(w, hh, Bitmap.Config.ARGB_8888);
+        Canvas c = new Canvas(out);
+        Paint p = new Paint(Paint.ANTI_ALIAS_FLAG | Paint.FILTER_BITMAP_FLAG);
+        String[] tw = teamWords(s);
+        boolean live = tw[2].equals("in");
+        float rad = SportsLook.card(1.1f * R);
+        c.drawColor(GROUND);
+        p.setColor(CARD); c.drawRoundRect(new RectF(0, 0, w, hh), rad, rad, p);
+        p.setStyle(Paint.Style.STROKE); p.setStrokeWidth(Math.max(1, (live ? .14f : .08f) * R)); p.setColor(live ? LIVE_C : EDGE);
+        c.drawRoundRect(new RectF(p.getStrokeWidth() / 2, p.getStrokeWidth() / 2, w - p.getStrokeWidth() / 2, hh - p.getStrokeWidth() / 2), rad, rad, p);
+        p.setStyle(Paint.Style.FILL);
+        float d = 3.5f * R, dcx = 1f * R + d / 2, dcy = hh / 2f;
+        if (s.kind.equals("team")) disc(c, p, s.team, teamCol(s.team, 0xFF3A4A66), dcx, dcy, d);
+        else { p.setColor(s.kind.equals("fy") ? 0xFF5B4BD6 : 0xFF2E7D4F); c.drawCircle(dcx, dcy, d / 2, p); text(c, s.kind.equals("fy") ? "★" : "+", h.fSemi, d / R * .5f, Color.WHITE, dcx, dcy + d * .18f, Paint.Align.CENTER, 0); }
+        float nx = dcx + d / 2 + .9f * R, maxW = w - nx - .9f * R;
+        text(c, ellip(tw[0], cond, 1.65f, maxW), cond, 1.65f, Color.WHITE, nx, hh / 2f - .25f * R, Paint.Align.LEFT, 0);
+        text(c, ellip(tw[1], h.fSemi, 1.05f, maxW), h.fSemi, 1.05f, live ? LIVE_C : tw[2].equals("pre") ? GOLD : SUB, nx, hh / 2f + 1.55f * R, Paint.Align.LEFT, 0);
+        out.setHasAlpha(false);
+        return out;
+    }
+
+    /** the page itself: lays its parts out down one column, draws their pictures, and says what's under a finger */
+    private final class PhoneView extends View {
+        float sy, teamsX, chipsX, teamsMax, chipsMax, total;
+        private final RectF feat = new RectF(), teamsBand = new RectF(), chipsBand = new RectF(), rf = new RectF();
+        private final List<RectF> itemR = new ArrayList<>();
+        private float[] chipXs = new float[0];
+        private float titleY; private boolean setup;
+        private final TextPaint t2 = new TextPaint(Paint.ANTI_ALIAS_FLAG);
+        private final Paint p2 = new Paint(Paint.ANTI_ALIAS_FLAG | Paint.FILTER_BITMAP_FLAG);
+        private final float M = 1.2f * R, FEAT_H = 21.4f * R, TEAM_W = 19f * R, TEAM_H = 6.4f * R, ROWP = 7.6f * R, CHIP_H = 3.4f * R, CG = .8f * R;
+        private StaticLayout setupL;
+        PhoneView(android.content.Context c) { super(c); }
+        float maxY() { return Math.max(0, total - getHeight()); }
+        /** which sideways row a finger at y (this view's own pixels) is on: 3 your teams, 4 the leagues, 5 neither */
+        int band(float y) { float cy = y + sy; return teamsBand.contains(1, cy) ? 3 : chipsBand.contains(1, cy) ? 4 : 5; }
+        private String chipName(int i) { return rail.label(i); }
+        private String chipCount(int i) { int[] cn = rail.counts.get(i); return cn[1] > 0 ? cn[1] + " LIVE" : String.valueOf(cn[0]); }
+        private void lay() {
+            float vw = getWidth(), w = vw - 2 * M, y = 1f * R;
+            feat.setEmpty(); teamsBand.setEmpty(); chipsBand.setEmpty(); itemR.clear();
+            setup = data.optBoolean("setup") || allRows.isEmpty();
+            if (setup) { total = getHeight(); sy = 0; return; }
+            if (isGame(featured)) { feat.set(M, y, M + w, y + FEAT_H); y += FEAT_H + 1.2f * R; }
+            int ns = sideItems.size();
+            if (ns > 0) {
+                y += 2.5f * R;
+                teamsBand.set(0, y, vw, y + TEAM_H);
+                teamsMax = Math.max(0, 2 * M + ns * TEAM_W + (ns - 1) * CG - vw);
+                teamsX = Math.max(0, Math.min(teamsMax, teamsX));
+                y += TEAM_H + 1.6f * R;
+            }
+            int nc = rail.count();
+            if (nc > 0) {
+                if (chipXs.length != nc + 1) chipXs = new float[nc + 1];
+                float x = M;
+                for (int i = 0; i < nc; i++) {
+                    chipXs[i] = x;
+                    t2.setTypeface(h.fSemi); t2.setTextSize(1.2f * R); t2.setLetterSpacing(rail.sp());
+                    float nw = t2.measureText(chipName(i));
+                    t2.setTypeface(cond); t2.setTextSize(1.1f * R); t2.setLetterSpacing(.04f);
+                    x += .5f * R + 2.4f * R + .7f * R + nw + .7f * R + t2.measureText(chipCount(i)) + 1.1f * R + CG;
+                }
+                t2.setLetterSpacing(0);
+                chipXs[nc] = x;
+                chipsBand.set(0, y, vw, y + CHIP_H);
+                chipsMax = Math.max(0, x - CG + M - vw);
+                chipsX = Math.max(0, Math.min(chipsMax, chipsX));
+                y += CHIP_H + 1.2f * R;
+            }
+            titleY = y + 2.3f * R;
+            y += 3.6f * R;
+            JSONArray items = rows.isEmpty() ? null : rows.get(0);
+            float cellW = (w - CG) / 2, cellH = cellW * CH / CW;
+            int gc = 0;
+            if (items != null) for (int i = 0; i < items.length(); i++) {
+                if (isGame(items.optJSONObject(i))) {
+                    if (gc == 1) { y += cellH + CG; gc = 0; }
+                    itemR.add(new RectF(M, y, M + w, y + ROWP)); y += ROWP;
+                } else {
+                    float x = M + gc * (cellW + CG);
+                    itemR.add(new RectF(x, y, x + cellW, y + cellH));
+                    if (gc == 1) { y += cellH + CG; gc = 0; } else gc = 1;
+                }
+            }
+            if (gc == 1) y += cellH + CG;
+            if (items == null || items.length() == 0) y += 4 * ROWP;
+            total = y + 1.5f * R;
+            sy = Math.max(0, Math.min(maxY(), sy));
+        }
+        private void word(Canvas c, String s, Typeface tf, float size, int color, float x, float y, float spacing) {
+            t2.setTypeface(tf); t2.setTextSize(size * R); t2.setColor(color); t2.setLetterSpacing(spacing); t2.setTextAlign(Paint.Align.LEFT);
+            c.drawText(s, x, y, t2);
+            t2.setLetterSpacing(0);
+        }
+        private void put(Canvas c, Bitmap b, RectF r, float rad) {
+            if (b != null) c.drawBitmap(b, null, r, p2);
+            else { p2.setColor(Ui.WHITE_7); c.drawRoundRect(r, rad, rad, p2); }
+        }
+        @Override protected void onDraw(Canvas c) {
+            c.drawColor(GROUND);
+            if (getWidth() == 0) return;
+            lay();
+            final int vw = getWidth(), vh = getHeight();
+            if (setup) {
+                word(c, "FOLLOW YOUR TEAMS", heavy, 2.6f, Color.WHITE, M + .4f * R, 6f * R, 0);
+                if (setupL == null) {
+                    t2.setTypeface(h.fReg); t2.setTextSize(1.35f * R); t2.setColor(Ui.WHITE_75); t2.setLetterSpacing(0);
+                    setupL = new StaticLayout("Pick the sports and teams you follow. TopShelf shows their games, live scores, and which of your Live TV channels is showing each one.", new TextPaint(t2), Math.round(vw - 2 * M - .8f * R), Layout.Alignment.ALIGN_NORMAL, 1.3f, 0, false);
+                }
+                c.save(); c.translate(M + .4f * R, 7.6f * R); setupL.draw(c); c.restore();
+                word(c, "Tap to pick your sports and teams", h.fSemi, 1.3f, GOLD, M + .4f * R, 9.6f * R + setupL.getHeight(), 0);
+                return;
+            }
+            c.save(); c.translate(0, -sy);
+            final String look = GlassPanel.look;
+            // the scoreboard
+            if (!feat.isEmpty() && feat.bottom > sy) {
+                final JSONObject f = featured; final int w = Math.round(feat.width()), hh = Math.round(FEAT_H);
+                Integer mine = playersIn.get(f.optString("k").split(":")[0]);
+                put(c, pic("pf:" + look + ":" + f.optString("k") + ":" + f.optString("tv") + f.optBoolean("tvOn") + ":" + (mine == null ? 0 : mine) + ":" + w + ":" + (f.optLong("at") - System.currentTimeMillis()) / 300000L, new Pic() { @Override public Bitmap make() { return paintFeatP(f, w, hh); } }), feat, 1.4f * R);
+            }
+            // your teams
+            if (!teamsBand.isEmpty() && teamsBand.bottom > sy && teamsBand.top - 3 * R < sy + vh) {
+                word(c, "YOUR TEAMS", heavy, 1.1f, GOLD, M, teamsBand.top - .9f * R, .14f);
+                final int w = Math.round(TEAM_W), hh = Math.round(TEAM_H);
+                for (int i = 0; i < sideItems.size(); i++) {
+                    float x = M + i * (TEAM_W + CG) - teamsX;
+                    if (x > vw || x + TEAM_W < 0) continue;
+                    final Side sd = sideItems.get(i);
+                    String[] tw = teamWords(sd);
+                    rf.set(x, teamsBand.top, x + TEAM_W, teamsBand.bottom);
+                    put(c, pic("pt:" + look + ":" + sd.kind + ":" + tw[0] + ":" + tw[1] + ":" + tw[2], new Pic() { @Override public Bitmap make() { return paintTeamP(sd, w, hh); } }), rf, 1.1f * R);
+                }
+            }
+            // the leagues
+            if (!chipsBand.isEmpty() && chipsBand.bottom > sy && chipsBand.top < sy + vh) {
+                int cur = tab.equals("Today") || tab.equals("Results") ? leagueSel : -1;
+                float rad = SportsLook.ctrlRadius(CHIP_H), cy = chipsBand.centerY();
+                for (int i = 0; i < chipXs.length - 1; i++) {
+                    float x0 = chipXs[i] - chipsX, x1 = chipXs[i + 1] - CG - chipsX;
+                    if (x0 > vw || x1 < 0) continue;
+                    boolean lit = i == cur;
+                    rf.set(x0, chipsBand.top, x1, chipsBand.bottom);
+                    p2.setStyle(Paint.Style.FILL); p2.setColor(lit ? GlassPanel.selFill() : Ui.WHITE_7); c.drawRoundRect(rf, rad, rad, p2);
+                    if (!lit) { p2.setStyle(Paint.Style.STROKE); p2.setStrokeWidth(Math.max(1, .08f * R)); p2.setColor(SportsLook.CHIP_EDGE); c.drawRoundRect(rf, rad, rad, p2); p2.setStyle(Paint.Style.FILL); }
+                    float d = 2.4f * R, dx = x0 + .5f * R + d / 2;
+                    p2.setColor(Color.WHITE); c.drawCircle(dx, cy, d / 2, p2);
+                    Bitmap lb = i < rail.icons.size() ? rail.got.get(rail.icons.get(i)) : null;
+                    if (lb != null) { float k = Math.min(d * .7f / lb.getWidth(), d * .7f / lb.getHeight()); rf.set(dx - lb.getWidth() * k / 2, cy - lb.getHeight() * k / 2, dx + lb.getWidth() * k / 2, cy + lb.getHeight() * k / 2); c.drawBitmap(lb, null, rf, p2); }
+                    float tx = x0 + .5f * R + d + .7f * R;
+                    word(c, chipName(i), h.fSemi, 1.2f, lit ? GlassPanel.selText() : SportsLook.ctrlText(false), tx, cy + .43f * R, rail.sp());
+                    t2.setTypeface(h.fSemi); t2.setTextSize(1.2f * R); t2.setLetterSpacing(rail.sp());
+                    float nw = t2.measureText(chipName(i));
+                    int[] cn = rail.counts.get(i);
+                    word(c, chipCount(i), cond, 1.1f, lit ? GlassPanel.selText() : cn[1] > 0 ? LIVE_C : TER, tx + nw + .7f * R, cy + .4f * R, .04f);
+                }
+            }
+            // the games
+            JSONArray items = rows.isEmpty() ? null : rows.get(0);
+            if (!titles.isEmpty() && titleY > sy - 2 * R) {
+                String tt = titles.get(0).toUpperCase(java.util.Locale.US);
+                word(c, tt, heavy, 2f, Color.WHITE, M, titleY, .02f);
+                t2.setTypeface(heavy); t2.setTextSize(2f * R); t2.setLetterSpacing(.02f);
+                float tw = t2.measureText(tt);
+                int games = 0, liveN = 0;
+                if (items != null) for (int k = 0; k < items.length(); k++) { JSONObject g = items.optJSONObject(k); if (isGame(g)) { games++; if ("in".equals(g.optString("state"))) liveN++; } }
+                if (games > 0) word(c, games + " game" + (games == 1 ? "" : "s") + (liveN > 0 && liveN < games ? " · " + liveN + " live" : ""), h.fReg, 1.2f, TER, M + tw + 1.2f * R, titleY, 0);
+            }
+            if (items == null || items.length() == 0) {
+                String note = notes.isEmpty() ? "" : notes.get(0);
+                if ("Loading…".equals(note)) { p2.setColor(Ui.WHITE_7); for (int k = 0; k < 4; k++) { rf.set(M, titleY + 1.3f * R + k * ROWP, vw - M, titleY + 1.3f * R + k * ROWP + ROWP - .6f * R); c.drawRoundRect(rf, R, R, p2); } }
+                else word(c, NativeHome.touchWords(note), h.fMed, 1.2f, Ui.WHITE_60, M, titleY + 2.8f * R, 0);
+            } else for (int i = 0; i < itemR.size() && i < items.length(); i++) {
+                RectF r = itemR.get(i);
+                if (r.bottom < sy) continue;
+                if (r.top > sy + vh) break;
+                final JSONObject it = items.optJSONObject(i);
+                Integer mine = playersIn.get(it.optString("k").split(":")[0]);
+                final int w = Math.round(r.width()), hh = Math.round(r.height());
+                if (isGame(it)) put(c, pic("pr:" + look + ":" + it.optString("k") + ":" + it.optString("lg") + ":" + it.optString("tv") + it.optBoolean("tvOn") + it.optBoolean("bell") + ":" + (mine == null ? 0 : mine) + ":" + w, new Pic() { @Override public Bitmap make() { return paintRowP(it, w, hh); } }), r, R);
+                else put(c, pic("card:" + look + ":" + it.optString("k") + ":" + it.optString("lg") + ":" + (mine == null ? 0 : mine), new Pic() { @Override public Bitmap make() { return paintCard(it); } }), r, 1.6f * R);
+            }
+            c.restore();
+        }
+        /** a finger at (x, y), this view's own pixels: "ok" when a game was chosen (OK opens its menu), "done" when the tap did it all */
+        String tap(float x, float y) {
+            if (getWidth() == 0) return null;
+            lay();
+            if (setup) { zone = "grid"; return "ok"; }
+            float cy = y + sy;
+            if (feat.contains(x, cy) && featured != null) {
+                SportsData.Ev e = null;
+                try { e = h.sportsData().find(featured.optString("k").split(":")[0]); } catch (Throwable ignored) { }
+                float[] b = featBtns(featured, feat.width());
+                float lx = x - feat.left, ly = cy - feat.top;
+                if (e == null) { openPage(featured); return "done"; }
+                if (b[1] > b[0] && lx >= b[0] - .4f * R && lx <= b[1] + .4f * R && ly >= b[4] - R) { h.sportsData().watch(e); return "done"; }
+                float[] at = h.local(this, 0, 0);
+                h.sportsData().details(e, new RectF(feat.left - at[0], feat.top - sy - at[1], feat.right - at[0], feat.bottom - sy - at[1]));
+                return "done";
+            }
+            if (teamsBand.contains(x, cy)) {
+                float v = x + teamsX - M; int i = (int) Math.floor(v / (TEAM_W + CG));
+                if (v < 0 || i >= sideItems.size() || v - i * (TEAM_W + CG) > TEAM_W) return null;
+                sideSel = i; sideOk();
+                return "done";
+            }
+            if (chipsBand.contains(x, cy)) {
+                float v = x + chipsX;
+                for (int i = 0; i < chipXs.length - 1; i++) if (v >= chipXs[i] - CG / 2 && v < chipXs[i + 1] - CG / 2) { leagueSel = i; tab = railTab(); zone = "grid"; applySet(true); return "done"; }
+                return null;
+            }
+            for (int i = 0; i < itemR.size(); i++) if (itemR.get(i).contains(x, cy)) { r = 0; cols.put(0, i); zone = "grid"; return "ok"; }
+            return null;
+        }
+    }
 
     NativeSports(NativeHome host) {
         super(host.getContext());
@@ -204,7 +607,7 @@ final class NativeSports extends FrameLayout implements NativeHome.Free {
         chrome = new FrameLayout(c);
         chrome.setClipChildren(true);
         chrome.setAlpha(0f);
-        addView(chrome, new LayoutParams(LayoutParams.MATCH_PARENT, h.px(TABS_Y + 3.8f)));
+        addView(chrome, new LayoutParams(LayoutParams.MATCH_PARENT, h.px(thumb ? 4.8f : TABS_Y + 3.8f)));
         ribBox = new FrameLayout(c);
         ribBox.setClipChildren(true);
         ribBox.setBackgroundColor(0xFF05080B);
@@ -239,7 +642,7 @@ final class NativeSports extends FrameLayout implements NativeHome.Free {
         updated = h.text(h.fReg, Ui.TEXT_M, TER);
         LinearLayout.LayoutParams ul = new LinearLayout.LayoutParams(LayoutParams.WRAP_CONTENT, LayoutParams.WRAP_CONTENT); ul.leftMargin = h.px(1.4f);
         tline.addView(updated, ul);
-        chrome.addView(tline, h.at(PAD, TABS_Y, thumb ? h.px(170) : LayoutParams.WRAP_CONTENT, LayoutParams.WRAP_CONTENT));      // (a phone: room for every tab; they slide)
+        chrome.addView(tline, h.at(thumb ? 1.2f : PAD, thumb ? .9f : TABS_Y, thumb ? h.px(170) : LayoutParams.WRAP_CONTENT, LayoutParams.WRAP_CONTENT));      // (a phone: room for every tab; they slide)
         if (thumb) { chrome.setBackgroundColor(GROUND); updated.setVisibility(GONE); }
 
         // the scoreboard (two pictures crossfading)
@@ -272,6 +675,11 @@ final class NativeSports extends FrameLayout implements NativeHome.Free {
         rowsIn = new FrameLayout(c);
         rowsIn.setClipChildren(false);
         rowsBox.addView(rowsIn, new LayoutParams(LayoutParams.MATCH_PARENT, h.px(400)));
+        if (thumb) {
+            phone = new PhoneView(c);
+            LayoutParams pl = new LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.MATCH_PARENT); pl.topMargin = h.px(4.8f); pl.bottomMargin = h.px(h.BOT);
+            addView(phone, pl);
+        }
         ring = new SportsLook.Focus(c, R);
         addView(ring, new LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.MATCH_PARENT));
         if (thumb) ring.setVisibility(GONE);
@@ -279,7 +687,7 @@ final class NativeSports extends FrameLayout implements NativeHome.Free {
         standings = new StandingsView(h);
         standings.setBackgroundColor(GROUND);
         standings.setVisibility(GONE);
-        LayoutParams stl = new LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.MATCH_PARENT); stl.topMargin = h.px(HERO_Y - 1.2f);
+        LayoutParams stl = new LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.MATCH_PARENT); stl.topMargin = h.px(thumb ? 4.8f : HERO_Y - 1.2f);
         addView(standings, stl);
         standings.onTables = new Runnable() { @Override public void run() {
             // (where your teams and the scoreboard's teams stand has just arrived: paint those again)
@@ -391,8 +799,7 @@ final class NativeSports extends FrameLayout implements NativeHome.Free {
             RAIL_Y = sideY + sh + (sideOn ? 1f : 0);
             ROWS_Y = RAIL_Y + 4.8f;
             LayoutParams rl = (LayoutParams) rail.getLayoutParams(); rl.topMargin = h.px(RAIL_Y); rail.setLayoutParams(rl);
-            LayoutParams bl = (LayoutParams) rowsBox.getLayoutParams(); bl.topMargin = h.px(ROWS_Y); bl.height = thumb ? h.px(ROW_H) : H - h.px(ROWS_Y); rowsBox.setLayoutParams(bl);
-            if (thumb) setPage(pageY);
+            LayoutParams bl = (LayoutParams) rowsBox.getLayoutParams(); bl.topMargin = h.px(ROWS_Y); bl.height = H - h.px(ROWS_Y); rowsBox.setLayoutParams(bl);
         }
         for (View v : new View[] { hero[0], hero[1] }) { LayoutParams lp = (LayoutParams) v.getLayoutParams(); int nw = h.px(heroW); if (lp.width != nw) { lp.width = nw; v.setLayoutParams(lp); heroKey = ""; } }
         heroWidth = heroW;
@@ -447,6 +854,7 @@ final class NativeSports extends FrameLayout implements NativeHome.Free {
     private String ribKey = "";
     /** the strip's games: live ones (your teams' first), then today's still to come, then the latest finals */
     private void paintRibbon() {
+        if (thumb) return;                     // (a phone: no score strip, the list has every score)
         List<JSONObject> live = new ArrayList<>(), pre = new ArrayList<>(), fin = new ArrayList<>();
         java.util.Set<String> seen = new java.util.HashSet<>();
         long now = System.currentTimeMillis();
@@ -582,7 +990,7 @@ final class NativeSports extends FrameLayout implements NativeHome.Free {
         drawTabs();
         rebuildRows();
         focus(smooth);
-        if (thumb) setPage(pageY);
+        if (thumb && phone != null) phone.invalidate();
     }
     private boolean stillThere(JSONObject g) {
         String id = g.optString("k").split(":")[0];
@@ -692,6 +1100,7 @@ final class NativeSports extends FrameLayout implements NativeHome.Free {
 
     private final Map<Integer, FrameLayout> stripOf = new HashMap<>();
     private void rebuildRows() {
+        if (thumb) { if (phone != null) phone.invalidate(); return; }
         rowsIn.removeAllViews();
         stripOf.clear();
         cardViews.clear();
@@ -735,6 +1144,7 @@ final class NativeSports extends FrameLayout implements NativeHome.Free {
 
     /** cards exist for what's near the screen */
     private void syncCards() {
+        if (thumb) return;
         java.util.Set<String> keep = new java.util.HashSet<>();
         for (int i = Math.max(0, r - 1); i <= Math.min(rows.size() - 1, r + 2); i++) {
             FrameLayout strip = stripOf.get(i);
@@ -760,6 +1170,7 @@ final class NativeSports extends FrameLayout implements NativeHome.Free {
     // ================================================================== focus
 
     private void focus(boolean smooth) {
+        if (thumb) { JSONObject bg = bestGame(); if (bg != null) featured = bg; if (phone != null) phone.invalidate(); return; }
         if (zone.equals("side") && sideSel < sideItems.size() && sideItems.get(sideSel).game != null) featured = sideItems.get(sideSel).game;
         if (rows.isEmpty()) { showHero(featured); paintBg(featured); placeRing(smooth); return; }
         float ty = -h.px(r * ROW_H);
@@ -907,6 +1318,13 @@ final class NativeSports extends FrameLayout implements NativeHome.Free {
             if (got != null) { zone = "grid"; drawTabs(); }
             return got;
         }
+        if (thumb) {
+            if (!h.hit(phone, x, y, 0)) return null;
+            float[] l = h.local(phone, x, y);
+            String got = phone.tap(l[0], l[1]);
+            lastOk = "ok".equals(got);
+            return got;
+        }
         if (heroTop >= 0 && featured != null && h.hit(hero[heroTop], x, y, 0)) { zone = "hero"; focus(true); return "ok"; }
         if (side.getVisibility() == VISIBLE && h.hit(side, x, y, 0)) {
             float ly = h.local(side, x, y)[1] / R;
@@ -966,7 +1384,7 @@ final class NativeSports extends FrameLayout implements NativeHome.Free {
         for (int k = off; k < allRows.size(); k++) { JSONArray a = allRows.get(k); for (int i = 0; i < a.length(); i++) if (a.optJSONObject(i).optString("k").split(":")[0].equals(id)) {
             int[] me = new int[2], host = new int[2];
             getLocationInWindow(me); h.getLocationInWindow(host);
-            float x = me[0] - host[0] + h.px(PAD), y = me[1] - host[1] + h.px(HERO_Y) + getPaddingTop() - pageY;
+            float x = me[0] - host[0] + h.px(PAD), y = me[1] - host[1] + h.px(HERO_Y) + getPaddingTop();
             h.sportsData().openPage(k - off, i, new RectF(x, y, x + h.px(heroWidth), y + h.px(HERO_H)));
             return;
         } }
@@ -987,7 +1405,7 @@ final class NativeSports extends FrameLayout implements NativeHome.Free {
         if (!it.optString("gameId").isEmpty()) h.sportsData().openGame(it.optString("gameId"));
         else h.toast(it.optString("name") + " has no game this week");
     }
-    void hold() { ok(); }
+    void hold() { if (thumb && !lastOk && !tab.equals("Standings")) return; ok(); }
     boolean back() {
         if (tab.equals("Standings") && zone.equals("grid") && standings.back()) return true;
         if (!zone.equals("grid")) { zone = "grid"; drawTabs(); focus(true); rail.invalidate(); return true; }
@@ -1676,6 +2094,7 @@ final class NativeSports extends FrameLayout implements NativeHome.Free {
     /** the your-teams column's height (rem) when it's stacked under the scoreboard */
     private float sideH() { int n = Math.max(1, sideItems.size()); return 2.6f + n * 6.4f + (n - 1) * .8f; }
     private void paintSide() {
+        if (thumb) { if (phone != null) phone.invalidate(); return; }
         final List<Side> items = new ArrayList<>(sideItems);
         StringBuilder kb = new StringBuilder();
         for (Side s : items) kb.append(s.kind).append(s.team == null ? "" : s.team.optString("full") + s.team.optString("pts") + s.team.optString("proj") + s.team.optInt("left")).append(s.game == null ? "" : s.game.optString("k") + placesOf(s.game)).append('|');
@@ -1984,6 +2403,7 @@ final class NativeSports extends FrameLayout implements NativeHome.Free {
 
     private String heroKey = "";
     private void showHero(final JSONObject it) {
+        if (thumb) { if (phone != null) phone.invalidate(); return; }
         Integer mine = it == null ? null : playersIn.get(it.optString("k").split(":")[0]);
         final String key = it == null ? "" : "hero:" + GlassPanel.look + ":" + it.optString("k") + ":" + Math.round(heroWidth) + ":" + (mine == null ? 0 : mine) + ":" + placesOf(it);
         if (key.equals(heroKey)) return;
@@ -2007,12 +2427,12 @@ final class NativeSports extends FrameLayout implements NativeHome.Free {
         nv.animate().cancel();
         nv.setImageBitmap(b);
         nv.bringToFront();
-        nv.setAlpha(0f); nv.setTranslationY(.4f * R - pageY);
+        nv.setAlpha(0f); nv.setTranslationY(.4f * R);
         final int under = heroTop;
         heroTop = next;
         // (Standings covers the scoreboard: a new scoreboard brought forward went over the tables)
         order();
-        nv.animate().alpha(1f).translationY(-pageY).setDuration(Ui.MOVE).setInterpolator(TileView.EASE).withEndAction(new Runnable() { @Override public void run() {
+        nv.animate().alpha(1f).translationY(0).setDuration(Ui.MOVE).setInterpolator(TileView.EASE).withEndAction(new Runnable() { @Override public void run() {
             if (heroTop == 1 - under || under < 0) { } if (under >= 0 && heroTop != under) hero[under].setAlpha(0f);
         } }).start();
     }
