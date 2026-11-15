@@ -333,7 +333,7 @@ final class NativeHome extends FrameLayout {
         menuStyle = side ? menuStylePref(S) : "panel";
         menuHead = null; rowStart = -1; railOpen = false; nowHead = nowGame = nowCw = null;
         barExtras.clear(); cornerL = cornerR = null; barScrim = null;
-        COLS = portrait ? 3 : 5; GAP_REM = portrait ? 2.2f : 2.75f; BOT = portrait && !side ? (phone ? 8.8f : 8.6f) : 0;
+        COLS = portrait ? 3 : 5; GAP_REM = portrait ? 2.2f : 2.75f; BOT = portrait && !side ? (phone ? 6.4f : 8.6f) : 0;
         TW = portrait ? (SW - 7 - (COLS - 1) * GAP_REM) / COLS : TW_REM; TH = TW * 9 / 16f; PITCH = TH + 5.8f; DOCK_PANEL_H = TH + 3.6f;     // (no names under the dock's icons: just room for the focused one to grow)
         M = (SW - COLS * TW - (COLS - 1) * GAP_REM) / 2f;
         DOCK_PANEL_Y = SH - 2.8f - DOCK_PANEL_H - BOT; DOCK_Y = DOCK_PANEL_Y + 1.8f;
@@ -508,7 +508,7 @@ final class NativeHome extends FrameLayout {
         tabsRow = new LinearLayout(c);
         /* a phone held upright (Chad picked it from a sketch, 1.0.446): one flat dark bar across the bottom edge, the
            tabs' names evenly along it, the one you're on white under a line of the look's highlight */
-        if (thumb) { tabs.setBare(); tabs.setLiquidAllowed(false); panels.remove(tabs); tabs.setBackground(new ThumbBar(0, false)); tabsRow.setPadding(0, 0, 0, px(2.6f)); }
+        if (thumb) { tabs.setBare(); tabs.setLiquidAllowed(false); panels.remove(tabs); tabs.setBackground(new ThumbBar(0, false)); tabsRow.setPadding(0, 0, 0, px(1.6f)); }
         else tabsRow.setPadding(px(.55f), px(.55f), px(.55f), px(.55f));
         tabViews = new TextView[TAB_IDS.length];
         for (int i = 0; i < TAB_IDS.length; i++) {
@@ -518,7 +518,7 @@ final class NativeHome extends FrameLayout {
             if (thumb) { t.setGravity(Gravity.CENTER); t.setSingleLine(true); t.setPadding(0, 0, 0, 0); }
             else t.setPadding(px(tp), px(.95f), px(tp), px(.95f));
             t.setBackground(pill(Color.TRANSPARENT));
-            LinearLayout.LayoutParams lp = thumb ? new LinearLayout.LayoutParams(0, px(5.6f), 1) : new LinearLayout.LayoutParams(LayoutParams.WRAP_CONTENT, LayoutParams.WRAP_CONTENT);
+            LinearLayout.LayoutParams lp = thumb ? new LinearLayout.LayoutParams(0, px(thumb ? 4.2f : 5.6f), 1) : new LinearLayout.LayoutParams(LayoutParams.WRAP_CONTENT, LayoutParams.WRAP_CONTENT);
             if (i > 0 && !thumb) lp.leftMargin = px(.3f);
             tabsRow.addView(t, lp);
             tabViews[i] = t;

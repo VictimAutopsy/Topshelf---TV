@@ -293,10 +293,12 @@ final class NativeLive extends FrameLayout implements NativeHome.Free {
         info.addView(bar, bl);
         iDesc = h.text(h.fReg, Ui.TEXT_M, Ui.WHITE_75); iDesc.setMaxLines(2); iDesc.setEllipsize(TextUtils.TruncateAt.END); iDesc.setLineSpacing(0, 1.25f);
         LinearLayout.LayoutParams ddl = new LinearLayout.LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT); ddl.topMargin = h.px(.8f);
+        if (nowList) { ddl.height = 0; ddl.topMargin = 0; }       // (the list: no room for the show's words; they were cut through the middle)
         info.addView(iDesc, ddl);
         iHint = h.text(h.fMed, Ui.TEXT_S, 0x99FF8A80);
         iHint.setLetterSpacing(.02f);
         LinearLayout.LayoutParams hl2 = new LinearLayout.LayoutParams(LayoutParams.WRAP_CONTENT, LayoutParams.WRAP_CONTENT); hl2.topMargin = h.px(.9f);
+        if (nowList) { hl2.height = 0; hl2.topMargin = 0; }
         info.addView(iHint, hl2);
         if (h.portrait) addView(info, h.at(nowList ? 1.6f : 3, PV_TOP + BIG_H + 1.2f, h.px(SW - (nowList ? 3.2f : 6)), h.px(nowList ? 9.3f : 14f)));       // (the list: the show's words and hints are cut off, the chips come next)
         else addView(info, h.at(5, 9.4f, h.px(Math.min(80, SW - BIG_W - 5 - 1f)), h.px(16.4f)));
@@ -2033,7 +2035,7 @@ final class NativeLive extends FrameLayout implements NativeHome.Free {
         fs.setVisibility(INVISIBLE);
         osd.animate().cancel(); osd.setAlpha(0f);
         bg.setVisibility(VISIBLE);
-        ((View) label.getParent()).setVisibility(VISIBLE);
+        if (!h.portrait) ((View) label.getParent()).setVisibility(VISIBLE);       // (upright it's never shown: it sat over the preview after leaving full screen)
         if (cats.get(cat).recent) {
             String u = playing != null ? playing.u : null;
             buildList(); guide.build();
