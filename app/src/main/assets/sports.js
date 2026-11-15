@@ -908,7 +908,7 @@ function spPickTap(t) {
    a live score ticker on Home, a heads-up when one of your teams scores, and an alert
    (pop-up, or a notification when TopShelf isn't open) shortly before their games start. */
 
-const TK = { items: [], i: 0, t: 0, scores: readJSON('spScores', {}), alerted: new Set(readJSON('spAlerted', [])) };
+const TK = { items: [], i: 0, t: 0, scores: readJSON('spScores', {}), alerted: new Set(readJSON('spAlerted', [])), rems: readJSON('spRems', []) };
 function spFavLeagues() { return SP.prefs.leagues.filter(id => (SP.prefs.teams[id] || []).length || (spLeague(id) || {}).cards); }
 
 /* Where TopShelf is, as the app sees it: 'away' (not on screen), 'home', 'live' (Live TV) or 'quiet'
@@ -928,7 +928,16 @@ function spSig(e) {
   return { st: e.state, sc: e.teams.map(t => t.score).join('-'), brk };
 }
 
+/* Game alerts turned off: the "starts soon" reminders already handed to Android (up to a day ahead) are taken
+   back, or they'd still arrive. Turned on again, the next look sets them afresh. */
+function spDropGameReminders() {
+  const ids = new Set(TK.rems);
+  spFavLeagues().forEach(id => (SP.ev[id] || []).forEach(e => { if (e.state === 'pre' && spFavGame(e)) ids.add('g' + e.id); }));
+  ids.forEach(id => { try { B.cancelReminder && B.cancelReminder(id); } catch (x) {} });
+  if (TK.rems.length) { TK.rems = []; writeJSON('spRems', []); }
+}
 async function spTick() {
+  if (S.gameAlerts === false) spDropGameReminders();
   const lgs = spFavLeagues();
   if (!lgs.length || spWhere() === 'away') { spTicker([]); return; }
   await Promise.all(lgs.map(id => spLoadLeague(id, false)));
@@ -949,7 +958,7 @@ async function spTick() {
   if (flash) { TK.i = show.indexOf(flash); TK.hold = now + SP_FLASH_MS; }
   spTicker(show);
   // on Live TV the ticker isn't kept up: it shows for a few seconds when something happens
-  if (flash && spWhere() === 'live') { try { B.nhTickerFlash && B.nhTickerFlash(SP_FLASH_MS); } catch (e) {} }
+  if (flash && S.gameAlerts !== false && spWhere() === 'live') { try { B.nhTickerFlash && B.nhTickerFlash(SP_FLASH_MS); } catch (e) {} }
   spScoreAlerts(mine);
   spGameAlerts(mine);
   if (tab === 'sports') spBuild();
@@ -1043,8 +1052,9 @@ function spRedZone(e, cur, watching, where) {
 /* A few minutes before your team plays: a pop-up with Watch buttons (and a notification if
    TopShelf isn't on screen — scheduled with Android so it arrives even when closed). */
 function spGameAlerts(mine) {
-  if (S.gameAlerts === false) return;
+  if (S.gameAlerts === false) { spDropGameReminders(); return; }
   const now = Date.now(), watching = spWatchingId();
+  const had = TK.rems.length;
   for (const e of mine) {
     if (e.state !== 'pre' || e.at - now > 24 * 3600000 || e.at < now - 10 * 60000) continue;
     const best = spMatch(e)[0];
@@ -1052,7 +1062,7 @@ function spGameAlerts(mine) {
     const title = e.card ? `${e.short} starts soon` : `${fav.name} ${spLeague(e.lg).name} game starts soon`;
     const vs = e.card ? spMainEvent(e) : `${e.teams[0].name} @ ${e.teams[1].name}`;
     const text = `${vs} · ${fmtTime(e.at)}${best ? ' on ' + best.ch.n : e.nets.length ? ' · ' + e.nets[0] : ''}`;
-    try { B.setReminder && B.setReminder('g' + e.id, e.at - 3 * 60000, title, text, best ? best.ch.u : ''); } catch (x) {}
+    try { if (B.setReminder) { B.setReminder('g' + e.id, e.at - 3 * 60000, title, text, best ? best.ch.u : ''); if (!TK.rems.includes('g' + e.id)) TK.rems.push('g' + e.id); } } catch (x) {}
     const where = spWhere();
     if (e.at - now <= 5 * 60000 && !TK.alerted.has(e.id) && (where === 'home' || where === 'live') && !['edit', 'menu', 'player'].includes(mode) && String(e.id) !== watching) {
       TK.alerted.add(e.id);
@@ -1069,6 +1079,7 @@ function spGameAlerts(mine) {
       if (!shown && mode === 'menu') $('#menu').classList.add('alert');
     }
   }
+  if (TK.rems.length !== had) { TK.rems = TK.rems.slice(-80); writeJSON('spRems', TK.rems); }
 }
 
 // your teams are checked in the background while TopShelf is open: every minute while one of

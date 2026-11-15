@@ -1333,7 +1333,7 @@ public class Bridge {
                 String k = e.getKey();
                 if (!k.startsWith("ui.") || !(e.getValue() instanceof String)) continue;
                 String key = k.substring(3);
-                if (key.equals("link") || key.startsWith("spTeams.") || key.equals("spScores") || key.equals("spAlerted")) continue;
+                if (key.equals("link") || key.startsWith("spTeams.") || key.equals("spScores") || key.equals("spAlerted") || key.equals("spRems")) continue;
                 ui.put(key, e.getValue());
             }
             JSONObject o = new JSONObject();

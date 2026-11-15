@@ -89,7 +89,7 @@ const SET_INFO = {
   'Google Drive': { about: 'Copies finished recordings to your Google Drive.', how: 'OK to open' },
   // ================================================================ Sports
   'Sports & teams': { about: 'The sports and the teams you follow.', how: 'OK to choose' },
-  'Game alerts': { about: 'A card on screen when something happens in one of your teams\' games.', opts: ON_OFF },
+  'Game alerts': { about: 'A card on screen when one of your teams scores or is about to play, the "starts soon" reminder when TopShelf isn\'t on screen, and the score strip popping up over Live TV. Off stops all of these. Fantasy alerts have their own switches.', opts: ON_OFF },
   'Red zone alerts': { about: 'An alert when your team gets inside the 20-yard line. Game alerts have to be on.' },
   'Yahoo Fantasy': { about: 'Connects your Yahoo Fantasy Football team, for alerts about your players. If Yahoo refuses access, you can pick your players yourself instead.', how: 'OK to open' },
   'Fantasy players': { about: 'Pick your fantasy players yourself.', how: 'OK to open' },

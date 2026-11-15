@@ -48,6 +48,14 @@ public class ReminderReceiver extends BroadcastReceiver {
     @Override
     public void onReceive(Context ctx, Intent in) {
         if (MainActivity.inFront) return;                    // the page shows its own pop-up
+        // (a game's "starts soon", set before Game alerts was turned off: it stays quiet)
+        String gid = in.getStringExtra("id");
+        if (gid != null && gid.startsWith("g")) {
+            try {
+                String st = ctx.getSharedPreferences(Bridge.PREFS, Context.MODE_PRIVATE).getString("ui.settings", null);
+                if (st != null && !new org.json.JSONObject(st).optBoolean("gameAlerts", true)) return;
+            } catch (Exception ignored) { }
+        }
         NotificationManager nm = (NotificationManager) ctx.getSystemService(Context.NOTIFICATION_SERVICE);
         if (nm == null) return;
         if (Build.VERSION.SDK_INT >= 26 && nm.getNotificationChannel(CHANNEL_ID) == null) {
