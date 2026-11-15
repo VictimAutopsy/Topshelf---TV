@@ -534,10 +534,23 @@ final class NativeHome extends FrameLayout {
         topRow = new LinearLayout(c);
         topRow.setGravity(Gravity.CENTER_VERTICAL);
         topRow.setPadding(px(.55f), px(.55f), px(1.4f), px(.55f));
+        if (thumb) {
+            /* a phone held upright (Chad picked it from a sketch, 1.0.450; he found the rounded bar looked bad): no bar,
+               the buttons straight on the featured picture at the top right, over a soft shade so they read on a
+               bright one; no weather or clock (the phone's own status bar has the time) */
+            topbar.setBare(); topbar.setLiquidAllowed(false); panels.remove(topbar);
+            topbar.setBackground(new GradientDrawable(GradientDrawable.Orientation.TOP_BOTTOM, new int[] { 0xA6000000, 0x52000000, 0x00000000 }));
+            topRow.setPadding(0, 0, 0, 0);
+            FrameLayout.LayoutParams rl = new FrameLayout.LayoutParams(LayoutParams.WRAP_CONTENT, LayoutParams.WRAP_CONTENT, Gravity.TOP | Gravity.RIGHT);
+            rl.topMargin = px(TOP + .6f); rl.rightMargin = px(1.2f);
+            topbar.addView(topRow, rl);
+            addView(topbar, new FrameLayout.LayoutParams(LayoutParams.MATCH_PARENT, px(TOP + 9f), Gravity.TOP));
+        } else {
         topbar.addView(topRow, new LayoutParams(LayoutParams.WRAP_CONTENT, LayoutParams.WRAP_CONTENT));
         FrameLayout.LayoutParams bl = new FrameLayout.LayoutParams(LayoutParams.WRAP_CONTENT, LayoutParams.WRAP_CONTENT, Gravity.TOP | Gravity.RIGHT);
         bl.topMargin = px(2.3f + TOP); bl.rightMargin = px(portrait ? 2.4f : 4.6f);
         addView(topbar, bl);
+        }
         tip = text(fMed, Ui.TEXT_S, Color.WHITE);
         tip.setShadowLayer(.6f * R, 0, .1f * R, Ui.BLACK_60);
         tip.setAlpha(0f);
@@ -807,7 +820,9 @@ final class NativeHome extends FrameLayout {
             else { GradientDrawable bg = new GradientDrawable(); bg.setShape(GradientDrawable.OVAL); bg.setColor(Color.TRANSPARENT); b.setBackground(bg); }
             if (fl) ic.setColor(Color.WHITE);
             b.setTag(ic);
-            float bs = styled && !fl ? 3.5f : 3.8f;
+            boolean thumb = phone && portrait;
+            float bs = thumb ? 4.6f : styled && !fl ? 3.5f : 3.8f;        // (a phone: a finger's size)
+            if (thumb) b.setPadding(px(1.15f), px(1.15f), px(1.15f), px(1.15f));
             LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(px(bs), px(bs));
             if (topRow.getChildCount() > 0) lp.leftMargin = px(styled ? .3f : .5f);
             topRow.addView(b, lp);
@@ -841,6 +856,7 @@ final class NativeHome extends FrameLayout {
             topRow.addView(wx, wl);
             topRow.addView(clock, kl);
         }
+        if (phone && portrait) { wx.setLayoutParams(new LinearLayout.LayoutParams(0, 0)); clock.setLayoutParams(new LinearLayout.LayoutParams(0, 0)); }      // (kept for the code that sets them; not shown)
         wx.setVisibility(GONE);
         tick();
     }
