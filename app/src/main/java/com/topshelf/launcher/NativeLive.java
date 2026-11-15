@@ -112,6 +112,13 @@ final class NativeLive extends FrameLayout implements NativeHome.Free {
     private final TextView iChan, iTitle, iWhen, iDesc;
     private final View iBar, iBarFill;
     private final GuideView guide;
+    /* A phone held upright has no time grid (Chad's call, 1.0.446: a traditional guide isn't needed there): the groups
+       are a row of chips and the channels an "on now" list (NowView) in the guide's place. The grid is still made, and
+       kept hidden: row, t, the list and the menus work as before, and whatever redraws, rebuilds or reveals the grid
+       does the same to the list (see GuideView's first lines). */
+    private final boolean nowList;
+    private NowView nowView; private ChipsView chips;
+    private int lastHit;                          // what the last finger was on: 1 a group's chip, 2 a channel, 3 a later show
     private final View guideDim;
     private final FrameLayout catsPanel;
     private static final float CAT_W = 23, CAT_TOP = 3.2f;
@@ -230,7 +237,8 @@ final class NativeLive extends FrameLayout implements NativeHome.Free {
     NativeLive(NativeHome host) {
         super(host.getContext());
         h = host; R = host.R; W = host.W; H = host.H; SW = host.SW; SH = host.SH;
-        if (h.portrait) { PV_TOP = h.TOP; PV_W = BIG_W = SW; PV_H = BIG_H = SW * 9 / 16f; PV_Y = 0; GUIDE_X = GP_X; GUIDE_Y = PV_TOP + BIG_H + 15.5f; }
+        nowList = h.phone && h.portrait;
+        if (h.portrait) { PV_TOP = h.TOP; PV_W = BIG_W = SW; PV_H = BIG_H = SW * 9 / 16f; PV_Y = 0; GUIDE_X = GP_X; GUIDE_Y = PV_TOP + BIG_H + (nowList ? 15.2f : 15.5f); }
         GUIDE_H = SH - GUIDE_Y - h.BOT;               // (runs to the bottom edge, like the rows on the other tabs)
         setClipChildren(false);
         android.content.Context c = getContext();
@@ -268,7 +276,7 @@ final class NativeLive extends FrameLayout implements NativeHome.Free {
         info.setOrientation(LinearLayout.VERTICAL);
         iChan = h.text(h.fSemi, Ui.TEXT_S, 0xFFFF8A80); iChan.setSingleLine(true); iChan.setEllipsize(TextUtils.TruncateAt.END); iChan.setLetterSpacing(.04f);
         info.addView(iChan);
-        iTitle = h.text(h.fSemi, 3.2f, Color.WHITE); iTitle.setSingleLine(true); iTitle.setEllipsize(TextUtils.TruncateAt.END); iTitle.setLetterSpacing(-.02f);
+        iTitle = h.text(h.fSemi, nowList ? 2.3f : 3.2f, Color.WHITE); iTitle.setSingleLine(true); iTitle.setEllipsize(TextUtils.TruncateAt.END); iTitle.setLetterSpacing(-.02f);
         iTitle.setShadowLayer(1.2f * R, 0, .2f * R, Ui.BLACK_55);
         LinearLayout.LayoutParams tl = new LinearLayout.LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT); tl.topMargin = h.px(.6f);
         info.addView(iTitle, tl);
@@ -290,12 +298,17 @@ final class NativeLive extends FrameLayout implements NativeHome.Free {
         iHint.setLetterSpacing(.02f);
         LinearLayout.LayoutParams hl2 = new LinearLayout.LayoutParams(LayoutParams.WRAP_CONTENT, LayoutParams.WRAP_CONTENT); hl2.topMargin = h.px(.9f);
         info.addView(iHint, hl2);
-        if (h.portrait) addView(info, h.at(3, PV_TOP + BIG_H + 1.2f, h.px(SW - 6), h.px(14f)));
+        if (h.portrait) addView(info, h.at(nowList ? 1.6f : 3, PV_TOP + BIG_H + 1.2f, h.px(SW - (nowList ? 3.2f : 6)), h.px(nowList ? 9.3f : 14f)));       // (the list: the show's words and hints are cut off, the chips come next)
         else addView(info, h.at(5, 9.4f, h.px(Math.min(80, SW - BIG_W - 5 - 1f)), h.px(16.4f)));
 
         // the guide grid
         guide = new GuideView(c);
         addView(guide, h.at(0, GUIDE_Y, W, h.px(GUIDE_H)));
+        if (nowList) {
+            guide.setVisibility(INVISIBLE);
+            nowView = new NowView(c);
+            addView(nowView, h.at(0, GUIDE_Y, W, h.px(GUIDE_H)));
+        }
         recView = new RecView(c);
         recView.setVisibility(INVISIBLE);
         addView(recView, h.at(0, GUIDE_Y, W, h.px(GUIDE_H)));
@@ -323,6 +336,8 @@ final class NativeLive extends FrameLayout implements NativeHome.Free {
         catsPanel.setAlpha(0f);
         catsPanel.setVisibility(INVISIBLE);
         addView(catsPanel, h.at(GUIDE_X, GUIDE_Y, h.px(CAT_W), h.px(GUIDE_H)));
+
+        if (nowList) { chips = new ChipsView(c); addView(chips, h.at(0, GUIDE_Y - 4.7f, W, h.px(4.4f))); }
 
         // the preview's window while nothing plays in it: the channel you're on, and how to watch it
         idle = new FrameLayout(c);
@@ -911,7 +926,8 @@ final class NativeLive extends FrameLayout implements NativeHome.Free {
         drawIdle();
         /* full screen: the guide stays hidden under the picture (a playlist or guide refresh finishing in the
            background used to bring it back, see-through over the channel) — it's brought up again on leaving */
-        if (full) { guide.setVisibility(INVISIBLE); recView.setVisibility(INVISIBLE); info.setVisibility(INVISIBLE); return; }
+        if (full) { guide.setVisibility(INVISIBLE); recView.setVisibility(INVISIBLE); info.setVisibility(INVISIBLE); if (chips != null) chips.setVisibility(INVISIBLE); return; }
+        if (chips != null) chips.setVisibility(VISIBLE);
         drawCats();
         boolean e = drawEmpty();
         boolean rc = recCat();
@@ -941,6 +957,7 @@ final class NativeLive extends FrameLayout implements NativeHome.Free {
 
     private Boolean catsOpen = null;
     private void drawCats() {
+        if (nowList) { zone = "guide"; if (chips != null) { chips.reveal(); chips.invalidate(); } return; }      // (no list of groups to bring out: they're the chips)
         catView.reveal();
         catView.invalidate();
         boolean open = zone.equals("cats") && shown;
@@ -1140,6 +1157,7 @@ final class NativeLive extends FrameLayout implements NativeHome.Free {
             return;
         }
         if (moving) { moveDone(); return; }
+        if (nowList && lastHit == 3) { lastHit = 0; channelMenu(); return; }
         if (zone.equals("cats")) { catSettle(); zone = "guide"; drawCats(); if (recCat()) drawInfo(); return; }
         if (recCat()) { recView.ok(); return; }
         Ch ch = row < list.size() ? list.get(row) : null;
@@ -1156,6 +1174,28 @@ final class NativeLive extends FrameLayout implements NativeHome.Free {
     @Override public void touchDown() { if (fling != null) fling.forceFinished(true); dragWhat = -1; zapGlide++; }
     @Override public boolean drag(char axis, float x0, float y0, float dPx) {
         if (shown && full) return fullDrag(axis, x0, y0, dPx);
+        if (nowList) {
+            // the list goes up and down, the chips sideways; nothing here takes the remote's steps
+            if (!shown || zap) return false;
+            if (dragWhat < 0) {
+                if (dPx == 0) return true;
+                dragWhat = 10; fsAcc = 0;
+                if (h.hit(chips, x0, y0, 0)) { if (axis == 'h') dragWhat = 9; }
+                else if (recCat()) { if (axis == 'v' && h.hit(recView, x0, y0, 0)) dragWhat = 6; }
+                else if (axis == 'v' && empty.getVisibility() != VISIBLE && !list.isEmpty() && h.hit(nowView, x0, y0, 0)) dragWhat = 8;
+            }
+            if (dragWhat == 8) nowView.slide(dPx);
+            else if (dragWhat == 6) recView.slide(dPx);
+            else if (dragWhat == 9 && !moving) chips.slide(dPx);
+            else if (dragWhat == 9) {
+                // moving a group: it's carried along the row
+                fsAcc += dPx;
+                float st = 5f * R;
+                while (fsAcc <= -st) { moveKey('u'); fsAcc += st; }
+                while (fsAcc >= st) { moveKey('d'); fsAcc -= st; }
+            }
+            return true;
+        }
         if (!shown || full || zap || moving || empty.getVisibility() == VISIBLE) return false;
         if (dragWhat < 0) {
             if (dPx == 0) return true;               // (which way it's going isn't known yet)
@@ -1249,11 +1289,14 @@ final class NativeLive extends FrameLayout implements NativeHome.Free {
         int what = dragWhat; dragWhat = -1;
         if (what <= 0 || !shown) return;
         if (what == 3 || what == 4 || what == 5 || what == 7) { if (full) fullDragEnd(what, axis, v); return; }
+        if (what == 10 || (what == 9 && moving)) return;
         if (fling == null) fling = new android.widget.OverScroller(getContext());
         flingWhat = what;
         if (what == 1) fling.fling(Math.round(guide.sx), Math.round(guide.sy), axis == 'h' ? -Math.round(v) : 0, axis == 'v' ? -Math.round(v) : 0,
                 0, Math.round(guide.maxX()), 0, Math.round(guide.maxY()));
         else if (what == 6) fling.fling(0, Math.round(recView.scroll), 0, -Math.round(v), 0, 0, 0, Math.round(recView.maxScroll()));
+        else if (what == 8) fling.fling(0, Math.round(nowView.sy), 0, -Math.round(v), 0, 0, 0, Math.round(nowView.maxY()));
+        else if (what == 9) fling.fling(Math.round(chips.sx), 0, -Math.round(v), 0, 0, Math.round(chips.maxX()), 0, 0);
         else fling.fling(0, Math.round(catView.scroll), 0, -Math.round(v), 0, 0, 0, Math.round(catView.maxScroll()));
         removeCallbacks(glide); postOnAnimation(glide);
     }
@@ -1261,6 +1304,8 @@ final class NativeLive extends FrameLayout implements NativeHome.Free {
         if (fling == null || !shown || full || !fling.computeScrollOffset()) return;
         if (flingWhat == 1) guide.slideTo(fling.getCurrX(), fling.getCurrY());
         else if (flingWhat == 6) recView.slideTo(fling.getCurrY());
+        else if (flingWhat == 8) nowView.slideTo(fling.getCurrY());
+        else if (flingWhat == 9) chips.slideTo(fling.getCurrX());
         else catView.slideTo(fling.getCurrY());
         if (!fling.isFinished()) postOnAnimation(this);
     } };
@@ -1302,7 +1347,18 @@ final class NativeLive extends FrameLayout implements NativeHome.Free {
             return "ok";
         }
         if (full || zap) return "ok";
-        if (empty.getVisibility() == VISIBLE) return "ok";
+        lastHit = 0;
+        if (nowList && h.hit(chips, x, y, 0)) {
+            // a group's chip: a tap opens the group (holding it: its menu, from hold())
+            if (moving) { moveDone(); return "done"; }
+            int i = chips.at(h.local(chips, x, y)[0]);
+            if (i < 0) return null;
+            lastHit = 1;
+            if (i != cat) { cat = i; main().removeCallbacks(catBuild); catBuild.run(); }
+            return "done";
+        }
+        if (nowList && moving) { moveDone(); return "done"; }
+        if (empty.getVisibility() == VISIBLE) return nowList && !chans.isEmpty() ? null : "ok";
         if (catsPanel.getVisibility() == VISIBLE && catsPanel.getAlpha() > .5f && h.hit(catView, x, y, 0)) {
             float ly = h.local(catView, x, y)[1];
             int i = (int) Math.floor((ly + catView.scroll - catView.padY) / catView.itemPx);
@@ -1320,6 +1376,25 @@ final class NativeLive extends FrameLayout implements NativeHome.Free {
                 if (!zone.equals("guide")) { zone = "guide"; drawCats(); }
                 recView.choose(i);
             }
+            return "ok";
+        }
+        if (nowList) {
+            if (list.isEmpty() || !h.hit(nowView, x, y, 0)) return null;
+            float[] l = h.local(nowView, x, y);
+            int[] at = nowView.at(l[0], l[1]);
+            if (at == null) return null;
+            if (at[1] == -2) { nowView.toggle(at[0]); return "done"; }          // (the arrow at a row's end: what's on later)
+            if (at[1] >= 0) {
+                // a later show: its menu (a reminder, recording it), as holding it in the guide
+                long[] se = nowView.later(at[1]);
+                if (se == null) return "done";
+                row = at[0]; t = se[0] + 1; lastHit = 3;
+                nowView.invalidate(); drawInfo();
+                return "ok";
+            }
+            long now = System.currentTimeMillis();
+            if (at[0] != row || t != now) { row = at[0]; t = now; nowView.invalidate(); drawInfo(); }
+            lastHit = 2;
             return "ok";
         }
         if (!h.hit(guide, x, y, 0) || list.isEmpty()) return null;
@@ -1343,6 +1418,7 @@ final class NativeLive extends FrameLayout implements NativeHome.Free {
     void hold() {
         if (full && recPlay != null) { recMoreMenu(); return; }
         if (full) { if (playing != null && !zap) playerMenu(); return; }
+        if (nowList && lastHit == 1) { catMenu(); return; }
         if (zone.equals("cats")) { if (moving) moveDone(); else catMenu(); return; }
         if (recCat()) { recView.menu(); return; }
         channelMenu();
@@ -1459,7 +1535,7 @@ final class NativeLive extends FrameLayout implements NativeHome.Free {
         catSettle();
         moving = true;
         drawCats();
-        h.toast("▲ ▼ move “" + cats.get(cat).name + "” · OK when it's where you want it");
+        h.toast(nowList ? "Slide “" + cats.get(cat).name + "” along the row · tap when it's where you want it" : "▲ ▼ move “" + cats.get(cat).name + "” · OK when it's where you want it");
     }
     private void moveKey(char d) {
         if (d == 'u' && cat > FIRST_GROUP) { java.util.Collections.swap(cats, cat, cat - 1); cat--; drawCats(); }
@@ -1536,7 +1612,7 @@ final class NativeLive extends FrameLayout implements NativeHome.Free {
             h.showMenu(l, a, null, 1f, c.name);
             return;
         }
-        l.add("Move (▲ ▼, then OK)"); a.add(new Runnable() { @Override public void run() { moveStart(); } });
+        l.add(nowList ? "Move" : "Move (▲ ▼, then OK)"); a.add(new Runnable() { @Override public void run() { moveStart(); } });
         if (cat > FIRST_GROUP) { l.add("Move to the top"); a.add(new Runnable() { @Override public void run() { moveTo(FIRST_GROUP); } }); }
         if (cat < cats.size() - 1) { l.add("Move to the bottom"); a.add(new Runnable() { @Override public void run() { moveTo(cats.size()); } }); }
         l.add("Hide this category"); a.add(new Runnable() { @Override public void run() {
@@ -1928,6 +2004,7 @@ final class NativeLive extends FrameLayout implements NativeHome.Free {
         zone = "guide";
         h.updateBars();
         bg.setVisibility(INVISIBLE); info.setVisibility(INVISIBLE); guide.setVisibility(INVISIBLE); empty.setVisibility(GONE);
+        if (chips != null) chips.setVisibility(INVISIBLE);
         catsPanel.setAlpha(0f); catsPanel.setVisibility(INVISIBLE); guideDim.setAlpha(0f); guide.setTranslationX(0); guideDim.setTranslationX(0); catsOpen = null;
         ((View) label.getParent()).setVisibility(INVISIBLE);
         fs.setVisibility(VISIBLE);
@@ -3380,7 +3457,12 @@ final class NativeLive extends FrameLayout implements NativeHome.Free {
 
         float totalW() { return HOURS * PER_HOUR * R; }
 
+        // (an upright phone: the on-now list stands in for the grid, and follows it)
+        @Override public void invalidate() { super.invalidate(); if (nowView != null) { nowView.invalidate(); if (chips != null) chips.invalidate(); } }
+        @Override public void setVisibility(int v) { if (nowList) { if (nowView != null) nowView.setVisibility(v); super.setVisibility(INVISIBLE); } else super.setVisibility(v); }
+
         void build() {
+            if (nowView != null) nowView.build();
             if (getWidth() == 0) { post(new Runnable() { @Override public void run() { if (getWidth() > 0) build(); } }); return; }
             names.clear();
             sx = (floor(System.currentTimeMillis()) - base) * perMs;
@@ -3400,6 +3482,7 @@ final class NativeLive extends FrameLayout implements NativeHome.Free {
 
         /** keep the focused channel and programme on screen */
         void reveal(boolean smooth) {
+            if (nowList) { if (nowView != null) nowView.reveal(); return; }
             if (getHeight() == 0 || list.isEmpty()) return;
             float y = sy, x = sx, viewH = getHeight() - head, viewW = getWidth() - chw;
             float top = row * rowPx, bot = top + rowPx;
@@ -3747,6 +3830,216 @@ final class NativeLive extends FrameLayout implements NativeHome.Free {
             }
             c.restore();
             tTitle.setAlpha(255); tSmall.setColor(Ui.WHITE_60);
+        }
+    }
+
+    // ================================================================== an upright phone: the groups as chips, the channels as an "on now" list
+
+    /** the groups in a row that slides sideways; the one that's open wears the look's highlight */
+    private final class ChipsView extends View {
+        private float sx; private float[] xs = new float[0];          // each chip's left edge, and the row's end
+        private final TextPaint tp = new TextPaint(Paint.ANTI_ALIAS_FLAG);
+        private final Paint fill = new Paint(Paint.ANTI_ALIAS_FLAG);
+        private final RectF rf = new RectF();
+        private final float padX = 1.5f * R, gap = .7f * R, chipH = 3.4f * R, left = 1.6f * R;
+        ChipsView(android.content.Context c) { super(c); tp.setTypeface(h.fSemi); tp.setTextSize(1.15f * R); }
+        private String name(Cat c) { return GlassPanel.look.equals("air") ? c.name.toUpperCase(Locale.US) : c.name; }
+        private void measure() {
+            tp.setLetterSpacing(GlassPanel.look.equals("air") ? .06f : 0f);
+            if (xs.length != cats.size() + 1) xs = new float[cats.size() + 1];
+            float x = left;
+            for (int i = 0; i < cats.size(); i++) { xs[i] = x; x += tp.measureText(name(cats.get(i))) + 2 * padX + gap; }
+            xs[cats.size()] = x - gap + left;
+        }
+        float maxX() { measure(); return Math.max(0, xs[cats.size()] - getWidth()); }
+        void slide(float d) { slideTo(sx - d); }
+        void slideTo(float x) { sx = Math.max(0, Math.min(maxX(), x)); invalidate(); }
+        /** the open group's chip is brought into view */
+        void reveal() {
+            if (getWidth() == 0 || cat >= cats.size()) return;
+            measure();
+            float a = xs[cat] - left, b = xs[cat + 1] - gap + left;
+            if (cat == cats.size() - 1) b = xs[cat + 1];
+            if (a < sx) sx = a; else if (b > sx + getWidth()) sx = b - getWidth();
+            sx = Math.max(0, Math.min(Math.max(0, xs[cats.size()] - getWidth()), sx));
+        }
+        /** the group under a finger at x (this view's own pixels), or −1 */
+        int at(float x) {
+            measure();
+            float v = x + sx;
+            for (int i = 0; i < cats.size(); i++) if (v >= xs[i] - gap / 2 && v < xs[i + 1] - gap / 2) return i;
+            return -1;
+        }
+        @Override protected void onDraw(Canvas c) {
+            if (cats.isEmpty()) return;
+            measure();
+            sx = Math.max(0, Math.min(Math.max(0, xs[cats.size()] - getWidth()), sx));
+            float cy = getHeight() / 2f, rad = GlassPanel.corner(chipH / 2);
+            for (int i = 0; i < cats.size(); i++) {
+                float x0 = xs[i] - sx, x1 = xs[i + 1] - gap - sx;
+                if (i == cats.size() - 1) x1 = xs[i + 1] - left - sx;
+                if (x1 < 0 || x0 > getWidth()) continue;
+                boolean on = i == cat;
+                rf.set(x0, cy - chipH / 2, x1, cy + chipH / 2);
+                fill.setColor(on ? GlassPanel.selFill() : Ui.WHITE_7);
+                c.drawRoundRect(rf, rad, rad, fill);
+                if (on && moving) { fill.setColor(Ui.WHITE_85); c.drawRect(x0, rf.bottom + .25f * R, x1, rf.bottom + .5f * R, fill); }
+                tp.setColor(on ? GlassPanel.selText() : Ui.WHITE_75);
+                c.drawText(name(cats.get(i)), x0 + padX, cy + tp.getTextSize() * .36f, tp);
+            }
+        }
+    }
+
+    /** One row a channel: its number and logo, what's on with how far through it is, and what's next (or the score while
+        one of your teams' games is on). The arrow at a row's end opens what's on later on that channel, under it. */
+    private final class NowView extends View {
+        private float sy; private ValueAnimator anim;
+        private int open = -1; private final List<long[]> laterList = new ArrayList<>();
+        private final float rowPx = 7.4f * R, subPx = 4.4f * R, arrowW = 5.6f * R;
+        private final TextPaint tTitle = new TextPaint(Paint.ANTI_ALIAS_FLAG), tSub = new TextPaint(Paint.ANTI_ALIAS_FLAG), tNum = new TextPaint(Paint.ANTI_ALIAS_FLAG), tLater = new TextPaint(Paint.ANTI_ALIAS_FLAG);
+        private final Paint fill = new Paint(Paint.ANTI_ALIAS_FLAG), line = new Paint(Paint.ANTI_ALIAS_FLAG), dot = new Paint(Paint.ANTI_ALIAS_FLAG);
+        private final RectF rf = new RectF();
+        private final Path path = new Path();
+        NowView(android.content.Context c) {
+            super(c);
+            tTitle.setTypeface(h.fSemi); tTitle.setTextSize(1.45f * R); tTitle.setColor(Color.WHITE);
+            tSub.setTypeface(h.fReg); tSub.setTextSize(1.08f * R);
+            tNum.setTypeface(h.fReg); tNum.setTextSize(1f * R); tNum.setColor(Ui.WHITE_60); tNum.setTextAlign(Paint.Align.RIGHT);
+            tLater.setTypeface(h.fMed); tLater.setTextSize(1.2f * R);
+            line.setStyle(Paint.Style.STROKE); line.setStrokeCap(Paint.Cap.ROUND); line.setStrokeJoin(Paint.Join.ROUND); line.setStrokeWidth(Math.max(2f, .16f * R)); line.setColor(Ui.WHITE_60);
+            dot.setColor(0xFFFF453A);
+        }
+        private float extra() { return open >= 0 ? Math.max(1, laterList.size()) * subPx + .6f * R : 0; }
+        private float top(int i) { return i * rowPx + (open >= 0 && i > open ? extra() : 0); }
+        float maxY() { return Math.max(0, list.size() * rowPx + extra() + R - getHeight()); }
+        void slide(float d) { slideTo(sy - d); }
+        void slideTo(float y) { if (anim != null) anim.cancel(); sy = Math.max(0, Math.min(maxY(), y)); invalidate(); }
+        void build() { open = -1; laterList.clear(); if (anim != null) anim.cancel(); sy = Math.max(0, Math.min(maxY(), (row - 1) * rowPx)); invalidate(); }
+        /** the chosen channel is kept on screen */
+        void reveal() {
+            if (getHeight() == 0 || list.isEmpty()) return;
+            float a = top(row), y = sy;
+            if (a < y) y = Math.max(0, a - rowPx); else if (a + rowPx > y + getHeight()) y = a + rowPx * 2 - getHeight();
+            slideTo(y);
+        }
+        /** what's under a finger: {channel, −1} its row, {channel, −2} the arrow at its end, {channel, n} the n-th later show; null for nothing */
+        int[] at(float x, float y) {
+            float v = y + sy; int n = list.size();
+            if (v < 0 || n == 0) return null;
+            int i;
+            if (open < 0 || v < top(open) + rowPx) i = (int) (v / rowPx);
+            else if (v < top(open) + rowPx + extra()) { int k = (int) ((v - top(open) - rowPx) / subPx); return new int[] { open, Math.min(k, laterList.size()) }; }
+            else i = (int) ((v - extra()) / rowPx);
+            if (i >= n) return null;
+            return new int[] { i, x > getWidth() - arrowW ? -2 : -1 };
+        }
+        long[] later(int n) { return n >= 0 && n < laterList.size() ? laterList.get(n) : null; }
+        /** opens what's on later under a channel (or closes it) */
+        @SuppressWarnings("unchecked")
+        void toggle(int i) {
+            float before = top(i) - sy;
+            if (open == i) { open = -1; laterList.clear(); }
+            else {
+                open = i; laterList.clear();
+                Object[] pg = i < list.size() ? progs(list.get(i)) : null;
+                long now = System.currentTimeMillis();
+                if (pg != null) { List<long[]> tt = (List<long[]>) pg[0]; for (int k = 0; k < tt.size() && laterList.size() < 8; k++) if (tt.get(k)[0] > now) laterList.add(new long[] { tt.get(k)[0], tt.get(k)[1], k }); }
+            }
+            // (the row stays where the finger is; opened near the bottom, it comes up so the first shows can be seen)
+            float y = top(i) - before;
+            if (open == i && top(i) - y + rowPx + Math.min(extra(), 2.2f * subPx) > getHeight()) y = top(i) + rowPx + Math.min(extra(), 2.2f * subPx) - getHeight();
+            slideTo(y);
+        }
+        private void arrow(Canvas c, float cx, float cy, boolean up) {
+            float a = .55f * R, d = up ? -a * .55f : a * .55f;
+            path.reset(); path.moveTo(cx - a, cy - d); path.lineTo(cx, cy + d); path.lineTo(cx + a, cy - d);
+            c.drawPath(path, line);
+        }
+        private String fit(String s, TextPaint p, float w) { return TextUtils.ellipsize(s, p, Math.max(1, w), TextUtils.TruncateAt.END).toString(); }
+        @Override protected void onDraw(Canvas c) {
+            int w = getWidth(), hh = getHeight();
+            if (w == 0 || list.isEmpty()) return;
+            if (open >= list.size()) { open = -1; laterList.clear(); }
+            sy = Math.max(0, Math.min(maxY(), sy));
+            c.clipRect(0, 0, w, hh);
+            long now = System.currentTimeMillis();
+            rebase();
+            float tx = 11.2f * R, tr = w - arrowW;
+            int hi = GlassPanel.selFill();
+            for (int i = Math.max(0, (int) ((sy - extra()) / rowPx) - 1); i < list.size(); i++) {
+                float y = top(i) - sy;
+                if (y > hh) break;
+                if (y + rowPx + (i == open ? extra() : 0) < 0) continue;
+                Ch ch = list.get(i);
+                boolean on = playing != null && playing.u.equals(ch.u);
+                if (i == row || on) { fill.setColor(Ui.WHITE_7); c.drawRect(0, y, w, y + rowPx, fill); }
+                if (on) { fill.setColor(hi); c.drawRect(0, y, Math.max(3f, .42f * R), y + rowPx, fill); }
+                fill.setColor(Ui.WHITE_7); c.drawRect(1.6f * R, y + rowPx - Math.max(1f, .05f * R), w, y + rowPx, fill);
+                float cy = y + rowPx / 2;
+                // number, logo
+                String num = chNum(ch);
+                tNum.setTextSize(1f * R); float nw = tNum.measureText(num); if (nw > 3.2f * R) tNum.setTextSize(Math.max(.62f * R, R * 3.2f * R / nw));
+                c.drawText(num, 4.4f * R, cy + tNum.getTextSize() * .36f, tNum);
+                float lx = 5.2f * R, bw = 5.2f * R, bh = 3.5f * R;
+                Bitmap lg = ch.l.isEmpty() ? null : chLogo(ch.l, this);
+                if (lg != null) {
+                    float k = Math.min(bw / lg.getWidth(), bh / lg.getHeight());
+                    rf.set(lx + (bw - lg.getWidth() * k) / 2, cy - lg.getHeight() * k / 2, lx + (bw + lg.getWidth() * k) / 2, cy + lg.getHeight() * k / 2);
+                    c.drawBitmap(lg, null, rf, LOGO_P);
+                } else {
+                    fill.setColor(Ui.WHITE_12); rf.set(lx + .4f * R, cy - bh / 2, lx + bw - .4f * R, cy + bh / 2); c.drawRoundRect(rf, GlassPanel.corner(.6f * R), GlassPanel.corner(.6f * R), fill);
+                    tTitle.setTextAlign(Paint.Align.CENTER); c.drawText(ch.n.isEmpty() ? "" : ch.n.substring(0, 1).toUpperCase(Locale.US), lx + bw / 2, cy + tTitle.getTextSize() * .36f, tTitle); tTitle.setTextAlign(Paint.Align.LEFT);
+                }
+                // what's on
+                long[] p = progAt(ch, now);
+                float avail = tr - tx;
+                if (p == null) {
+                    c.drawText(fit(ch.n, tTitle, avail), tx, cy - .2f * R, tTitle);
+                    tSub.setColor(Ui.WHITE_50);
+                    c.drawText(progs(ch) == null ? "" : "No guide information", tx, cy + 1.5f * R, tSub);
+                } else {
+                    String title = progText(ch, p)[0]; if (title.isEmpty()) title = "Untitled";
+                    float bx = tx, ty = y + 2.15f * R, my = ty - tTitle.getTextSize() * .36f;
+                    if (recMarks.contains(ch.u + "|" + p[0])) { float rr = .42f * R; c.drawCircle(bx + rr, my, rr, dot); bx += 2 * rr + .55f * R; }
+                    String gm = gameMarks.isEmpty() ? null : gameMarks.get(ch.u + "|" + p[0]);
+                    SportsData.Ev game = null;
+                    if (gm != null) try { game = h.sportsData().find(gm); } catch (Throwable ignored) { }
+                    if (game != null) bx += guide.gameTag(c, bx, my, game.state.equals("in"), 255);
+                    c.drawText(fit(title, tTitle, tr - bx), bx, ty, tTitle);
+                    tSub.setColor(Ui.WHITE_60);
+                    c.drawText(fit(ch.n + "  ·  " + dur(Math.max(60000, p[1] - now)) + " left", tSub, avail), tx, y + 3.75f * R, tSub);
+                    float by = y + 4.45f * R, bt = Math.max(2f, .26f * R), fr = Math.max(0f, Math.min(1f, (now - p[0]) / (float) Math.max(1, p[1] - p[0])));
+                    fill.setColor(Ui.WHITE_20); c.drawRect(tx, by, tr - R, by + bt, fill);
+                    fill.setColor(Color.WHITE); c.drawRect(tx, by, tx + (tr - R - tx) * fr, by + bt, fill);
+                    String sc = game != null ? guide.score(game) : "";
+                    if (!sc.isEmpty()) { tSub.setColor(Color.WHITE); tSub.setTypeface(h.fMed); c.drawText(fit(sc, tSub, avail), tx, y + 6.35f * R, tSub); tSub.setTypeface(h.fReg); }
+                    else {
+                        long[] nx = nextAfter(ch, p[1] - 1);
+                        if (nx != null) { String nt = progText(ch, nx)[0]; tSub.setColor(Ui.WHITE_50); c.drawText(fit("Next " + fmtShort(nx[0]) + "  ·  " + (nt.isEmpty() ? "Untitled" : nt), tSub, avail), tx, y + 6.35f * R, tSub); }
+                    }
+                }
+                arrow(c, w - arrowW / 2, cy, i == open);
+                if (i != open) continue;
+                // later on this channel
+                float y0 = y + rowPx;
+                fill.setColor(0x38000000); c.drawRect(0, y0, w, y0 + extra(), fill);
+                fill.setColor(hi); c.drawRect(0, y0, Math.max(3f, .42f * R), y0 + extra(), fill);
+                if (laterList.isEmpty()) { tSub.setColor(Ui.WHITE_50); c.drawText("Nothing listed for later", tx, y0 + subPx / 2 + tSub.getTextSize() * .36f, tSub); continue; }
+                for (int k = 0; k < laterList.size(); k++) {
+                    long[] se = laterList.get(k);
+                    float sc = y0 + k * subPx + subPx / 2;
+                    tSub.setColor(Ui.WHITE_60);
+                    c.drawText(fmtShort(se[0]), 2.2f * R, sc + tSub.getTextSize() * .36f, tSub);
+                    float bx = tx, my = sc;
+                    if (remHas(ch.u, se[0])) { float bs = tLater.getTextSize(); HomeIcons.at(c, HomeIcons.BELL, bx + bs * .5f, my, bs * 1.1f, 0xFFFFD60A); bx += bs * 1.45f; }
+                    if (recMarks.contains(ch.u + "|" + se[0])) { float rr = .42f * R; c.drawCircle(bx + rr, my, rr, dot); bx += 2 * rr + .55f * R; }
+                    String gm = gameMarks.isEmpty() ? null : gameMarks.get(ch.u + "|" + se[0]);
+                    if (gm != null) { SportsData.Ev g = null; try { g = h.sportsData().find(gm); } catch (Throwable ignored) { } if (g != null) bx += guide.gameTag(c, bx, my, false, 255); }
+                    String nt = progText(ch, se)[0];
+                    tLater.setColor(row == i && t >= se[0] && t < se[1] ? Color.WHITE : Ui.WHITE_85);
+                    c.drawText(fit(nt.isEmpty() ? "Untitled" : nt, tLater, w - 1.6f * R - bx), bx, sc + tLater.getTextSize() * .36f, tLater);
+                }
+            }
         }
     }
 

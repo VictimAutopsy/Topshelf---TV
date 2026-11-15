@@ -282,6 +282,21 @@ final class NativeHome extends FrameLayout {
         lp.leftMargin = px(xRem); lp.topMargin = px(yRem);
         return lp;
     }
+    /** the upright phone's tab bar: its flat dark ground with a hairline along the top, or (line) the mark over the tab you're on */
+    private final class ThumbBar extends android.graphics.drawable.Drawable {
+        private final android.graphics.Paint p = new android.graphics.Paint();
+        private final int color; private final boolean line;
+        ThumbBar(int color, boolean line) { this.color = color; this.line = line; }
+        @Override public void draw(android.graphics.Canvas c) {
+            android.graphics.Rect b = getBounds();
+            if (line) { p.setColor(color); float w = Math.min(b.width() - px(1.6f), px(6f)), cx = b.exactCenterX(); c.drawRect(cx - w / 2, b.top, cx + w / 2, b.top + Math.max(3f, .26f * R), p); return; }
+            p.setColor(0xF50C0C0F); c.drawRect(b, p);
+            p.setColor(Ui.WHITE_12); c.drawRect(b.left, b.top, b.right, b.top + Math.max(1f, .06f * R), p);
+        }
+        @Override public void setAlpha(int a) { }
+        @Override public void setColorFilter(android.graphics.ColorFilter cf) { }
+        @Override public int getOpacity() { return android.graphics.PixelFormat.TRANSLUCENT; }
+    }
     /* On a phone the hints speak of the finger, not the remote: "OK" is a tap, "hold OK" a hold, ◀ ▶ and ▲ ▼ a swipe. */
     private static final java.util.regex.Pattern OK_W = java.util.regex.Pattern.compile("\\bOK(?= ·| on | again| to | \\()");
     static String touchWords(String s) {
@@ -318,7 +333,7 @@ final class NativeHome extends FrameLayout {
         menuStyle = side ? menuStylePref(S) : "panel";
         menuHead = null; rowStart = -1; railOpen = false; nowHead = nowGame = nowCw = null;
         barExtras.clear(); cornerL = cornerR = null; barScrim = null;
-        COLS = portrait ? 3 : 5; GAP_REM = portrait ? 2.2f : 2.75f; BOT = portrait && !side ? (phone ? 10.6f : 8.6f) : 0;
+        COLS = portrait ? 3 : 5; GAP_REM = portrait ? 2.2f : 2.75f; BOT = portrait && !side ? (phone ? 8.8f : 8.6f) : 0;
         TW = portrait ? (SW - 7 - (COLS - 1) * GAP_REM) / COLS : TW_REM; TH = TW * 9 / 16f; PITCH = TH + 5.8f; DOCK_PANEL_H = TH + 3.6f;     // (no names under the dock's icons: just room for the focused one to grow)
         M = (SW - COLS * TW - (COLS - 1) * GAP_REM) / 2f;
         DOCK_PANEL_Y = SH - 2.8f - DOCK_PANEL_H - BOT; DOCK_Y = DOCK_PANEL_Y + 1.8f;
@@ -488,11 +503,14 @@ final class NativeHome extends FrameLayout {
         buildStyledBar(c);
         } else {
         // --- tab bar
-        tabs = glass(3f, Ui.WHITE_7);
-        tabsRow = new LinearLayout(c);
-        tabsRow.setPadding(px(.55f), px(.55f), px(.55f), px(.55f));
-        tabViews = new TextView[TAB_IDS.length];
         final boolean thumb = phone && portrait;
+        tabs = glass(thumb ? 0f : 3f, Ui.WHITE_7);
+        tabsRow = new LinearLayout(c);
+        /* a phone held upright (Chad picked it from a sketch, 1.0.446): one flat dark bar across the bottom edge, the
+           tabs' names evenly along it, the one you're on white under a line of the look's highlight */
+        if (thumb) { tabs.setBare(); tabs.setLiquidAllowed(false); panels.remove(tabs); tabs.setBackground(new ThumbBar(0, false)); tabsRow.setPadding(0, 0, 0, px(2.6f)); }
+        else tabsRow.setPadding(px(.55f), px(.55f), px(.55f), px(.55f));
+        tabViews = new TextView[TAB_IDS.length];
         for (int i = 0; i < TAB_IDS.length; i++) {
             TextView t = text(fSemi, thumb ? 1.4f : portrait ? 1.3f : 1.35f, Ui.WHITE_75);
             t.setText(TAB_NAMES[i]);
@@ -501,13 +519,14 @@ final class NativeHome extends FrameLayout {
             else t.setPadding(px(tp), px(.95f), px(tp), px(.95f));
             t.setBackground(pill(Color.TRANSPARENT));
             LinearLayout.LayoutParams lp = thumb ? new LinearLayout.LayoutParams(0, px(5.6f), 1) : new LinearLayout.LayoutParams(LayoutParams.WRAP_CONTENT, LayoutParams.WRAP_CONTENT);
-            if (i > 0) lp.leftMargin = px(.3f);
+            if (i > 0 && !thumb) lp.leftMargin = px(.3f);
             tabsRow.addView(t, lp);
             tabViews[i] = t;
         }
         tabs.addView(tabsRow, new LayoutParams(thumb ? LayoutParams.MATCH_PARENT : LayoutParams.WRAP_CONTENT, LayoutParams.WRAP_CONTENT));
-        FrameLayout.LayoutParams tl = new FrameLayout.LayoutParams(thumb ? px(SW - 3) : LayoutParams.WRAP_CONTENT, LayoutParams.WRAP_CONTENT, (portrait ? Gravity.BOTTOM : Gravity.TOP) | Gravity.CENTER_HORIZONTAL);
-        if (portrait) tl.bottomMargin = px(thumb ? 2.8f : 2f); else tl.topMargin = px(2.3f);      // (3 rem: above the strip Android's swipe-up-for-home takes)
+        FrameLayout.LayoutParams tl = new FrameLayout.LayoutParams(thumb ? LayoutParams.MATCH_PARENT : LayoutParams.WRAP_CONTENT, LayoutParams.WRAP_CONTENT, (portrait ? Gravity.BOTTOM : Gravity.TOP) | Gravity.CENTER_HORIZONTAL);
+        if (thumb) tl.bottomMargin = 0;           // (flush with the bottom edge: the row's own padding keeps the names above the strip Android's swipe-up-for-home takes)
+        else if (portrait) tl.bottomMargin = px(2f); else tl.topMargin = px(2.3f);
         addView(tabs, tl);
 
         // --- top bar (round buttons, weather, clock)
@@ -1400,6 +1419,11 @@ final class NativeHome extends FrameLayout {
                 boolean active = TAB_IDS[i].equals(tab);
                 int on = tab.equals("movies") ? 0x42FFB040 : tab.equals("series") ? 0x3D64D2FF : tab.equals("live") ? 0x47FF453A : tab.equals("sports") ? 0x4234C759 : Ui.WHITE_20;
                 int onText = tab.equals("movies") ? 0xFFFFE2B3 : tab.equals("series") ? 0xFFD2F2FF : tab.equals("live") ? 0xFFFFD9D6 : tab.equals("sports") ? 0xFFD4FFE0 : Color.WHITE;
+                if (phone && portrait) {
+                    t.setBackground(active ? new ThumbBar(GlassPanel.selFill(), true) : null);
+                    t.setTextColor(active || sel ? Color.WHITE : Ui.WHITE_60);
+                    continue;
+                }
                 t.setBackground(pill(sel ? GlassPanel.selFill() : active ? on : Color.TRANSPARENT));
                 t.setTextColor(sel ? GlassPanel.selText() : active ? onText : Ui.WHITE_75);
                 t.setScaleX(1f); t.setScaleY(1f);
