@@ -1771,6 +1771,7 @@ final class NativeHome extends FrameLayout {
         if (saver || vodPlayingNow() || addonsOpenNow() || gameOpenNow() || fySetupOpen() || launchOv.getVisibility() == VISIBLE) return null;
         if (titleOpenNow()) return titleView;
         if (onVod() && isLive()) return live;
+        if (onVod() && isSports()) return sports;
         if (!onVod() || isLive() || isSports()) return null;
         return vod;
     }
@@ -1806,6 +1807,7 @@ final class NativeHome extends FrameLayout {
                 if (vodH != null) vodH.touchDown();
                 if (titleView != null) titleView.touchDown();
                 if (live != null) live.touchDown();
+                if (sports != null) sports.touchDown();
                 if (tVel != null) tVel.recycle();
                 tVel = android.view.VelocityTracker.obtain(); tVel.addMovement(e);
                 main.removeCallbacks(tLong); main.postDelayed(tLong, 460);

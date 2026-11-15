@@ -47,7 +47,7 @@ import java.util.Map;
  * Every card, the scoreboard, your-teams column and the strip are painted into one picture each (off the
  * main thread) whenever their games change, so moving around is just moving pictures.
  */
-final class NativeSports extends FrameLayout {
+final class NativeSports extends FrameLayout implements NativeHome.Free {
     /* Fading in, this pane is drawn piece by piece at the fading strength rather than into one picture
        first: its rows and pictures are still arriving as it fades, and each one spoilt that picture,
        so the whole screen was drawn twice a frame (switching tabs ran at about 20 frames a second). */
@@ -120,9 +120,76 @@ final class NativeSports extends FrameLayout {
         @Override protected int sizeOf(String k, Bitmap b) { return b.getByteCount(); }
     };
 
+    /* A phone held upright (1.0.452): everything sits below the camera cutout; the score strip and the tabs stay at the
+       top (the tabs slide sideways when there are more than fit) and the rest — the scoreboard, your teams, the leagues,
+       the games — is one page that slides up and down under a finger, with the leagues and the games sliding sideways
+       in their rows. Nothing there takes the remote's steps except Standings, and the remote's ring isn't shown. */
+    private final boolean thumb;
+    private float pageY, tabsX;
+    private android.widget.OverScroller fling;
+    private int dragWhat = -1, flingWhat;          // 1 the tabs, 2 the page, 3 the leagues, 4 the games, 5 nothing; 0 not ours (Standings: the steps)
+    private View[] paged() { return new View[] { hero[0], hero[1], side, rail, rowsBox, setupTitle, setupSub }; }
+    private float pageMax() { return standings.shownNow() ? 0 : Math.max(0, h.px(ROWS_Y + ROW_H + h.BOT + 1f) + getPaddingTop() - H); }
+    private void setPage(float y) {
+        pageY = Math.max(0, Math.min(pageMax(), y));
+        for (View v : paged()) { v.animate().cancel(); v.setTranslationY(-pageY); }
+        if (heroTop >= 0) { hero[heroTop].setAlpha(1f); hero[1 - heroTop].setAlpha(0f); }          // (a scoreboard caught mid-fade)
+    }
+    private float tabsMax() { return Math.max(0, tabRow.getWidth() + (liveChip.getVisibility() == VISIBLE ? liveChip.getWidth() + h.px(1.2f) : 0) + 2 * h.px(PAD) - W); }
+    private float gamesMax() { return rows.isEmpty() ? 0 : Math.max(0, PAD * 2 + rows.get(0).length() * (CW + GAP) - GAP - SW); }
+    private void slideGames(float rem) {
+        FrameLayout strip = stripOf.get(0);
+        if (strip == null) return;
+        float sc = Math.max(0, Math.min(gamesMax(), rem));
+        scrolls.put(0, sc);
+        strip.animate().cancel(); strip.setTranslationX(-sc * R);
+        syncCards();
+    }
+    @Override public void touchDown() { if (fling != null) fling.forceFinished(true); dragWhat = -1; }
+    @Override public boolean drag(char axis, float x0, float y0, float d) {
+        if (!thumb || !shown) return false;
+        if (dragWhat < 0) {
+            if (d == 0) return true;
+            dragWhat = 5;
+            if (axis == 'h' && h.hit(chrome, x0, y0, 0) && h.local(chrome, x0, y0)[1] > h.px(RIB_H)) dragWhat = 1;
+            else if (standings.shownNow()) dragWhat = 0;
+            else if (axis == 'v') dragWhat = 2;
+            else if (rail.getVisibility() == VISIBLE && h.hit(rail, x0, y0, 0)) dragWhat = 3;
+            else if (h.hit(rowsBox, x0, y0, 0) && stripOf.get(0) != null) dragWhat = 4;
+        }
+        if (dragWhat == 0) return false;
+        if (dragWhat == 1) { tabsX = Math.max(0, Math.min(tabsMax(), tabsX - d)); tline.setTranslationX(-tabsX); }
+        else if (dragWhat == 2) setPage(pageY - d);
+        else if (dragWhat == 3) rail.slideTo(rail.slideX - d);
+        else if (dragWhat == 4) slideGames(scroll(0) - d / R);
+        return true;
+    }
+    @Override public void dragEnd(char axis, float v) {
+        int what = dragWhat; dragWhat = -1;
+        if (what <= 0 || what == 5 || !shown) return;
+        if (fling == null) fling = new android.widget.OverScroller(getContext());
+        flingWhat = what;
+        int vv = -Math.round(v);
+        if (what == 1) fling.fling(Math.round(tabsX), 0, vv, 0, 0, Math.round(tabsMax()), 0, 0);
+        else if (what == 2) fling.fling(0, Math.round(pageY), 0, vv, 0, 0, 0, Math.round(pageMax()));
+        else if (what == 3) fling.fling(Math.round(rail.slideX), 0, vv, 0, 0, Math.round(rail.maxX()), 0, 0);
+        else fling.fling(Math.round(scroll(0) * R), 0, vv, 0, 0, Math.round(gamesMax() * R), 0, 0);
+        removeCallbacks(glide); postOnAnimation(glide);
+    }
+    private final Runnable glide = new Runnable() { @Override public void run() {
+        if (fling == null || !shown || !fling.computeScrollOffset()) return;
+        if (flingWhat == 1) { tabsX = fling.getCurrX(); tline.setTranslationX(-tabsX); }
+        else if (flingWhat == 2) setPage(fling.getCurrY());
+        else if (flingWhat == 3) rail.slideTo(fling.getCurrX());
+        else slideGames(fling.getCurrX() / R);
+        if (!fling.isFinished()) postOnAnimation(this);
+    } };
+
     NativeSports(NativeHome host) {
         super(host.getContext());
         h = host; R = host.R; W = host.W; H = host.H; SW = host.SW;
+        thumb = h.phone && h.portrait;
+        if (thumb) setPadding(0, h.px(h.TOP), 0, 0);
         if (h.portrait) { HERO_H = 31f; SIDE_W = SW - 2 * PAD; sideY = HERO_Y + HERO_H + 1.6f; }
         setClipChildren(true);
         setBackgroundColor(GROUND);
@@ -172,7 +239,8 @@ final class NativeSports extends FrameLayout {
         updated = h.text(h.fReg, Ui.TEXT_M, TER);
         LinearLayout.LayoutParams ul = new LinearLayout.LayoutParams(LayoutParams.WRAP_CONTENT, LayoutParams.WRAP_CONTENT); ul.leftMargin = h.px(1.4f);
         tline.addView(updated, ul);
-        chrome.addView(tline, h.at(PAD, TABS_Y, LayoutParams.WRAP_CONTENT, LayoutParams.WRAP_CONTENT));
+        chrome.addView(tline, h.at(PAD, TABS_Y, thumb ? h.px(170) : LayoutParams.WRAP_CONTENT, LayoutParams.WRAP_CONTENT));      // (a phone: room for every tab; they slide)
+        if (thumb) { chrome.setBackgroundColor(GROUND); updated.setVisibility(GONE); }
 
         // the scoreboard (two pictures crossfading)
         for (int i = 0; i < 2; i++) {
@@ -206,6 +274,7 @@ final class NativeSports extends FrameLayout {
         rowsBox.addView(rowsIn, new LayoutParams(LayoutParams.MATCH_PARENT, h.px(400)));
         ring = new SportsLook.Focus(c, R);
         addView(ring, new LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.MATCH_PARENT));
+        if (thumb) ring.setVisibility(GONE);
         // Standings (its own tab): over the scoreboard, cards and leagues, under the tabs
         standings = new StandingsView(h);
         standings.setBackgroundColor(GROUND);
@@ -322,7 +391,8 @@ final class NativeSports extends FrameLayout {
             RAIL_Y = sideY + sh + (sideOn ? 1f : 0);
             ROWS_Y = RAIL_Y + 4.8f;
             LayoutParams rl = (LayoutParams) rail.getLayoutParams(); rl.topMargin = h.px(RAIL_Y); rail.setLayoutParams(rl);
-            LayoutParams bl = (LayoutParams) rowsBox.getLayoutParams(); bl.topMargin = h.px(ROWS_Y); bl.height = H - h.px(ROWS_Y); rowsBox.setLayoutParams(bl);
+            LayoutParams bl = (LayoutParams) rowsBox.getLayoutParams(); bl.topMargin = h.px(ROWS_Y); bl.height = thumb ? h.px(ROW_H) : H - h.px(ROWS_Y); rowsBox.setLayoutParams(bl);
+            if (thumb) setPage(pageY);
         }
         for (View v : new View[] { hero[0], hero[1] }) { LayoutParams lp = (LayoutParams) v.getLayoutParams(); int nw = h.px(heroW); if (lp.width != nw) { lp.width = nw; v.setLayoutParams(lp); heroKey = ""; } }
         heroWidth = heroW;
@@ -512,6 +582,7 @@ final class NativeSports extends FrameLayout {
         drawTabs();
         rebuildRows();
         focus(smooth);
+        if (thumb) setPage(pageY);
     }
     private boolean stillThere(JSONObject g) {
         String id = g.optString("k").split(":")[0];
@@ -844,7 +915,7 @@ final class NativeSports extends FrameLayout {
         }
         if (rail.getVisibility() == VISIBLE && h.hit(rail, x, y, 0)) {
             float[] l = h.local(rail, x, y);
-            for (int i = 0; i < rail.chips.size(); i++) if (rail.chips.get(i).contains(l[0], l[1])) { leagueSel = i; tab = railTab(); zone = "grid"; applySet(true); rail.invalidate(); return "done"; }
+            for (int i = 0; i < rail.chips.size(); i++) if (rail.chips.get(i).contains(l[0], l[1])) { rail.bring(i); leagueSel = i; tab = railTab(); zone = "grid"; applySet(true); rail.invalidate(); return "done"; }
             return null;
         }
         for (Map.Entry<String, CardView> en : cardViews.entrySet()) {
@@ -895,7 +966,7 @@ final class NativeSports extends FrameLayout {
         for (int k = off; k < allRows.size(); k++) { JSONArray a = allRows.get(k); for (int i = 0; i < a.length(); i++) if (a.optJSONObject(i).optString("k").split(":")[0].equals(id)) {
             int[] me = new int[2], host = new int[2];
             getLocationInWindow(me); h.getLocationInWindow(host);
-            float x = me[0] - host[0] + h.px(PAD), y = me[1] - host[1] + h.px(HERO_Y);
+            float x = me[0] - host[0] + h.px(PAD), y = me[1] - host[1] + h.px(HERO_Y) + getPaddingTop() - pageY;
             h.sportsData().openPage(k - off, i, new RectF(x, y, x + h.px(heroWidth), y + h.px(HERO_H)));
             return;
         } }
@@ -1747,9 +1818,27 @@ final class NativeSports extends FrameLayout {
                 ws[i] = .5f * R + d + .8f * R + nws[i] + .8f * R + NativeSports.this.measure(cn[1] > 0 ? cn[1] + " LIVE" : String.valueOf(cn[0]), cond, SportsLook.T_LABEL, .04f) + SportsLook.CTRL_PAD * R;
                 if (i <= leagueSel) selR += ws[i] + (i > 0 ? .8f * R : 0);
             }
-            x -= Math.max(0, x + selR - (getWidth() - PAD * R));
+            float auto = Math.max(0, x + selR - (getWidth() - PAD * R));
+            if (thumb) {
+                // (a phone: the row stays where a finger left it)
+                float total = 0; for (int i = 0; i < n; i++) total += ws[i] + (i > 0 ? .8f * R : 0);
+                slideMax = Math.max(0, total + 2 * PAD * R - getWidth());
+                if (!fingered) slideX = auto;
+                slideX = Math.max(0, Math.min(slideMax, slideX));
+                x -= slideX;
+            } else x -= auto;
             chips.clear();
             for (int i = 0; i < n; i++) { chips.add(new RectF(x, top, x + ws[i], top + hh)); x += ws[i] + .8f * R; }
+        }
+        float slideX, slideMax; boolean fingered;
+        float maxX() { return slideMax; }
+        void slideTo(float x) { fingered = true; slideX = Math.max(0, Math.min(slideMax, x)); invalidate(); }
+        /** a chip that was tapped while partly off the edge comes fully in */
+        void bring(int i) {
+            if (!thumb || i < 0 || i >= chips.size()) return;
+            RectF c = chips.get(i); float pad = PAD * R;
+            fingered = true;
+            if (c.left < pad) slideX -= pad - c.left; else if (c.right > getWidth() - pad) slideX += c.right - (getWidth() - pad);
         }
         /** a league's chip, in this view's own coordinates (null before there's room to lay them out) */
         RectF chipAt(int i) {
@@ -1918,12 +2007,12 @@ final class NativeSports extends FrameLayout {
         nv.animate().cancel();
         nv.setImageBitmap(b);
         nv.bringToFront();
-        nv.setAlpha(0f); nv.setTranslationY(.4f * R);
+        nv.setAlpha(0f); nv.setTranslationY(.4f * R - pageY);
         final int under = heroTop;
         heroTop = next;
         // (Standings covers the scoreboard: a new scoreboard brought forward went over the tables)
         order();
-        nv.animate().alpha(1f).translationY(0).setDuration(Ui.MOVE).setInterpolator(TileView.EASE).withEndAction(new Runnable() { @Override public void run() {
+        nv.animate().alpha(1f).translationY(-pageY).setDuration(Ui.MOVE).setInterpolator(TileView.EASE).withEndAction(new Runnable() { @Override public void run() {
             if (heroTop == 1 - under || under < 0) { } if (under >= 0 && heroTop != under) hero[under].setAlpha(0f);
         } }).start();
     }
