@@ -73,6 +73,11 @@ Quick compile check without building:
   score and period in place of the times. `SportsData.guideGames` finds the shows (same matching as Sports' "Watch on…"),
   `NativeLive.askGames` asks every 30 s while the guide is up. He likes the guide's layout and look as they are: he turned
   down a picture-first redesign and three new looks.
+- Game and fantasy alerts (`SportsAlert`, 1.0.442) are one small bar, 3.9 rem tall, in the chosen look: a tag naming what
+  happened (the look's highlight; On Air's red bar with the slanted end), logos, the score or matchup, a short detail,
+  "OK · Watch". Chad uses the On Air look (he calls it the news theme) and turned down bigger cards and a glass pill as
+  blocking too much and not fitting it. Where it shows is his setting, Settings › Sports › Alert position (`S.alertPlace`):
+  top right (default) or bottom middle. Mock up anything on screen in the look he uses.
 - Diagnostics: `Diag.ev("...")`. Lines are scrubbed of keys and logins, but don't log full stream or addon links anyway.
 
 ## Working with Chad

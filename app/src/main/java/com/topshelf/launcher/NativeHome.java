@@ -1866,7 +1866,7 @@ final class NativeHome extends FrameLayout {
         if (saver) { stopSaver(); return; }
         if (launchOv.getVisibility() == VISIBLE) { hideLaunch(); return; }
         if (fySetupOpen()) { fySetupClose(); return; }
-        if (alertTakesOk() && x > W * .2f && x < W * .8f && y < px(16)) { alertView.ok(); return; }       // (a tap on the game alert)
+        if (alertTakesOk() && alertView.hitCard(x, y)) { alertView.ok(); return; }       // (a tap on the game alert)
         if (mode.equals("menu")) {
             for (int i = 0; i < menuRows.getChildCount(); i++) if (hit(menuRows.getChildAt(i), x, y, 0)) { menuSel = i; drawMenu(); ok(); return; }
             if (!hit(menuPanel, x, y, 0)) closeMenu();

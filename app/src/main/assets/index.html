@@ -1089,6 +1089,8 @@ function buildAllSettings() {
     { label: 'Phone & TV link', value: () => IS_TV ? (lkInfo().paired || []).length ? `${lkInfo().paired.length} phone(s) linked` : 'Link your phone' : lkOn() ? `Linked to ${lkTvName()}` : 'Not linked',
       ok: () => { closeSettings(); openLink(); } },
     { label: 'Game alerts', value: () => S.gameAlerts === false ? 'Off' : 'On', cycle: () => { S.gameAlerts = S.gameAlerts === false; save(); if (window.spTick) spTick(); } },
+    { label: 'Alert position', value: () => S.alertPlace === 'bottom' ? 'Bottom middle' : 'Top right',
+      cycle: () => { S.alertPlace = S.alertPlace === 'bottom' ? 'top' : 'bottom'; save(); } },
     { label: 'Red zone alerts', value: () => S.gameAlerts === false ? 'Off (game alerts are off)' : S.redZone === false ? 'Off' : 'On · your team inside the 20',
       cycle: () => { S.redZone = S.redZone === false; save(); } },
     // on the phone: set it up for the linked TV (its setup page opens in the phone's browser)
@@ -1355,7 +1357,7 @@ const SET_SECTIONS = [
     ['Channels', ['Channel groups', 'Channel group order', 'Hidden channels', 'Reminders']],
     ['Recording', ['Recordings', 'Google Drive']] ] },
   { name: 'Sports', about: 'Your teams, game alerts and fantasy', groups: [
-    ['', ['Sports & teams', 'Game alerts', 'Red zone alerts']],
+    ['', ['Sports & teams', 'Game alerts', 'Red zone alerts', 'Alert position']],
     ['Fantasy', ['Yahoo Fantasy', 'Fantasy players', 'Fantasy scoring', /^Fantasy · /]] ] },
   { name: 'Screen & sleep', about: 'Screensaver, bedtime and picture', groups: [
     ['', ['Screensaver', 'Bedtime']],
