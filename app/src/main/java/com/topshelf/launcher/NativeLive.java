@@ -1153,13 +1153,15 @@ final class NativeLive extends FrameLayout implements NativeHome.Free {
     // ---------------------------------------------------------------- a finger on a phone: the guide and the groups slide with it
     private android.widget.OverScroller fling;
     private int dragWhat = -1, flingWhat;          // -1 not decided yet, 0 not ours (the remote's steps), 1 the guide, 2 the groups
-    @Override public void touchDown() { if (fling != null) fling.forceFinished(true); dragWhat = -1; }
+    @Override public void touchDown() { if (fling != null) fling.forceFinished(true); dragWhat = -1; zapGlide++; }
     @Override public boolean drag(char axis, float x0, float y0, float dPx) {
-        if (!shown || full || zap || moving || recCat() || empty.getVisibility() == VISIBLE) return false;
+        if (shown && full) return fullDrag(axis, x0, y0, dPx);
+        if (!shown || full || zap || moving || empty.getVisibility() == VISIBLE) return false;
         if (dragWhat < 0) {
             if (dPx == 0) return true;               // (which way it's going isn't known yet)
             dragWhat = 0;
             if (zone.equals("cats")) { if (axis == 'v' && h.hit(catView, x0, y0, 0)) dragWhat = 2; }
+            else if (recCat()) { if (axis == 'v' && h.hit(recView, x0, y0, 0)) dragWhat = 6; }
             else if (!list.isEmpty() && h.hit(guide, x0, y0, 0)) {
                 // sliding right when the guide is already at its start still brings the groups out
                 if (!(axis == 'h' && dPx > 0 && guide.sx <= 1)) dragWhat = 1;
@@ -1167,21 +1169,98 @@ final class NativeLive extends FrameLayout implements NativeHome.Free {
         }
         if (dragWhat == 1) { guide.slide(axis, dPx); return true; }
         if (dragWhat == 2) { catView.slide(dPx); return true; }
+        if (dragWhat == 6) { recView.slide(dPx); return true; }
         return false;
+    }
+    /* Watching full screen on a phone, a slide is one thing, however far or fast it goes (the remote's steps made a
+       flick change channel several times): on the timeline it moves the point you'll jump to, and it jumps when you
+       let go; over the channel list it moves through the channels; anywhere else, up or down is the next or the
+       previous channel, from the left brings the channel list out (it comes from that side), to the left goes back
+       to the channel before. While the toolbar's up, a slide off the timeline does nothing, so reaching for a
+       button can't change the channel. */
+    private float fsAcc; private int zapGlide;
+    private boolean fullDrag(char axis, float x0, float y0, float dPx) {
+        if (statsView.shown) return false;
+        if (dragWhat < 0) {
+            if (dPx == 0) return true;
+            fsAcc = 0;
+            if (zap) dragWhat = axis == 'v' ? 4 : 5;
+            else if (barShown() && axis == 'h' && Math.abs(h.local(controls, x0, y0)[1] - 3.2f * R) < 2.6f * R) {
+                dragWhat = 7;
+                if (!noBuf()) { dragWhat = 3; barFocus = true; barRow = 0; scrubbing = true; scrubWall = posWall(); main().removeCallbacks(scrubCommit); }
+            } else dragWhat = barShown() && barFocus ? 7 : 5;      // (the channel's banner alone, after a change, doesn't stop the next slide)
+        }
+        fsAcc += dPx;
+        if (dragWhat == 3) {
+            scrubWall = wallAt(h.local(controls, x0 + fsAcc, y0)[0]);
+            main().removeCallbacks(osdHide); main().removeCallbacks(scrubCommit);
+            controls.invalidate();
+        } else if (dragWhat == 4) {
+            float rp = 6.2f * R; int n = list.size(); boolean moved = false;
+            while (fsAcc <= -rp && zapSel < n - 1) { zapSel++; fsAcc += rp; moved = true; }
+            while (fsAcc >= rp && zapSel > 0) { zapSel--; fsAcc -= rp; moved = true; }
+            fsAcc = Math.max(-rp, Math.min(rp, fsAcc));
+            main().removeCallbacks(zapIdle); main().postDelayed(zapIdle, 9000);
+            if (moved) zapView.invalidate();
+        }
+        return true;
+    }
+    private void fullDragEnd(int what, char axis, float v) {
+        if (what == 3) { commitScrub(); showOsd(); return; }
+        if (what == 4) {
+            // a flick carries on through the list, slowing
+            final int dir = v < 0 ? 1 : -1, id = zapGlide;
+            int n = (int) Math.min(30, Math.abs(v) / (6.2f * R * 5));
+            long at = 0;
+            for (int i = 0; i < n; i++) {
+                at += 28 + 3L * i;
+                main().postDelayed(new Runnable() { @Override public void run() {
+                    if (!zap || id != zapGlide) return;
+                    int to = Math.max(0, Math.min(list.size() - 1, zapSel + dir));
+                    if (to != zapSel) { zapSel = to; zapView.invalidate(); }
+                } }, at);
+            }
+            return;
+        }
+        if (what != 5 || Math.abs(fsAcc) < 3.5f * R) return;
+        boolean on = fsAcc < 0;                       // (the finger went left, or up)
+        if (zap) { if (axis == 'h' && on) zapClose(); return; }
+        if (recPlay != null) { if (axis == 'h') { skip(on ? -10000 : 30000); showOsd(); } return; }
+        if (axis == 'v') zapStep(on ? 1 : -1);
+        else if (on) prevChannel();
+        else zapOpen();
+    }
+    /** the timeline's ends, as Controls draws it: the show that's on (or the recording), stretched to take in where you are and live */
+    private long[] barSpan() {
+        Ch ch = playing;
+        long now = System.currentTimeMillis(), pos = posWall(), live = liveWall();
+        long[] pr = recPlay != null ? new long[] { bufStart(), Math.max(recPlay.optLong("end"), live) } : ch != null ? progAt(ch, pos) : null;
+        long a = pr != null ? pr[0] : now - 30 * 60000L, b = pr != null ? pr[1] : now + 5 * 60000L;
+        if (pos < a) a = pos - 60000; if (live > b) b = live;
+        return new long[] { a, Math.max(a + 1, b) };
+    }
+    /** the moment under a finger at x (the controls' own pixels) on the timeline, kept within what can be played */
+    private long wallAt(float x) {
+        long[] s = barSpan();
+        long w = s[0] + (long) ((s[1] - s[0]) * Math.max(0f, Math.min(1f, x / Math.max(1, controls.getWidth()))));
+        return Math.max(bufStart(), Math.min(liveWall(), w));
     }
     @Override public void dragEnd(char axis, float v) {
         int what = dragWhat; dragWhat = -1;
         if (what <= 0 || !shown) return;
+        if (what == 3 || what == 4 || what == 5 || what == 7) { if (full) fullDragEnd(what, axis, v); return; }
         if (fling == null) fling = new android.widget.OverScroller(getContext());
         flingWhat = what;
         if (what == 1) fling.fling(Math.round(guide.sx), Math.round(guide.sy), axis == 'h' ? -Math.round(v) : 0, axis == 'v' ? -Math.round(v) : 0,
                 0, Math.round(guide.maxX()), 0, Math.round(guide.maxY()));
+        else if (what == 6) fling.fling(0, Math.round(recView.scroll), 0, -Math.round(v), 0, 0, 0, Math.round(recView.maxScroll()));
         else fling.fling(0, Math.round(catView.scroll), 0, -Math.round(v), 0, 0, 0, Math.round(catView.maxScroll()));
         removeCallbacks(glide); postOnAnimation(glide);
     }
     private final Runnable glide = new Runnable() { @Override public void run() {
         if (fling == null || !shown || full || !fling.computeScrollOffset()) return;
         if (flingWhat == 1) guide.slideTo(fling.getCurrX(), fling.getCurrY());
+        else if (flingWhat == 6) recView.slideTo(fling.getCurrY());
         else catView.slideTo(fling.getCurrY());
         if (!fling.isFinished()) postOnAnimation(this);
     } };
@@ -1202,8 +1281,25 @@ final class NativeLive extends FrameLayout implements NativeHome.Free {
                     barFocus = true; barRow = 1; barSel = i; press(id); showOsd(); return "done";
                 }
             }
+            // a tap on the timeline jumps there
+            if (Math.abs(l[1] - 3.2f * R) < 2.2f * R) {
+                if (!noBuf()) { barFocus = true; barRow = 0; scrubbing = false; main().removeCallbacks(scrubCommit); seekTo(wallAt(l[0])); }
+                showOsd();
+                return "done";
+            }
             barFocus = false; barRow = 1; main().removeCallbacks(osdHide); osd.animate().alpha(0f).translationY(h.px(2)).setDuration(Ui.BASE).start();
             return "done";
+        }
+        if (zap && h.phone) {
+            // the channel list: a tap on a channel watches it; beside the list closes it
+            main().removeCallbacks(zapIdle); main().postDelayed(zapIdle, 9000);
+            if (!h.hit(zapView, x, y, 0)) { zapClose(); return "done"; }
+            float[] l = h.local(zapView, x, y);
+            int i = zapView.rowAt(l[0], l[1]);
+            if (i == -2) { zapClose(); return "done"; }
+            if (i < 0) return "done";
+            zapSel = i;
+            return "ok";
         }
         if (full || zap) return "ok";
         if (empty.getVisibility() == VISIBLE) return "ok";
@@ -1214,7 +1310,18 @@ final class NativeLive extends FrameLayout implements NativeHome.Free {
             cat = i; zone = "cats";
             return "ok";
         }
-        if (recCat()) return h.hit(recView, x, y, 0) ? "ok" : null;
+        if (recCat()) {
+            if (!h.hit(recView, x, y, 0)) return null;
+            if (h.phone) {
+                // (as in the guide: what's chosen is the recording under the finger)
+                int i = recView.itemAt(h.local(recView, x, y)[1]);
+                if (i < 0) return null;
+                catSettle();
+                if (!zone.equals("guide")) { zone = "guide"; drawCats(); }
+                recView.choose(i);
+            }
+            return "ok";
+        }
         if (!h.hit(guide, x, y, 0) || list.isEmpty()) return null;
         float ly = h.local(guide, x, y)[1];
         if (ly < guide.head) return null;
@@ -2132,6 +2239,24 @@ final class NativeLive extends FrameLayout implements NativeHome.Free {
             anim.addUpdateListener(new ValueAnimator.AnimatorUpdateListener() { @Override public void onAnimationUpdate(ValueAnimator a) { scroll = from + (target - from) * (Float) a.getAnimatedValue(); invalidate(); } });
             anim.start();
         }
+        // a finger (phones): the list slides with it, and a tap chooses the recording under it
+        int itemAt(float ly) {
+            float yy = ly + scroll;
+            for (int i = 0; i < items.size(); i++) { float t0 = top(i); if (yy >= t0 && yy < t0 + rowH) return i; }
+            return -1;
+        }
+        void choose(int i) { sel = i; invalidate(); drawInfo(); }
+        float maxScroll() {
+            if (items.isEmpty()) return 0;
+            float viewH = getHeight() > 0 ? getHeight() : GUIDE_H * R;
+            return Math.max(0, top(items.size() - 1) + rowH + R - viewH);
+        }
+        void slide(float dPx) { slideTo(scroll - dPx); }
+        void slideTo(float to) {
+            if (anim != null) anim.cancel();
+            scroll = target = Math.max(0, Math.min(maxScroll(), to));
+            invalidate();
+        }
         void key(char d) {
             if (d == 'l') { zone = "cats"; drawCats(); drawInfo(); invalidate(); return; }
             if (d == 'u') { if (sel == 0) { h.enterTopFromVod(); return; } sel--; }
@@ -2187,7 +2312,7 @@ final class NativeLive extends FrameLayout implements NativeHome.Free {
             boolean f0 = zone.equals("guide");
             if (items.isEmpty()) {
                 tS.setTextAlign(Paint.Align.LEFT);
-                c.drawText("Nothing here yet — hold OK on a show in the guide and choose ● Record.", x0, 3 * R, tS);
+                c.drawText(h.phone ? "Nothing here yet — hold on a show in the guide and choose ● Record." : "Nothing here yet — hold OK on a show in the guide and choose ● Record.", x0, 3 * R, tS);
                 return;
             }
             c.save(); c.clipRect(0, 0, w, hh);
@@ -3690,7 +3815,17 @@ final class NativeLive extends FrameLayout implements NativeHome.Free {
             }
             c.restore();
             tProg.setColor(Ui.WHITE_60);
-            c.drawText("▲▼ choose · OK watch · ◀ close", padL + .7f * R, hh - 1.5f * R, tProg);
+            c.drawText(h.phone ? "Tap a channel · swipe left to close" : "▲▼ choose · OK watch · ◀ close", padL + .7f * R, hh - 1.5f * R, tProg);
+        }
+        /** the channel under a finger (this view's own pixels): −2 beside the list, −1 none */
+        int rowAt(float x, float y) {
+            int w = getWidth(), hh = getHeight(), n = list.size();
+            float padR = 4.8f * R, listTop = 2f * R + tHead.getTextSize() + 1f * R, listBot = hh - 2.6f * R - 1.5f * R, rowH = 6.2f * R;
+            if (x > w - padR) return -2;
+            if (n == 0 || y < listTop || y >= listBot) return -1;
+            int visible = (int) ((listBot - listTop) / rowH);
+            int i = Math.max(0, Math.min(zapSel - visible / 2, n - visible)) + (int) ((y - listTop) / rowH);
+            return i < n ? i : -1;
         }
     }
 
