@@ -80,6 +80,10 @@ Quick compile check without building:
   top right (default) or bottom middle. Mock up anything on screen in the look he uses.
 - Holding Back on Live TV's guide (0.6 s) goes full screen on the channel in the preview, or the highlighted one (Chad asked,
   1.0.444): there Back acts on release (`NativeHome.backHold`, `NativeLive.holdBack`); a short press is Back as before.
+- On the TV a channel going full screen from the guide's preview grows out of it, and Back shrinks it into the preview
+  before the guide returns (Chad asked, 1.0.458): `NativePlayer.zoom` moves and scales the full-screen picture only (its
+  surface is never resized), `NativeLive.exitFullZoom` / `leaving`. Not on a phone (it turns sideways), nor for a
+  recording, a rewound channel or the external player.
 - Diagnostics: `Diag.ev("...")`. Lines are scrubbed of keys and logins, but don't log full stream or addon links anyway.
 
 ## Working with Chad

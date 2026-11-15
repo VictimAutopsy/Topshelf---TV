@@ -1128,6 +1128,7 @@ final class NativeLive extends FrameLayout implements NativeHome.Free {
     private long lastKeyAt;
 
     boolean move(char d) {
+        if (leaving) return true;
         long now = SystemClock.uptimeMillis();
         if (now - lastKeyAt < 60) return true;      // held keys: not faster than the screen can follow
         lastKeyAt = now;
@@ -1141,6 +1142,7 @@ final class NativeLive extends FrameLayout implements NativeHome.Free {
     }
 
     void ok() {
+        if (leaving) return;
         if (full && statsView.shown) { statsView.close(); return; }
         if (full) {
             if (zap) { zapPick(); return; }
@@ -1439,11 +1441,12 @@ final class NativeLive extends FrameLayout implements NativeHome.Free {
     }
 
     boolean back() {
+        if (leaving) return true;
         if (full && statsView.shown) { statsView.close(); return true; }
         if (zap) { zapClose(); return true; }
         if (full && barShown() && barFocus && scrubbing) { scrubbing = false; main().removeCallbacks(scrubCommit); controls.invalidate(); return true; }   // (Back: don't jump)
         if (full && barShown()) { barFocus = false; barRow = 1; main().removeCallbacks(osdHide); osd.animate().alpha(0f).translationY(h.px(2)).setDuration(Ui.BASE).start(); return true; }
-        if (full) { exitFull(); return true; }
+        if (full) { exitFullZoom(); return true; }
         if (moving) { moveDone(); return true; }
         if (zone.equals("cats")) catSettle();
         if (zone.equals("cats") && (!list.isEmpty() || recCat())) { zone = "guide"; drawCats(); return true; }
@@ -2011,8 +2014,20 @@ final class NativeLive extends FrameLayout implements NativeHome.Free {
         pvTune.showNow(); fsTune.showNow();
     }
 
+    /* Going full screen from the preview, and back into it, the picture grows and shrinks (TV only: a phone
+       turns sideways for it). `leaving`: it's shrinking, and the remote waits for it. */
+    private boolean leaving;
+    private static final int ZOOM_MS = 360;
+    private NativePlayer zoomer() {
+        if (h.phone || !shown || playing == null || !ready || covered || "external".equals(h.S.optString("livePlayer"))) return null;
+        return h.act.nativePlayer();
+    }
+
     private void enterFull() {
         Diag.ev("live: full screen");
+        NativePlayer zp = !full && pv.getVisibility() != VISIBLE ? zoomer() : null;      // (the picture is showing in the preview)
+        RectF from = zp != null ? new RectF(pvBox()) : null;
+        if (leaving) { leaving = false; NativePlayer np = h.act.nativePlayer(); if (np != null) np.zoomStop(); }
         full = true;
         h.videoTurn(true);
         zone = "guide";
@@ -2025,12 +2040,30 @@ final class NativeLive extends FrameLayout implements NativeHome.Free {
         statsBox.setVisibility(stats ? VISIBLE : GONE);
         showOsd();
         place();
+        if (zp != null) zp.zoom(from, true, ZOOM_MS, null);          // (the preview's box is in the same pixels as the picture's)
         findGame();
         pushWatching();
         if (ready) startShift();
     }
 
+    /** Back from full screen: the picture shrinks into the preview, then the guide comes back */
+    private void exitFullZoom() {
+        if (leaving) return;
+        final NativePlayer zp = recPlay == null && !behind() && !zap ? zoomer() : null;
+        if (zp == null) { exitFull(); return; }
+        leaving = true;
+        statsView.close();
+        fs.setVisibility(INVISIBLE);
+        osd.animate().cancel(); osd.setAlpha(0f);
+        zp.zoom(new RectF(pvBox()), false, ZOOM_MS - 40, new Runnable() { @Override public void run() {
+            if (!leaving) return;
+            leaving = false;
+            if (full) exitFull();
+        } });
+    }
+
     private void exitFull() {
+        if (leaving) { leaving = false; NativePlayer np = h.act.nativePlayer(); if (np != null) np.zoomStop(); if (!full) return; }
         Diag.ev("live: back to the guide");
         if (zap) zapClose();
         statsView.close();

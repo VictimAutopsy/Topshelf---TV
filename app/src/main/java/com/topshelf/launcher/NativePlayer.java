@@ -317,11 +317,56 @@ final class NativePlayer implements Player.Listener {
     private float pvScale = 1f;
     void setPvScale(float s) { if (s == pvScale) return; pvScale = s; applyScale(); }
     private void applyScale() {
-        if (sv == null) return;
+        if (sv == null || zoomAnim != null) return;
         float s = "pv".equals(mode) ? pvScale : 1f;
         FrameLayout.LayoutParams lp = (FrameLayout.LayoutParams) sv.getLayoutParams();
         sv.setPivotX(bx + bw - lp.leftMargin); sv.setPivotY(by + bh - lp.topMargin);
         if (sv.getScaleX() != s) { sv.setScaleX(s); sv.setScaleY(s); }
+    }
+
+    /* Live TV going full screen from its preview, or back (TV only): the picture is laid out full screen the whole
+       time and only moved and scaled, so its surface is never resized while it moves (as the preview's grow).
+       from: the preview's box in screen pixels; in: grow from it to the whole screen, else shrink into it. */
+    private android.animation.ValueAnimator zoomAnim;
+    private Runnable zoomEnd;
+    void zoom(android.graphics.RectF from, final boolean in, int ms, Runnable end) {
+        zoomStop();
+        if (sv == null || !"fs".equals(mode) || bw <= 0 || from == null || from.width() <= 0) { if (end != null) end.run(); return; }
+        FrameLayout.LayoutParams lp = (FrameLayout.LayoutParams) sv.getLayoutParams();
+        final float L = lp.leftMargin, T = lp.topMargin;
+        final float s = from.width() / bw;
+        final float tx = from.left - L - s * (bx - L), ty = from.top - T - s * (by - T);
+        sv.setPivotX(0); sv.setPivotY(0);
+        zoomEnd = end;
+        zoomAnim = android.animation.ValueAnimator.ofFloat(0f, 1f);
+        zoomAnim.setDuration(ms);
+        zoomAnim.setInterpolator(TileView.EASE);
+        android.animation.ValueAnimator.AnimatorUpdateListener u = new android.animation.ValueAnimator.AnimatorUpdateListener() {
+            @Override public void onAnimationUpdate(android.animation.ValueAnimator a) {
+                float f = (Float) a.getAnimatedValue(), q = in ? 1f - f : f;      // q: 1 = on the preview, 0 = full screen
+                float sc = 1f + (s - 1f) * q;
+                sv.setScaleX(sc); sv.setScaleY(sc); sv.setTranslationX(tx * q); sv.setTranslationY(ty * q);
+            }
+        };
+        zoomAnim.addUpdateListener(u);
+        u.onAnimationUpdate(zoomAnim);
+        zoomAnim.addListener(new android.animation.AnimatorListenerAdapter() {
+            private boolean cancelled;
+            @Override public void onAnimationCancel(android.animation.Animator a) { cancelled = true; }
+            @Override public void onAnimationEnd(android.animation.Animator a) { if (!cancelled) zoomStop(); }
+        });
+        zoomAnim.start();
+    }
+    boolean zooming() { return zoomAnim != null; }
+    /** the move ends now: the picture at rest where it's laid out, and what was to happen after it happens */
+    void zoomStop() {
+        if (zoomAnim == null) return;
+        android.animation.ValueAnimator a = zoomAnim; zoomAnim = null;
+        a.cancel();
+        if (sv != null) { sv.setTranslationX(0); sv.setTranslationY(0); sv.setScaleX(1f); sv.setScaleY(1f); }
+        applyScale();
+        Runnable e = zoomEnd; zoomEnd = null;
+        if (e != null) e.run();
     }
 
     /* A phone turned sideways for a video (or back): the picture that fills the screen fills its new shape. */
@@ -335,6 +380,7 @@ final class NativePlayer implements Player.Listener {
     }
     /** mode: "pv" | "fs" | "hide"; rect in screen pixels (fs: 0 = whole screen) */
     void layout(String newMode, int x, int y, int w, int h, float r, int animMs) {
+        if (zoomAnim != null && !"fs".equals("top".equals(newMode) ? "fs" : newMode)) zoomStop();
         String nm = "top".equals(newMode) ? "fs" : newMode;
         if (!nm.equals(mode)) Diag.ev("video " + mode + " → " + nm + (w > 0 ? " " + w + "x" + h + " at " + x + "," + y : ""));
         mode = "top".equals(newMode) ? "fs" : newMode;
