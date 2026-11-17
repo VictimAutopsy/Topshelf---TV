@@ -1382,15 +1382,20 @@ function settingsPlace(label) {
   return [SET_SECTIONS.length - 1, -1];
 }
 /* a section's rows: each group under its heading, in the order the group names them */
+/* a phone: settings that only do something on a TV (Home's photos and TV layout, its widgets and weather, the
+   screensaver and bedtime) aren't listed, and a section left with nothing isn't either (Chad picked it from a sketch) */
+const PHONE_HIDE = ['Photos from', 'Reddit account', 'Show', 'Change photo every', 'Photos', 'Slow zoom', 'Menu', 'Home style',
+  'Side menu style', 'Bar style', 'Top Shelf', 'Home widgets', 'Weather', 'Temperature', 'Screensaver', 'Bedtime'];
+const PHONE_ABOUT = { 'Home': 'Look and clock', 'Screen & sleep': 'Screen' };
 function settingsSectionRows(i) {
   const out = [];
   const add = (head, rs) => { if (!rs.length) return; if (head) out.push({ head: true, label: head, value: () => '' }); rs.forEach(r => out.push(Object.assign({}, r, { gap: false }))); };
   SET_SECTIONS[i].groups.forEach(([head, items], g) => {
     const rs = [];
-    for (const it of items) for (const r of SET.all) if (setMatch(it, r.label) && settingsPlace(r.label)[1] === g && settingsPlace(r.label)[0] === i && !rs.includes(r)) rs.push(r);
+    for (const it of items) for (const r of SET.all) if (setMatch(it, r.label) && settingsPlace(r.label)[1] === g && settingsPlace(r.label)[0] === i && !rs.includes(r) && (IS_TV || !PHONE_HIDE.includes(r.label))) rs.push(r);
     add(head, rs);
   });
-  if (i === SET_SECTIONS.length - 1) add('Other', SET.all.filter(r => settingsPlace(r.label)[1] === -1));
+  if (i === SET_SECTIONS.length - 1) add('Other', SET.all.filter(r => settingsPlace(r.label)[1] === -1 && (IS_TV || !PHONE_HIDE.includes(r.label))));
   return out;
 }
 function settingsFootPhotos() {
@@ -1405,8 +1410,9 @@ function buildSettings() {
   SET.all = sRows;
   if (SET.sec == null) {
     sRows = SET_SECTIONS.map((x, i) => ({ section: i, label: x.name, chevron: true,
-      value: () => i === SET_SECTIONS.length - 1 && typeof UPD !== 'undefined' && UPD.latest && UPD.latest.newer ? `Update ${UPD.latest.name} ready` : x.about,
+      value: () => i === SET_SECTIONS.length - 1 && typeof UPD !== 'undefined' && UPD.latest && UPD.latest.newer ? `Update ${UPD.latest.name} ready` : (!IS_TV && PHONE_ABOUT[x.name]) || x.about,
       ok: () => settingsEnter(i) }));
+    if (!IS_TV) sRows = sRows.filter(r => settingsSectionRows(r.section).length > 0);
   } else if (SET.sub === 'groups') {
     sRows = lgRows();
   } else {

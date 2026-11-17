@@ -540,7 +540,7 @@ if (NH.on) {
     showMenu = function (entries, anchor, title) {
       /* a menu a setting opens (Look, Voice, Continue watching's "Clear all"…) is the panel that pops out beside
          Settings on the TV, like every other setting's choices: not the old menu in the middle of the screen */
-      if (NH.on && IS_TV && NH.sheet && mode === 'settings' && B.nhSheetChoices && entries && entries.length) {
+      if (NH.on && NH.sheet && mode === 'settings' && B.nhSheetChoices && entries && entries.length) {       // (a phone: the sheet from the bottom)
         const r = sRows[sSel] || {}, lab = entries.map(e => String(e[1])), tick = /^✓\s*/;
         let inf = {}; try { inf = setInfoFor(r, String(r.value ? r.value() : '')); } catch (e) {}
         // (when its choices are written up in setinfo.js, in the same order: their names and notes)

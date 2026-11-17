@@ -1784,6 +1784,7 @@ final class NativeHome extends FrameLayout {
     /** the screen under the finger that slides freely with it (Home, Movies, TV Shows, a title's page, Live TV's guide), when nothing is open over it */
     private Free freeNow() {
         if (phone && mode.equals("find") && find != null && find.freeOn()) return find;
+        if (phone && mode.equals("sheet") && sheet != null && sheet.freeOn()) return sheet;
         if (!phone || !(mode.equals("grid") || mode.equals("top"))) return null;
         if (gameOpenNow() && !saver) return gamePage;
         if (saver || vodPlayingNow() || addonsOpenNow() || gameOpenNow() || fySetupOpen() || launchOv.getVisibility() == VISIBLE) return null;
@@ -1830,6 +1831,7 @@ final class NativeHome extends FrameLayout {
                 if (sports != null) sports.touchDown();
                 if (gamePage != null && gamePage.shownNow()) gamePage.touchDown();
                 if (find != null && find.freeOn()) find.touchDown();
+                if (sheet != null && sheet.freeOn()) sheet.touchDown();
                 if (tVel != null) tVel.recycle();
                 tVel = android.view.VelocityTracker.obtain(); tVel.addMovement(e);
                 main.removeCallbacks(tLong); main.postDelayed(tLong, 460);
