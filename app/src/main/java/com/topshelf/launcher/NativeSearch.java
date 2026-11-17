@@ -141,7 +141,7 @@ final class NativeSearch {
                 if (!recent.isEmpty()) {
                     JSONArray it = new JSONArray(); for (String r : recent) it.put(new JSONObject().put("t", "chip").put("label", r));
                     sec(secs, "Recent searches", "q", it, recent, "");
-                } else big = "Search your apps, movies, TV shows and Live TV channels.";
+                } else big = h.phone ? "Search movies, TV shows and Live TV channels." : "Search your apps, movies, TV shows and Live TV channels.";
             } else {
                 if (!apps.isEmpty()) {
                     JSONArray it = new JSONArray();
@@ -156,9 +156,10 @@ final class NativeSearch {
                         JSONObject c = chans.optJSONObject(i); l.add(c);
                         it.put(new JSONObject().put("t", "chan").put("label", c.optString("n") + (c.optBoolean("fav") ? " ★" : "")).put("sub", c.optString("now").isEmpty() ? c.optString("g") : c.optString("now")).put("img", c.optString("l")));
                     }
-                    sec(secs, "Live TV channels", "chan", it, l, "");
+                    sec(secs, h.phone ? "Channels" : "Live TV channels", "chan", it, l, "");
                 }
-                if (!progs.isEmpty()) {
+                if (!progs.isEmpty() && h.phone) phoneProgs(secs);
+                else if (!progs.isEmpty()) {
                     JSONArray it = new JSONArray();
                     long now = System.currentTimeMillis();
                     NativeLive lv = h.liveData();
@@ -174,9 +175,46 @@ final class NativeSearch {
                 }
                 if (movies != null && series != null && rows.isEmpty()) big = "Nothing found for “" + q + "”.";
             }
-            o.put("kind", "search").put("q", q).put("ph", "Apps, movies, TV shows, channels…").put("big", big).put("start", -1).put("sections", secs);
+            o.put("kind", "search").put("q", q).put("ph", h.phone ? "Movies, TV shows, channels…" : "Apps, movies, TV shows, channels…").put("big", big).put("start", -1).put("sections", secs);
         } catch (Exception ignored) { }
         h.searchShow(o, first);
+    }
+    /* a phone (Chad picked it from a sketch): what's on now and what's on later as two lists, one show a row —
+       on now with how far through it is, later with its time and a bell to tap for a reminder */
+    private void phoneProgs(JSONArray secs) throws Exception {
+        long now = System.currentTimeMillis();
+        NativeLive lv = h.liveData();
+        JSONArray on = new JSONArray(), later = new JSONArray();
+        List<JSONObject> lOn = new ArrayList<>(), lLater = new ArrayList<>();
+        for (JSONObject x : progs) {
+            JSONObject ch = x.optJSONObject("ch"); JSONArray p = x.optJSONArray("p");
+            long s = p.optLong(0), e = p.optLong(1);
+            String t = p.optString(2).isEmpty() ? "Untitled" : p.optString(2);
+            if (s <= now && now < e) {
+                long left = Math.max(1, (e - now + 59999) / 60000);
+                on.put(new JSONObject().put("t", "row").put("label", t).put("img", ch.optString("l"))
+                        .put("pct", e > s ? (float) (now - s) / (e - s) : 0).put("sub", left + " min left · " + ch.optString("n")));
+                lOn.add(x);
+            } else if (s > now) {
+                later.put(new JSONObject().put("t", "row").put("label", t).put("img", ch.optString("l"))
+                        .put("sub", when(s) + " · " + ch.optString("n")).put("bellBtn", true)
+                        .put("bell", lv != null && lv.hasReminder(ch.optString("u"), s)));
+                lLater.add(x);
+            }
+        }
+        if (on.length() > 0) sec(secs, "On now", "prog", on, lOn, "");
+        if (later.length() > 0) sec(secs, "Later", "prog", later, lLater, "");
+    }
+    /** a phone: the bell on a later show was tapped — its reminder on or off */
+    void bell(int ri, int c) {
+        Object it = item(ri, c);
+        if (!(it instanceof JSONObject) || !kind(ri).equals("prog")) return;
+        JSONObject x = (JSONObject) it;
+        JSONObject ch = x.optJSONObject("ch"); JSONArray p = x.optJSONArray("p");
+        if (ch == null || p == null) return;
+        NativeLive lv = h.liveData();
+        if (lv != null) lv.toggleReminder(ch.optString("u"), p.optLong(0), p.optLong(1), p.optString(2));
+        push(false);
     }
     private void sec(JSONArray secs, String title, String kind, JSONArray items, List<?> backing, String note) throws Exception {
         int ri = items.length() > 0 ? rows.size() : -1;

@@ -33,7 +33,7 @@ import java.util.Map;
  * and rows of results underneath (apps, posters, channels, teams…), each row sliding sideways. What's
  * found and what OK does stay with the page (nhFind hands the rows over); moving happens here.
  */
-final class NativeFind extends FrameLayout {
+final class NativeFind extends FrameLayout implements NativeHome.Free {
     private static final float INSET = 0, HEAD_Y = 3.2f, HEAD_H = 5, BODY_Y = 9.6f, PADX = 4.6f, GAP = 1.3f;
 
     private final NativeHome h;
@@ -48,6 +48,13 @@ final class NativeFind extends FrameLayout {
     private final LinearLayout list;
     private final TextView big;
     private final int pw, ph;
+    /* A phone (Chad picked it from a sketch, 1.0.468): below the camera cutout a back arrow, the box (with a clear ×
+       and a line of the look's highlight while typing) and the mic; under it the results slide up and down under the
+       finger, rows of posters slide sideways, and channels and shows are lists, one a row. A tap chooses at once. */
+    private final boolean phn;
+    private ImageView backBtn, clearBtn;
+    private View typeLine;
+    private float padX;
 
     private String kind = "";
     private boolean noBox;
@@ -77,9 +84,12 @@ final class NativeFind extends FrameLayout {
         LayoutParams pl = new LayoutParams(pw, ph); pl.leftMargin = h.px(INSET); pl.topMargin = h.px(INSET);
         addView(panel, pl);
 
+        phn = h.phone;
+        padX = phn ? 1.9f : PADX;
         // the box
         head = new FrameLayout(c);
         headBg = new GradientDrawable(); headBg.setCornerRadius(2.5f * R); headBg.setColor(Ui.WHITE_12);
+        if (phn) { headBg.setCornerRadius(GlassPanel.corner(.6f * R)); headBg.setColor(0xFF131A23); headBg.setStroke(Math.max(1, h.px(.12f)), 0xFF222C38); }
         head.setBackground(headBg);
         ImageView mag = new ImageView(c);
         HomeIcons mi = new HomeIcons(HomeIcons.SEARCH, 2f); mi.setColor(Ui.WHITE_60);
@@ -89,7 +99,7 @@ final class NativeFind extends FrameLayout {
         input = new EditText(c);
         input.setBackground(null);
         input.setTypeface(h.fMed);
-        input.setTextSize(android.util.TypedValue.COMPLEX_UNIT_PX, 1.6f * R);
+        input.setTextSize(android.util.TypedValue.COMPLEX_UNIT_PX, (phn ? 1.9f : 1.6f) * R);
         input.setTextColor(Color.WHITE);
         input.setHintTextColor(0x73FFFFFF);
         input.setSingleLine(true);
@@ -98,20 +108,43 @@ final class NativeFind extends FrameLayout {
         input.setPadding(0, 0, 0, 0);
         input.setFocusable(false);
         LayoutParams il = new LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.MATCH_PARENT);
-        il.leftMargin = h.px(4.6f); il.rightMargin = h.px(10);
+        il.leftMargin = h.px(4.6f); il.rightMargin = h.px(phn ? 4.6f : 10);
         head.addView(input, il);
+        if (phn) {
+            clearBtn = new ImageView(c);
+            HomeIcons ci = new HomeIcons(HomeIcons.CLEAR, 2.2f); ci.setColor(Ui.WHITE_75);
+            clearBtn.setImageDrawable(ci); clearBtn.setPadding(h.px(1.1f), h.px(1.1f), h.px(1.1f), h.px(1.1f));
+            head.addView(clearBtn, new LayoutParams(h.px(4.4f), h.px(4.4f), Gravity.CENTER_VERTICAL | Gravity.END));
+            clearBtn.setOnClickListener(new OnClickListener() { @Override public void onClick(View v) { input.setText(""); } });
+            typeLine = new View(c); typeLine.setVisibility(INVISIBLE);
+            head.addView(typeLine, new LayoutParams(LayoutParams.MATCH_PARENT, Math.max(2, h.px(.24f)), Gravity.BOTTOM));
+        }
         mic = new ImageView(c);
         HomeIcons mc = new HomeIcons(HomeIcons.MIC, 2f); mc.setColor(Ui.WHITE_85);
         mic.setImageDrawable(mc);
         mic.setPadding(h.px(.85f), h.px(.85f), h.px(.85f), h.px(.85f));
-        LayoutParams mcl = new LayoutParams(h.px(3.6f), h.px(3.6f), Gravity.CENTER_VERTICAL | Gravity.END); mcl.rightMargin = h.px(.7f);
-        head.addView(mic, mcl);
+        if (!phn) {
+            LayoutParams mcl = new LayoutParams(h.px(3.6f), h.px(3.6f), Gravity.CENTER_VERTICAL | Gravity.END); mcl.rightMargin = h.px(.7f);
+            head.addView(mic, mcl);
+        }
         btn = h.text(h.fSemi, Ui.TEXT_M, 0xFF111111);
         btn.setText("Done");
         btn.setPadding(h.px(1.8f), h.px(.8f), h.px(1.8f), h.px(.8f));
         LayoutParams bl = new LayoutParams(LayoutParams.WRAP_CONTENT, LayoutParams.WRAP_CONTENT, Gravity.CENTER_VERTICAL | Gravity.END); bl.rightMargin = h.px(.7f);
         head.addView(btn, bl);
         LayoutParams hl = new LayoutParams(pw - h.px(4.8f), h.px(HEAD_H)); hl.leftMargin = h.px(2.4f); hl.topMargin = h.px(HEAD_Y);
+        if (phn) {
+            float top = h.TOP + .8f, hh = 5.4f;
+            hl = new LayoutParams(pw - h.px(11.6f), h.px(hh)); hl.leftMargin = h.px(5.8f); hl.topMargin = h.px(top);
+            backBtn = new ImageView(c);
+            HomeIcons bi = new HomeIcons(HomeIcons.BACK, 2.2f); bi.setColor(Color.WHITE);
+            backBtn.setImageDrawable(bi); backBtn.setPadding(h.px(1.2f), h.px(1.2f), h.px(1.2f), h.px(1.2f));
+            LayoutParams bkl = new LayoutParams(h.px(5.2f), h.px(5.2f)); bkl.leftMargin = h.px(.5f); bkl.topMargin = h.px(top + (hh - 5.2f) / 2);
+            panel.addView(backBtn, bkl);
+            mic.setPadding(h.px(1.1f), h.px(1.1f), h.px(1.1f), h.px(1.1f));
+            LayoutParams mcl = new LayoutParams(h.px(5.2f), h.px(5.2f), Gravity.END); mcl.rightMargin = h.px(.4f); mcl.topMargin = h.px(top + (hh - 5.2f) / 2);
+            panel.addView(mic, mcl);
+        }
         panel.addView(head, hl);
 
         // the rows
@@ -125,13 +158,14 @@ final class NativeFind extends FrameLayout {
         big.setGravity(Gravity.CENTER);
         LayoutParams gl = new LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT); gl.topMargin = h.px(4);
         body.addView(big, gl);
-        LayoutParams yl = new LayoutParams(pw, ph - h.px(BODY_Y)); yl.topMargin = h.px(BODY_Y);
+        LayoutParams yl = new LayoutParams(pw, ph - h.px(bodyY())); yl.topMargin = h.px(bodyY());
         panel.addView(body, yl);
 
         input.addTextChangedListener(new TextWatcher() {
             @Override public void beforeTextChanged(CharSequence s, int a, int b, int d) { }
             @Override public void onTextChanged(CharSequence s, int a, int b, int d) { }
             @Override public void afterTextChanged(Editable s) {
+                if (clearBtn != null) clearBtn.setVisibility(s.length() > 0 && kind.equals("search") ? VISIBLE : GONE);
                 if (quiet) return;
                 h.main.removeCallbacks(sendQ);
                 h.main.postDelayed(sendQ, 300);
@@ -149,6 +183,8 @@ final class NativeFind extends FrameLayout {
         panel.setTranslationY(0);
         setVisibility(GONE);
     }
+
+    private float bodyY() { return phn ? h.TOP + 7.2f : BODY_Y; }
 
     /** Search is the app's own (NativeSearch); the sports picker and the icon picker are still the page's */
     private boolean nat() { return kind.equals("search") && h.nativeSearchOn(); }
@@ -188,7 +224,8 @@ final class NativeFind extends FrameLayout {
         boolean search = kind.equals("search");
         boolean box = !o.optBoolean("nobox");
         head.setVisibility(box ? VISIBLE : GONE);
-        ((LayoutParams) body.getLayoutParams()).topMargin = h.px(box ? BODY_Y : 2.4f);
+        ((LayoutParams) body.getLayoutParams()).topMargin = h.px(box ? bodyY() : phn ? h.TOP + 1.6f : 2.4f);
+        if (backBtn != null) { backBtn.setVisibility(box ? VISIBLE : GONE); mic.setVisibility(box && k.equals("search") ? VISIBLE : GONE); }
         body.requestLayout();
         noBox = !box;
         mic.setVisibility(search ? VISIBLE : GONE);
@@ -196,6 +233,11 @@ final class NativeFind extends FrameLayout {
         input.setHint(o.optString("ph"));
         String q = o.optString("q");
         if (!typing && !q.equals(input.getText().toString())) { quiet = true; input.setText(q); input.setSelection(input.length()); quiet = false; }
+        if (clearBtn != null) {
+            clearBtn.setVisibility(input.length() > 0 && search ? VISIBLE : GONE);
+            ((LayoutParams) input.getLayoutParams()).rightMargin = h.px(search ? 4.6f : 10); input.requestLayout();
+        }
+        float keepY = list.getTranslationY();
         big.setText(o.optString("big"));
         big.setVisibility(o.optString("big").isEmpty() ? GONE : VISIBLE);
 
@@ -218,12 +260,17 @@ final class NativeFind extends FrameLayout {
             r = ni >= 0 ? ni : Math.min(r, rows.size() - 1);
         }
         if (r >= rows.size()) r = rows.size() - 1;
+        if (phn) {
+            // a phone: the page stays where the finger left it as results come in (a new search starts at the top)
+            if (first || newKind || q.isEmpty()) keepY = 0;
+            list.setTranslationY(-Math.max(0, Math.min(maxY(), -keepY)));
+        }
         mark(false);
     }
 
     private void build(JSONArray ss) {
         list.removeAllViews();
-        secs.clear(); rows.clear(); ringOf.clear(); ringRad.clear();
+        secs.clear(); rows.clear(); ringOf.clear(); ringRad.clear(); bellOf.clear();
         focusedItem = null;
         if (ss == null) return;
         Context c = getContext();
@@ -234,18 +281,21 @@ final class NativeFind extends FrameLayout {
             LinearLayout v = new LinearLayout(c);
             v.setOrientation(LinearLayout.VERTICAL);
             v.setClipChildren(false); v.setClipToPadding(false);
-            TextView t = h.text(h.fSemi, Ui.TEXT_L, Ui.WHITE_95);
+            TextView t = h.text(h.fSemi, phn ? 2f : Ui.TEXT_L, Ui.WHITE_95);
             t.setText(so.optString("title"));
-            t.setPadding(h.px(PADX), 0, 0, 0);
+            t.setPadding(h.px(padX), phn ? h.px(1) : 0, 0, phn ? h.px(.6f) : 0);
+            if (phn) { t.setAllCaps(true); t.setLetterSpacing(.04f); }
             v.addView(t);
+            boolean vert = phn && (s.kind.equals("chan") || s.kind.equals("prog"));
             if (s.items.length() == 0) {
                 TextView n = h.text(h.fReg, Ui.TEXT_M, Ui.WHITE_60);
                 n.setText(so.optString("note"));
-                n.setPadding(h.px(PADX), h.px(.8f), h.px(PADX), 0);
+                n.setPadding(h.px(padX), h.px(.8f), h.px(padX), 0);
                 if ("Searching…".equals(so.optString("note"))) {
                     // (results are on their way: the shapes of a row of them)
-                    Skel sk = new Skel(c, 6, h.px(10.4f), h.px(15.6f), h.px(GAP), h.px(1.1f), h.px(1), false);
-                    LinearLayout.LayoutParams skl = new LinearLayout.LayoutParams(sk.wide(), sk.tall()); skl.leftMargin = h.px(PADX); skl.topMargin = h.px(1f);
+                    Skel sk = phn ? new Skel(c, 4, h.px(12.2f), h.px(18.3f), h.px(1.2f), GlassPanel.corner(R), h.px(1), false)
+                            : new Skel(c, 6, h.px(10.4f), h.px(15.6f), h.px(GAP), h.px(1.1f), h.px(1), false);
+                    LinearLayout.LayoutParams skl = new LinearLayout.LayoutParams(sk.wide(), sk.tall()); skl.leftMargin = h.px(padX); skl.topMargin = h.px(1f);
                     v.addView(sk, skl);
                 } else if (!so.optString("note").isEmpty()) v.addView(n);
             } else {
@@ -254,19 +304,20 @@ final class NativeFind extends FrameLayout {
                 s.in = new LinearLayout(c);
                 s.in.setClipChildren(false);
                 s.in.setClipToPadding(false);      // (the item you're on grows past the row's padding)
-                s.in.setPadding(h.px(PADX), h.px(1), h.px(PADX), h.px(1.4f));
+                s.in.setPadding(h.px(padX), h.px(1), h.px(padX), h.px(1.4f));
+                if (vert) { s.in.setOrientation(LinearLayout.VERTICAL); s.in.setPadding(0, 0, 0, h.px(.6f)); }
                 for (int j = 0; j < s.items.length(); j++) {
-                    View card = item(s.items.optJSONObject(j));
-                    LinearLayout.LayoutParams cl = new LinearLayout.LayoutParams(LayoutParams.WRAP_CONTENT, LayoutParams.WRAP_CONTENT);
-                    if (j > 0) cl.leftMargin = h.px(GAP);
+                    View card = vert ? phoneRow(s.items.optJSONObject(j)) : item(s.items.optJSONObject(j));
+                    LinearLayout.LayoutParams cl = new LinearLayout.LayoutParams(vert ? LayoutParams.MATCH_PARENT : LayoutParams.WRAP_CONTENT, LayoutParams.WRAP_CONTENT);
+                    if (j > 0 && !vert) cl.leftMargin = h.px(phn ? 1.2f : GAP);
                     s.in.addView(card, cl);
                     s.cards.add(card);
                 }
-                s.strip.addView(s.in, new LayoutParams(LayoutParams.WRAP_CONTENT, LayoutParams.WRAP_CONTENT));
+                s.strip.addView(s.in, new LayoutParams(vert ? LayoutParams.MATCH_PARENT : LayoutParams.WRAP_CONTENT, LayoutParams.WRAP_CONTENT));
                 v.addView(s.strip, new LinearLayout.LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT));
                 rows.add(s);
             }
-            LinearLayout.LayoutParams vl = new LinearLayout.LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT); vl.topMargin = h.px(1.2f);
+            LinearLayout.LayoutParams vl = new LinearLayout.LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT); vl.topMargin = h.px(phn ? 1.6f : 1.2f);
             list.addView(v, vl);
             s.view = v;
             secs.add(s);
@@ -290,10 +341,10 @@ final class NativeFind extends FrameLayout {
         Context c = getContext();
         boolean on = it.optBoolean("on");
         if (t.equals("chip")) {
-            TextView v = h.text(h.fSemi, Ui.TEXT_M, on ? GlassPanel.selText() : Color.WHITE);
+            TextView v = h.text(h.fSemi, phn ? 1.6f : Ui.TEXT_M, on ? GlassPanel.selText() : Color.WHITE);
             v.setText(it.optString("label") + (on ? "  ✓" : ""));
             v.setSingleLine(true);
-            v.setPadding(h.px(1.6f), h.px(.9f), h.px(1.6f), h.px(.9f));
+            v.setPadding(h.px(1.6f), h.px(phn ? 1.2f : .9f), h.px(1.6f), h.px(phn ? 1.2f : .9f));
             GradientDrawable b = new GradientDrawable(); b.setCornerRadius(GlassPanel.corner(2 * R)); b.setColor(on ? GlassPanel.selFill() : Ui.WHITE_12);
             v.setBackground(b);
             ringOf.put(v, v); ringRad.put(v, 2 * R);
@@ -326,14 +377,15 @@ final class NativeFind extends FrameLayout {
             ImageView iv = new ImageView(c);
             iv.setScaleType(ImageView.ScaleType.CENTER_CROP);
             card.addView(iv, new LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.MATCH_PARENT));
-            image(iv, it.optString("img"), it.optString("img2"), h.px(10), h.px(15));
-            v.addView(card, new LinearLayout.LayoutParams(h.px(10), h.px(15)));
-            TextView l = h.text(h.fSemi, Ui.TEXT_S, Color.WHITE);
+            float pwR = phn ? 12.2f : 10, phR = phn ? 18.3f : 15;
+            image(iv, it.optString("img"), it.optString("img2"), h.px(pwR), h.px(phR));
+            v.addView(card, new LinearLayout.LayoutParams(h.px(pwR), h.px(phR)));
+            TextView l = h.text(h.fSemi, phn ? 1.5f : Ui.TEXT_S, Color.WHITE);
             l.setText(it.optString("label")); l.setMaxLines(2); l.setEllipsize(TextUtils.TruncateAt.END);
-            LinearLayout.LayoutParams ll = new LinearLayout.LayoutParams(h.px(10), LayoutParams.WRAP_CONTENT); ll.topMargin = h.px(.6f);
+            LinearLayout.LayoutParams ll = new LinearLayout.LayoutParams(h.px(pwR), LayoutParams.WRAP_CONTENT); ll.topMargin = h.px(.6f);
             v.addView(l, ll);
             if (!it.optString("sub").isEmpty()) {
-                TextView y = h.text(h.fReg, Ui.TEXT_XS, Ui.WHITE_60); y.setText(it.optString("sub"));
+                TextView y = h.text(h.fReg, phn ? 1.35f : Ui.TEXT_XS, Ui.WHITE_60); y.setText(it.optString("sub"));
                 v.addView(y);
             }
             ringOf.put(v, card); ringRad.put(v, R);
@@ -396,6 +448,66 @@ final class NativeFind extends FrameLayout {
         FrameLayout wrap = new FrameLayout(c);
         wrap.addView(v, new LayoutParams(h.px(25), h.px(6.2f)));
         ringOf.put(wrap, v); ringRad.put(wrap, 1.3f * R);
+        return wrap;
+    }
+
+    /** a phone: a channel or a show as one row of a list — logo, name, and under it what's on (with how far through
+        it is) or when it's on; a later show has a bell at the end to tap for a reminder */
+    private final Map<View, View> bellOf = new HashMap<>();
+    private View phoneRow(JSONObject it) {
+        Context c = getContext();
+        LinearLayout v = new LinearLayout(c);
+        v.setGravity(Gravity.CENTER_VERTICAL);
+        v.setPadding(h.px(padX), 0, h.px(it.optBoolean("bellBtn") ? .4f : padX), 0);
+        v.setMinimumHeight(h.px(7.2f));
+        FrameLayout lg = new FrameLayout(c);
+        GradientDrawable lb = new GradientDrawable(); lb.setCornerRadius(GlassPanel.corner(.5f * R)); lb.setColor(0xFF1B2430); lg.setBackground(lb);
+        if (it.optString("img").isEmpty()) {
+            TextView ini = h.text(h.fSemi, 1.8f, Color.WHITE); ini.setText(it.optString("label").isEmpty() ? "" : it.optString("label").substring(0, 1)); ini.setGravity(Gravity.CENTER);
+            lg.addView(ini, new LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.MATCH_PARENT));
+        } else {
+            ImageView iv = new ImageView(c);
+            iv.setScaleType(ImageView.ScaleType.FIT_CENTER);
+            iv.setPadding(h.px(.4f), h.px(.4f), h.px(.4f), h.px(.4f));
+            lg.addView(iv, new LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.MATCH_PARENT));
+            image(iv, it.optString("img"), "", h.px(4.8f), h.px(4.8f));
+        }
+        v.addView(lg, new LinearLayout.LayoutParams(h.px(4.8f), h.px(4.8f)));
+        LinearLayout tx = new LinearLayout(c); tx.setOrientation(LinearLayout.VERTICAL);
+        TextView b = h.text(h.fSemi, 1.75f, Color.WHITE);
+        b.setText(it.optString("label")); b.setSingleLine(true); b.setEllipsize(TextUtils.TruncateAt.END);
+        tx.addView(b);
+        LinearLayout line2 = new LinearLayout(c); line2.setGravity(Gravity.CENTER_VERTICAL);
+        if (it.has("pct")) {
+            FrameLayout bar = new FrameLayout(c); bar.setBackgroundColor(0xFF2A3442);
+            View fill = new View(c); fill.setBackgroundColor(GlassPanel.look.equals("glass") || GlassPanel.look.equals("spot") ? Color.WHITE : GlassPanel.selFill());
+            int bw = h.px(9);
+            bar.addView(fill, new LayoutParams(Math.round(bw * (float) Math.max(0, Math.min(1, it.optDouble("pct")))), LayoutParams.MATCH_PARENT));
+            LinearLayout.LayoutParams bl = new LinearLayout.LayoutParams(bw, Math.max(2, h.px(.35f))); bl.rightMargin = h.px(.9f);
+            line2.addView(bar, bl);
+        }
+        TextView sb = h.text(h.fReg, 1.4f, Ui.WHITE_60);
+        sb.setText(it.optString("sub")); sb.setSingleLine(true); sb.setEllipsize(TextUtils.TruncateAt.END);
+        line2.addView(sb, new LinearLayout.LayoutParams(0, LayoutParams.WRAP_CONTENT, 1));
+        LinearLayout.LayoutParams l2 = new LinearLayout.LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT); l2.topMargin = h.px(.4f);
+        tx.addView(line2, l2);
+        LinearLayout.LayoutParams tl = new LinearLayout.LayoutParams(0, LayoutParams.WRAP_CONTENT, 1); tl.leftMargin = h.px(1.4f);
+        v.addView(tx, tl);
+        if (it.optBoolean("bellBtn")) {
+            ImageView bell = new ImageView(c);
+            HomeIcons bi = new HomeIcons(HomeIcons.BELL, 2f); bi.setColor(it.optBoolean("bell") ? 0xFFFFD60A : Ui.WHITE_75);
+            bell.setImageDrawable(bi); bell.setPadding(h.px(1.4f), h.px(1.4f), h.px(1.4f), h.px(1.4f));
+            v.addView(bell, new LinearLayout.LayoutParams(h.px(5.4f), h.px(5.4f)));
+            bellOf.put(v, bell);
+        }
+        // the line between rows
+        LinearLayout wrap = new LinearLayout(c); wrap.setOrientation(LinearLayout.VERTICAL);
+        wrap.addView(v, new LinearLayout.LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT));
+        View rule = new View(c); rule.setBackgroundColor(0xFF161E28);
+        LinearLayout.LayoutParams rl = new LinearLayout.LayoutParams(LayoutParams.MATCH_PARENT, Math.max(1, h.px(.1f))); rl.leftMargin = h.px(padX);
+        wrap.addView(rule, rl);
+        if (bellOf.containsKey(v)) bellOf.put(wrap, bellOf.remove(v));
+        ringOf.put(wrap, v); ringRad.put(wrap, 0f);
         return wrap;
     }
 
@@ -517,6 +629,7 @@ final class NativeFind extends FrameLayout {
     // ================================================================== focus
 
     private void mark(boolean animate) {
+        if (phn && kind.equals("search")) { if (typeLine != null) { typeLine.setBackgroundColor(GlassPanel.look.equals("glass") || GlassPanel.look.equals("spot") ? Color.WHITE : GlassPanel.selFill()); typeLine.setVisibility(typing ? VISIBLE : INVISIBLE); } return; }   // (a finger: nothing to show you're on, and the page stays where it was slid)
         // the box and the button
         headBg.setColor(r == -1 ? 0x29FFFFFF : Ui.WHITE_12);
         headBg.setStroke(r == -1 ? Math.max(2, h.px(.18f)) : 0, Ui.WHITE_95);
@@ -615,6 +728,21 @@ final class NativeFind extends FrameLayout {
        the pane, null for nothing */
     String focusAt(float x, float y) {
         if (!h.hit(panel, x, y, 0)) return "back";
+        if (phn) {
+            if (fling != null) fling.forceFinished(true);
+            if (backBtn != null && h.hit(backBtn, x, y, .3f)) return "back";
+            if (clearBtn != null && clearBtn.getVisibility() == VISIBLE && h.hit(clearBtn, x, y, .3f)) { input.setText(""); if (!typing) startTyping(); return null; }
+            if (h.hit(body, x, y, 0)) for (int ri = 0; ri < rows.size(); ri++) {
+                Sec s = rows.get(ri);
+                for (int c = 0; c < s.cards.size(); c++) {
+                    View card = s.cards.get(c);
+                    if (!h.hit(card, x, y, 0)) continue;
+                    View bell = bellOf.get(card);
+                    if (bell != null && h.hit(bell, x, y, .2f) && nat()) { h.search.bell(s.ri, c); return null; }
+                    r = ri; cols.put(ri, c); return "ok";
+                }
+            }
+        }
         if (h.hit(btn, x, y, .4f) || h.hit(mic, x, y, .4f)) { r = -2; mark(true); return "ok"; }
         if (!noBox && h.hit(head, x, y, 0)) { r = -1; mark(true); return "ok"; }
         for (int ri = 0; ri < rows.size(); ri++) {
@@ -623,8 +751,9 @@ final class NativeFind extends FrameLayout {
         }
         return null;
     }
-    boolean overBox(float x, float y) { return h.hit(input, x, y, .6f); }
+    boolean overBox(float x, float y) { return phn ? h.hit(head, x, y, .2f) : h.hit(input, x, y, .6f); }
     void ok() {
+        if (phn && r >= 0 && r < rows.size()) { Sec s = rows.get(r); if (nat()) h.search.ok(s.ri, col(r)); else h.page("window.nhFindOk && nhFindOk(" + s.ri + "," + col(r) + ")"); return; }
         if (r == -2) { if (nat()) h.bridge.voiceInput("Search TopShelf"); else h.page(kind.equals("search") ? "window.nhFindVoice && nhFindVoice()" : "window.nhFindClose && nhFindClose()"); return; }
         if (r == -1) { startTyping(); return; }
         Sec s = rows.get(r);
@@ -652,6 +781,7 @@ final class NativeFind extends FrameLayout {
 
     void startTyping() {
         typing = true;
+        if (typeLine != null) typeLine.setVisibility(VISIBLE);
         r = -1; mark(true);
         input.setFocusable(true);
         input.setFocusableInTouchMode(true);
@@ -673,6 +803,7 @@ final class NativeFind extends FrameLayout {
     void stopTyping(boolean toResults) {
         if (!typing) return;
         typing = false;
+        if (typeLine != null) typeLine.setVisibility(INVISIBLE);
         InputMethodManager im = (InputMethodManager) getContext().getSystemService(Context.INPUT_METHOD_SERVICE);
         if (im != null) im.hideSoftInputFromWindow(input.getWindowToken(), 0);
         input.clearFocus();
@@ -690,4 +821,44 @@ final class NativeFind extends FrameLayout {
         if (code == KeyEvent.KEYCODE_DPAD_UP) { if (down) { stopTyping(false); r = -2; mark(true); } return true; }
         return false;
     }
+
+    // ================================================================== a finger (phones): the page and its rows slide
+
+    private android.widget.OverScroller fling;
+    private Sec flingRow;
+    private Sec dragRow;
+    private float maxY() {
+        float viewH = body.getHeight() > 0 ? body.getHeight() : ph - h.px(bodyY());
+        return Math.max(0, list.getLayoutParams().height - h.px(3) + h.px(2) - viewH);
+    }
+    private float maxX(Sec s) { return Math.max(0, s.in.getWidth() - pw); }
+    /** whether a finger slides this (a phone, the box shown and not being typed in) */
+    boolean freeOn() { return phn && shown && !typing; }
+    @Override public void touchDown() { if (fling != null) fling.forceFinished(true); dragRow = null; }
+    @Override public boolean drag(char axis, float x0, float y0, float d) {
+        if (!phn) return false;
+        if (axis == 'v') {
+            list.setTranslationY(-Math.max(0, Math.min(maxY(), -list.getTranslationY() - d)));
+            return true;
+        }
+        if (dragRow == null) for (Sec s : rows) if (s.strip != null && s.in.getOrientation() == LinearLayout.HORIZONTAL && h.hit(s.strip, x0, y0, 0)) { dragRow = s; break; }
+        if (dragRow == null) return true;
+        dragRow.scroll = Math.max(0, Math.min(maxX(dragRow), dragRow.scroll - d));
+        dragRow.in.setTranslationX(-dragRow.scroll);
+        return true;
+    }
+    @Override public void dragEnd(char axis, float v) {
+        if (!phn) return;
+        if (fling == null) fling = new android.widget.OverScroller(getContext());
+        if (axis == 'v') { flingRow = null; fling.fling(0, Math.round(-list.getTranslationY()), 0, -Math.round(v), 0, 0, 0, Math.round(maxY())); }
+        else if (dragRow != null) { flingRow = dragRow; fling.fling(Math.round(dragRow.scroll), 0, -Math.round(v), 0, 0, Math.round(maxX(dragRow)), 0, 0); }
+        else return;
+        removeCallbacks(glide); postOnAnimation(glide);
+    }
+    private final Runnable glide = new Runnable() { @Override public void run() {
+        if (fling == null || !shown || !fling.computeScrollOffset()) return;
+        if (flingRow != null) { flingRow.scroll = fling.getCurrX(); flingRow.in.setTranslationX(-flingRow.scroll); }
+        else list.setTranslationY(-fling.getCurrY());
+        if (!fling.isFinished()) postOnAnimation(this);
+    } };
 }

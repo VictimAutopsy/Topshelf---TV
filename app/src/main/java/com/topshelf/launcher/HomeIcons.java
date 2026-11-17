@@ -13,7 +13,8 @@ final class HomeIcons extends Drawable {
     static final int SEARCH = 0, PHOTOS = 1, SETTINGS = 2, REMOTE = 3, CHEVRON = 4, GEAR_BIG = 5, MIC = 6,
             HOME = 7, FILM = 8, TV = 9, LIVE = 10, TROPHY = 11,      // (the side menu's tabs)
             MOON = 12,                                                 // (Settings › Screen & sleep)
-            BELL = 13;                                                 // (a reminder is set: was the 🔔 emoji)
+            BELL = 13,                                                 // (a reminder is set: was the 🔔 emoji)
+            BACK = 14, CLEAR = 15;                                     // (a phone's back arrow, a text box's clear)
     private final int kind;
     private final Paint p = new Paint(Paint.ANTI_ALIAS_FLAG);
     private int color = 0xFFFFFFFF;
@@ -72,6 +73,8 @@ final class HomeIcons extends Drawable {
             case TROPHY: c.drawPath(CUP, p); break;
             case MOON: c.drawPath(MOON_PATH, p); break;
             case BELL: c.drawPath(BELL_PATH, p); c.drawLine(10, 21.5f, 14, 21.5f, p); break;
+            case BACK: c.drawLine(15, 5, 8, 12, p); c.drawLine(8, 12, 15, 19, p); break;
+            case CLEAR: c.drawLine(6, 6, 18, 18, p); c.drawLine(18, 6, 6, 18, p); break;
         }
         c.restore();
     }
@@ -84,7 +87,7 @@ final class HomeIcons extends Drawable {
     private static final Path MOON_PATH = new Path(), BELL_PATH = new Path();
     /* An icon drawn straight onto a canvas, in a line of drawn text (where an emoji used to be: emoji come in the
        TV's own cartoon style and matched nothing else). Centred at cx, cy and `size` px across. */
-    private static final HomeIcons[] INLINE = new HomeIcons[14];
+    private static final HomeIcons[] INLINE = new HomeIcons[16];
     static void at(Canvas c, int kind, float cx, float cy, float size, int color) {
         HomeIcons d = INLINE[kind];
         if (d == null) d = INLINE[kind] = new HomeIcons(kind, 1.9f);
