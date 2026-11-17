@@ -32,10 +32,45 @@ import java.util.Map;
  * team stats side by side — all from ESPN's game summary, fetched again every 30 s while the game is on.
  * ▲ ▼ move down the page, Back closes it (back into the scoreboard, when it came from there).
  */
-final class GameView extends FrameLayout {
+final class GameView extends FrameLayout implements NativeHome.Free {
     private static final int GROUND = SportsLook.GROUND, CARD = SportsLook.CARD, EDGE = SportsLook.EDGE, GOLD = SportsLook.GOLD, LIVE_C = SportsLook.LIVE, DIM = SportsLook.TER;
     private final NativeHome h;
     private final float R;
+    /* A phone (Chad picked it from a sketch, 1.0.464): below the camera cutout a back arrow and GAME, then the compact
+       scoreboard from the phone's Sports page (the teams one above the other on a card in their colours), the game's
+       buttons the width of the screen, and the rest of the page sliding up and down under the finger. */
+    private final boolean phone;
+    private float topY() { return phone ? h.TOP * h.R : 0; }
+    private final List<Object[]> taps = new ArrayList<>();      // {RectF on the page, action index (-1 back, -2 update)}
+    private android.widget.OverScroller fling;
+    @Override public void touchDown() { if (fling != null) fling.forceFinished(true); if (anim != null) anim.cancel(); scrollT = scroll; }
+    @Override public boolean drag(char axis, float x0, float y0, float d) {
+        if (axis != 'v') return true;
+        scroll = scrollT = Math.max(0, Math.min(maxScroll, scroll - d)); page.invalidate(); return true;
+    }
+    @Override public void dragEnd(char axis, float v) {
+        if (axis != 'v') return;
+        if (fling == null) fling = new android.widget.OverScroller(getContext());
+        fling.fling(0, Math.round(scroll), 0, -Math.round(v), 0, 0, 0, Math.round(maxScroll));
+        removeCallbacks(glideOn); postOnAnimation(glideOn);
+    }
+    private final Runnable glideOn = new Runnable() { @Override public void run() {
+        if (fling == null || !shownNow() || !fling.computeScrollOffset()) return;
+        scroll = scrollT = fling.getCurrY(); page.invalidate();
+        if (!fling.isFinished()) postOnAnimation(this);
+    } };
+    /** a finger tapped (x, y on screen): the back arrow, or one of the game's buttons */
+    void tapAt(float x, float y) {
+        float[] l = h.local(this, x, y);
+        for (Object[] t : taps) {
+            RectF r = (RectF) t[0];
+            if (!r.contains(l[0], l[1] + ((Integer) t[1] == -1 ? 0 : scroll))) continue;
+            int i = (Integer) t[1];
+            if (i == -1) { close(); return; }
+            act = i == -2 ? actL.size() : i; scrollT = 0;
+            actOk(); return;
+        }
+    }
     private final Typeface cond, heavy;
     private final Page page;
     private String sport = "", league = "", id = "";
@@ -57,7 +92,8 @@ final class GameView extends FrameLayout {
 
     GameView(NativeHome host) {
         super(host.getContext());
-        h = host; R = host.R;
+        h = host; phone = host.phone;
+        R = phone ? host.R * 1.3f : host.R;          // (a phone: a third larger, as Standings)
         setBackgroundColor(GROUND);
         setClickable(true);
         cond = SportsLook.cond(); heavy = SportsLook.heavy();
@@ -277,10 +313,11 @@ final class GameView extends FrameLayout {
 
         @Override protected void onDraw(Canvas c) {
             int w = getWidth(), hh = getHeight();
-            float px = 4 * R, cw = w - 2 * px;
+            float px = phone ? 1.5f * R : 4 * R, cw = w - 2 * px;
+            if (phone) taps.clear();
             c.save(); c.translate(0, -scroll);
-            float y = header(c, w);
-            y = buttons(c, px, y, cw);
+            float y = phone ? headerPhone(c, w, px) : header(c, w);
+            y = phone ? buttonsPhone(c, px, y, cw) : buttons(c, px, y, cw);
             if (sum == null) {
                 if (!err.isEmpty()) text(c, "Couldn't load the game right now", h.fMed, 1.5f, DIM, px, y + 4 * R, Paint.Align.LEFT, 0);
                 else {
@@ -290,7 +327,7 @@ final class GameView extends FrameLayout {
                     for (int i = 0; i < 4; i++) Skel.block(c, skP, skR, px + (i % 2) * (bw + 2 * R), y + 2 * R + (i / 2) * 17 * R, bw, 15 * R, 1.2f * R);
                     postInvalidateOnAnimation();
                 }
-                c.restore(); maxScroll = 0; return;
+                c.restore(); maxScroll = 0; if (phone) backBar(c, w, px); return;
             }
             y += 2.4f * R;
             y = lineScore(c, px, y, cw) + 2.4f * R;
@@ -300,8 +337,93 @@ final class GameView extends FrameLayout {
             y = stats(c, px, y, cw);
             c.restore();
             maxScroll = Math.max(0, y + 3 * R - hh);
+            if (phone) { backBar(c, w, px); return; }
             // the foot
             text(c, "◀ ▶ choose   ·   OK select   ·   ▲ ▼ move   ·   Back close", h.fMed, 1.1f, Ui.WHITE_60, px, hh - 1.6f * R, Paint.Align.LEFT, 0);
+        }
+
+        /** a phone: the back arrow and the page's name, staying put at the top while the page slides under it */
+        private void backBar(Canvas c, int w, float px) {
+            float t0 = topY(), bh = 4.2f * R;
+            p.setColor(GROUND); c.drawRect(0, 0, w, t0 + bh, p);
+            float cy = t0 + bh / 2;
+            p.setStyle(Paint.Style.STROKE); p.setStrokeWidth(.22f * R); p.setStrokeCap(Paint.Cap.ROUND); p.setStrokeJoin(Paint.Join.ROUND); p.setColor(Color.WHITE);
+            Path a = new Path(); a.moveTo(px + 1.1f * R, cy - 1f * R); a.lineTo(px + .1f * R, cy); a.lineTo(px + 1.1f * R, cy + 1f * R); c.drawPath(a, p);
+            p.setStyle(Paint.Style.FILL); p.setStrokeCap(Paint.Cap.BUTT);
+            text(c, "GAME", heavy, 1.9f, Color.WHITE, px + 2.6f * R, cy + .7f * R, Paint.Align.LEFT, .04f);
+            taps.add(new Object[] { new RectF(0, t0, px + 9 * R, t0 + bh), -1 });
+        }
+        /** a phone: the compact scoreboard (as on the phone's Sports page), the teams one above the other */
+        private float headerPhone(Canvas c, int w, float px) {
+            float top = topY() + 4.6f * R, cw = w - 2 * px, hh = 13.4f * R;
+            RectF card = new RectF(px, top, px + cw, top + hh);
+            if (teams.size() < 2) { skP.setColor(Skel.tone()); Skel.block(c, skP, skR, card.left, card.top, card.width(), card.height(), SportsLook.card(1.2f * R)); return card.bottom; }
+            String st = state();
+            boolean live = "in".equals(st), post = "post".equals(st);
+            float rad = SportsLook.card(1.2f * R);
+            p.setColor(SportsLook.CARD); c.drawRoundRect(card, rad, rad, p);
+            c.save(); Path clip = new Path(); clip.addRoundRect(card, rad, rad, Path.Direction.CW); c.clipPath(clip);
+            p.setColor(teamCol(0)); c.drawRect(card.left, card.top, card.centerX(), card.top + .5f * R, p);
+            p.setColor(teamCol(1)); c.drawRect(card.centerX(), card.top, card.right, card.top + .5f * R, p);
+            c.restore();
+            p.setStyle(Paint.Style.STROKE); p.setStrokeWidth(Math.max(1, (live ? .16f : .08f) * R)); p.setColor(live ? LIVE_C : SportsLook.EDGE);
+            c.drawRoundRect(card, rad, rad, p); p.setStyle(Paint.Style.FILL);
+            JSONObject cm = comp(), sto = cm == null ? null : cm.optJSONObject("status"), ty = sto == null ? null : sto.optJSONObject("type");
+            String detail = ty == null ? "" : ty.optString("shortDetail");
+            float ix = card.left + 1.3f * R, ir = card.right - 1.3f * R;
+            text(c, ((live ? "LIVE · " : "") + detail).toUpperCase(Locale.US), heavy, 1.2f, live ? LIVE_C : post ? DIM : GOLD, ix, card.top + 2.6f * R, Paint.Align.LEFT, .04f);
+            JSONObject gi = sum == null ? null : sum.optJSONObject("gameInfo"), v = gi == null ? null : gi.optJSONObject("venue");
+            if (v != null) text(c, ellip(v.optString("fullName").toUpperCase(Locale.US), cond, 1f, cw * .45f), cond, 1f, DIM, ir, card.top + 2.55f * R, Paint.Align.RIGHT, .06f);
+            for (int i = 0; i < 2; i++) {
+                JSONObject t = teams.get(i);
+                float cy = card.top + (5.9f + i * 4.1f) * R, d = 3.2f * R;
+                boolean dim = post && !t.optBoolean("winner");
+                p.setColor(Color.WHITE); c.drawCircle(ix + d / 2, cy, d / 2, p);
+                Bitmap b = logo(t.optString("logo"));
+                if (b != null) { float sc = Math.min(d * .7f / b.getWidth(), d * .7f / b.getHeight()); float bw = b.getWidth() * sc, bh = b.getHeight() * sc; c.drawBitmap(b, null, new RectF(ix + (d - bw) / 2, cy - bh / 2, ix + (d + bw) / 2, cy + bh / 2), p); }
+                String sc = t.optString("score");
+                boolean showSc = (live || post) && !sc.isEmpty();
+                float scW = 0;
+                if (showSc) { tp.setTypeface(heavy); tp.setTextSize(2.9f * R); scW = tp.measureText(sc) + R; text(c, sc, heavy, 2.9f, dim ? SportsLook.SUB : Color.WHITE, ir, cy + 1.05f * R, Paint.Align.RIGHT, -.02f); }
+                float nx = ix + d + R;
+                String rec = t.optString("rec");
+                tp.setTypeface(h.fReg); tp.setTextSize(1f * R); float recW = rec.isEmpty() ? 0 : tp.measureText(rec) + .7f * R;
+                String nm = ellip(t.optString("name"), cond, 2f, ir - nx - scW - recW);
+                text(c, nm, cond, 2f, dim ? SportsLook.SUB : Color.WHITE, nx, cy + .7f * R, Paint.Align.LEFT, 0);
+                tp.setTypeface(cond); tp.setTextSize(2f * R);
+                if (!rec.isEmpty()) text(c, rec, h.fReg, 1f, DIM, nx + tp.measureText(nm) + .7f * R, cy + .65f * R, Paint.Align.LEFT, 0);
+            }
+            return card.bottom;
+        }
+        /** a phone: the game's buttons, sharing the width of the screen (the first is the big one: Watch on…) */
+        private float buttonsPhone(Canvas c, float x, float y, float cw) {
+            boolean air = GlassPanel.look.equals("air");
+            float bh = 4.2f * R, top = y + 1.2f * R, gap = .8f * R;
+            int n = actL.size() + 1;
+            List<String> labs = new ArrayList<>();
+            for (int i = 0; i < n; i++) { String lab = i < actL.size() ? actL.get(i) : "Update"; labs.add(air ? lab.toUpperCase(Locale.US) : lab); }
+            // two to a row (three when they're short), the first a little wider
+            int per = n <= 2 ? n : 3;
+            float yy = top;
+            for (int r0 = 0; r0 < n; r0 += per) {
+                int k = Math.min(per, n - r0);
+                float unit = (cw - gap * (k - 1)) / (k + (r0 == 0 && k > 1 ? .4f : 0)), bx = x;
+                for (int j = 0; j < k; j++) {
+                    int i = r0 + j;
+                    float bw = unit * (r0 == 0 && j == 0 && k > 1 ? 1.4f : 1);
+                    RectF r = new RectF(bx, yy, bx + bw, yy + bh);
+                    boolean big = i == 0 && actWatch > 0;
+                    if (big) { p.setColor(GlassPanel.raiseFill()); c.drawRoundRect(r, SportsLook.ctrlRadius(bh), SportsLook.ctrlRadius(bh), p); }
+                    else SportsLook.ctrl(c, p, r, R, false);
+                    float sp = air ? .05f : 0;
+                    text(c, ellip(labs.get(i), h.fSemi, 1.25f, bw - 1.4f * R), h.fSemi, 1.25f, big ? Color.WHITE : SportsLook.ctrlText(false), r.centerX(), r.centerY() + .45f * R, Paint.Align.CENTER, sp);
+                    taps.add(new Object[] { r, i < actL.size() ? i : -2 });
+                    bx += bw + gap;
+                }
+                yy += bh + gap;
+            }
+            if (!actNote.isEmpty()) { text(c, ellip(actNote, h.fMed, 1.05f, cw), h.fMed, 1.05f, DIM, x, yy + 1.1f * R, Paint.Align.LEFT, 0); yy += 2f * R; }
+            return yy - gap;
         }
 
         /** the game's buttons, under the scoreboard: Sports' own controls, the one the remote is on lit and ringed */

@@ -1784,6 +1784,7 @@ final class NativeHome extends FrameLayout {
     /** the screen under the finger that slides freely with it (Home, Movies, TV Shows, a title's page, Live TV's guide), when nothing is open over it */
     private Free freeNow() {
         if (!phone || !(mode.equals("grid") || mode.equals("top"))) return null;
+        if (gameOpenNow() && !saver) return gamePage;
         if (saver || vodPlayingNow() || addonsOpenNow() || gameOpenNow() || fySetupOpen() || launchOv.getVisibility() == VISIBLE) return null;
         if (titleOpenNow()) return titleView;
         if (onVod() && isLive()) return live;
@@ -1824,6 +1825,7 @@ final class NativeHome extends FrameLayout {
                 if (titleView != null) titleView.touchDown();
                 if (live != null) live.touchDown();
                 if (sports != null) sports.touchDown();
+                if (gamePage != null && gamePage.shownNow()) gamePage.touchDown();
                 if (tVel != null) tVel.recycle();
                 tVel = android.view.VelocityTracker.obtain(); tVel.addMovement(e);
                 main.removeCallbacks(tLong); main.postDelayed(tLong, 460);
@@ -1933,7 +1935,7 @@ final class NativeHome extends FrameLayout {
         if (vodPlayingNow()) { if (vodPlayer.focusAt(x, y) == null) okPress(); return; }
         if (addonsOpenNow()) { if (phone) addonsView.tapAt(x, y); else okPress(); return; }
         if (titleOpenNow()) { if ("ok".equals(titleView.focusAt(x, y))) okPress(); return; }
-        if (gameOpenNow()) return;
+        if (gameOpenNow()) { if (phone) gamePage.tapAt(x, y); return; }
         if (mode.equals("sheet") && sheet != null) { int r = sheet.focusAt(x, y); if (r == 1) ok(); else if (r < 0) back(); return; }
         if (mode.equals("dialog") && dlg != null) { if (dlg.focusAt(x, y)) ok(); return; }
         if (mode.equals("find") && find != null) { String r = find.focusAt(x, y); if ("ok".equals(r)) ok(); else if ("back".equals(r)) back(); return; }

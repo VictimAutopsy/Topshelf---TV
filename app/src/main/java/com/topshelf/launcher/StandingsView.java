@@ -65,6 +65,17 @@ final class StandingsView extends View {
 
     private final NativeHome h;
     private final float R;
+    /* A phone held upright (Chad picked it from a sketch, 1.0.464): the leagues as chips sliding sideways along the
+       top, the views as one switch the width of the screen under them, one conference at a time (its name a tab:
+       AFC | NFC) where the TV has two side by side, and one table that slides up and down under the finger; your team
+       is chosen on arriving, so the sentence at the foot says where it stands. A tap on a team opens its page. */
+    private final boolean phone;
+    private int pcf;                                // the conference shown (a phone)
+    private final List<Pane> allPanes = new ArrayList<>();
+    private final List<RectF> confHits = new ArrayList<>();
+    private final List<String> confNames = new ArrayList<>();
+    private float chipsX, chipsMax;
+    private float pad() { return phone ? 1.4f * R : 4 * R; }
     private final TextPaint t = new TextPaint(Paint.ANTI_ALIAS_FLAG);
     private final Paint p = new Paint(Paint.ANTI_ALIAS_FLAG | Paint.FILTER_BITMAP_FLAG);
     private final RectF rf = new RectF();
@@ -126,7 +137,9 @@ final class StandingsView extends View {
 
     StandingsView(NativeHome host) {
         super(host.getContext());
-        h = host; R = host.R;
+        h = host; phone = host.phone;
+        // (a phone: everything a third larger, as if the screen were 35 rem wide: the columns that fit are worked out from that)
+        R = phone ? host.R * 1.3f : host.R;
         fMed = host.fMed; fSemi = host.fSemi;
         t.setFontFeatureSettings("tnum");          // figures line up in their columns
         boolean m = true;
@@ -341,8 +354,23 @@ final class StandingsView extends View {
         if (playIn) legend.add(new Object[] { AMBER, "rail", "Play-in" });
         for (String m : letters) legend.add(new Object[] { 0, m, clinchMeaning(lg[0], m) });
         for (Map.Entry<String, Integer> z : zn.entrySet()) zones.add(new Object[] { z.getValue(), z.getKey() });
-        if (panes.size() > 1) { for (Object[] z : zones) legend.add(new Object[] { z[0], "rail", z[1] }); zones.clear(); }
+        if (panes.size() > 1 || phone) { for (Object[] z : zones) legend.add(new Object[] { z[0], "rail", z[1] }); zones.clear(); }
+        allPanes.clear();
+        if (phone && panes.size() > 1) {
+            allPanes.addAll(panes);
+            if (!sameBoard) {
+                // the conference with your team in it
+                pcf = 0;
+                for (int a = 0; a < allPanes.size(); a++) for (Block b : allPanes.get(a).blocks) for (Row r : b.rows) if (favs.contains(lg[0] + ":" + r.id)) { pcf = a; }
+            }
+            pcf = Math.max(0, Math.min(pcf, allPanes.size() - 1));
+            panes.clear(); panes.add(allPanes.get(pcf));
+        }
+        confNames.clear();
+        for (Pane pn : allPanes) confNames.add(pn.title);
+        if (phone && !allPanes.isEmpty()) for (Pane pn : allPanes) pn.title = "";        // (its name is the tab above)
         layout();
+        if (phone && !sameBoard) { scroll = scrollT = 0; intoBoard(); }
     }
     /** a long table in two columns, ranked straight through (1–16 | 17–32) */
     private void split(List<Row> all, int cut) {
@@ -457,11 +485,13 @@ final class StandingsView extends View {
         for (int a = 0; a < panes.size(); a++) for (int b = 0; b < panes.get(a).flat.size(); b++) if (favs.contains(lg + ":" + panes.get(a).flat.get(b).id)) { pi = a; ri = b; break outer; }
         follow();
     }
-    private float boardTop() { return 4.9f * R; }
-    private float footTop() { return getHeight() - 3.1f * R; }
+    private float boardTop() { return phone ? (allPanes.size() > 1 ? 11.2f : 8.3f) * R : 4.9f * R; }
+    private float footTop() { return phone ? getHeight() - h.BOT * h.R - 5.2f * R : getHeight() - 3.1f * R; }
+    /** a phone: how far the table can slide */
+    private float maxScroll() { return Math.max(0, boardH - (footTop() - .6f * R - boardTop())); }
     /** the chosen team kept in sight */
     private void follow() {
-        if (focus != 2 || pi >= panes.size()) return;
+        if (phone || focus != 2 || pi >= panes.size()) return;
         Pane pn = panes.get(pi);
         if (ri >= pn.rowY.size()) return;
         float y0 = pn.rowY.get(ri), y1 = y0 + rowH, top = boardTop(), bot = footTop() - .6f * R;
@@ -495,12 +525,16 @@ final class StandingsView extends View {
             focus = 0; if (i != sel) { sel = i; scroll = scrollT = 0; pi = ri = 0; boardKey = ""; load(); }
             invalidate(); return "done";
         }
+        for (int i = 0; i < confHits.size(); i++) if (confHits.get(i).contains(x, y)) {
+            if (i != pcf) { pcf = i; boardKey = ""; scroll = scrollT = 0; pi = ri = 0; intoBoard(); }
+            invalidate(); return "done";
+        }
         for (int i = 0; i < viewHits.size(); i++) if (viewHits.get(i).contains(x, y)) { focus = 1; viewSel.put(lgId(), i); boardKey = ""; scroll = scrollT = 0; pi = ri = 0; invalidate(); return "done"; }
         float cy = y + scroll;
         for (int a = 0; a < panes.size(); a++) {
             Pane pn = panes.get(a);
             if (x < pn.x || x > pn.x + pn.w) continue;
-            for (int k = 0; k < pn.rowY.size(); k++) if (cy >= pn.rowY.get(k) && cy < pn.rowY.get(k) + rowH) { focus = 2; pi = a; ri = k; invalidate(); return "ok"; }
+            for (int k = 0; k < pn.rowY.size(); k++) if (cy >= pn.rowY.get(k) && cy < pn.rowY.get(k) + rowH) { focus = 2; pi = a; ri = k; invalidate(); return phone ? "done" : "ok"; }
         }
         return null;
     }
@@ -944,17 +978,17 @@ final class StandingsView extends View {
     private void layout() {
         int w = getWidth();
         if (w == 0 || panes.isEmpty()) return;
-        float pad = 4 * R, gap = 2 * R, top = boardTop(), avail = footTop() - .6f * R - top;
+        float pad = pad(), gap = 2 * R, top = boardTop(), avail = footTop() - .6f * R - top;
         boolean side = panes.size() == 1 && !zones.isEmpty();
         sideW = side ? 26 * R : 0;
-        float pw = panes.size() >= 2 ? (w - 2 * pad - gap) / 2 : side ? w - 2 * pad - gap - sideW : Math.min(w - 2 * pad, 86 * R);
+        float pw = phone ? w - 2 * pad : panes.size() >= 2 ? (w - 2 * pad - gap) / 2 : side ? w - 2 * pad - gap - sideW : Math.min(w - 2 * pad, 86 * R);
         // the row height: as roomy as the screen allows with every team in sight
         float best = Float.MAX_VALUE;
         for (Pane pn : panes) {
             int rows = 0; for (Block b : pn.blocks) rows += b.rows.size();
             if (rows > 0) best = Math.min(best, (avail - fixedH(pn)) / rows);
         }
-        rowH = best >= 2.3f * R ? Math.min(2.95f * R, best) : 2.45f * R;
+        rowH = phone ? 3.3f * R : best >= 2.3f * R ? Math.min(2.95f * R, best) : 2.45f * R;
         boardH = 0;
         for (int i = 0; i < panes.size(); i++) {
             Pane pn = panes.get(i);
@@ -1017,7 +1051,7 @@ final class StandingsView extends View {
     }
 
     private void drawBoard(Canvas c, int w, int hh) {
-        float pad = 4 * R;
+        float pad = pad();
         drawTop(c, w);
         if (chips.isEmpty()) return;
         Object[] got = cache.get(lgId());
@@ -1046,8 +1080,9 @@ final class StandingsView extends View {
     /** the leagues on the left and the views on the right: Sports' own controls (SportsLook), the chosen one's
         fill gliding to it, and the ring and glow round the one the remote is on */
     private void drawTop(Canvas c, int w) {
-        float pad = 4 * R, ch = SportsLook.CTRL_H * R, by = 2.3f * R, top = by - ch / 2, bot = by + ch / 2, cp = 1.2f * R, gap = .7f * R, rad = SportsLook.ctrlRadius(ch);
-        boolean here = team == null && remote, air = GlassPanel.look.equals("air");
+        float pad = pad(), ch = SportsLook.CTRL_H * R, by = 2.3f * R, top = by - ch / 2, bot = by + ch / 2, cp = 1.2f * R, gap = .7f * R, rad = SportsLook.ctrlRadius(ch);
+        boolean here = team == null && remote && !phone, air = GlassPanel.look.equals("air");
+        if (phone) { drawTopPhone(c, w, pad, ch, cp, gap, air); return; }
         List<String> vs = views();
         viewHits.clear();
         float segL = w - pad;
@@ -1113,6 +1148,78 @@ final class StandingsView extends View {
         t.setLetterSpacing(0);
         if (on != null) { SportsLook.glow(c, p, on, rad, R, SportsLook.GOLD, .8f, SportsLook.GLOW_CTRL); SportsLook.ring(c, p, on, rad, R, 255); }
     }
+
+    /** a phone: the leagues sliding along the top, the views as one switch under them, then the conferences as tabs */
+    private void drawTopPhone(Canvas c, int w, float pad, float ch, float cp, float gap, boolean air) {
+        float by = 2.3f * R, top = by - ch / 2, bot = by + ch / 2;
+        t.setTypeface(fSemi); t.setTextSize(SportsLook.T_CTRL * R); t.setLetterSpacing(air ? .05f : 0);
+        chipHits.clear(); viewHits.clear(); confHits.clear();
+        if (chips.isEmpty()) { t.setLetterSpacing(0); return; }
+        String[] ls = new String[chips.size()]; float[] ws = new float[chips.size()]; float all = 0;
+        for (int i = 0; i < chips.size(); i++) { ls[i] = air ? chips.get(i)[4].toUpperCase(Locale.US) : chips.get(i)[4]; ws[i] = t.measureText(ls[i]) + 2 * cp; all += ws[i] + (i > 0 ? gap : 0); }
+        chipsMax = Math.max(0, all - (w - 2 * pad));
+        chipsX = Math.max(0, Math.min(chipsX, chipsMax));
+        float x = pad - chipsX;
+        for (int i = 0; i < chips.size(); i++) {
+            chipHits.add(new RectF(x, 0, x + ws[i], bot + .6f * R));
+            rf.set(x, top, x + ws[i], bot); SportsLook.ctrl(c, p, rf, R, i == sel);
+            t.setLetterSpacing(air ? .05f : 0);
+            text(c, ls[i], x + ws[i] / 2, by + .46f * R, fSemi, SportsLook.T_CTRL, SportsLook.ctrlText(i == sel), Paint.Align.CENTER);
+            x += ws[i] + gap;
+        }
+        // the views: one switch across the screen
+        List<String> vs = views();
+        if (vs.size() > 1) {
+            float vy = 5.6f * R, vt = vy - ch / 2, vb = vy + ch / 2, sw = (w - 2 * pad - gap * (vs.size() - 1)) / vs.size();
+            int vi = viewIndex();
+            for (int i = 0; i < vs.size(); i++) {
+                float ax = pad + i * (sw + gap);
+                viewHits.add(new RectF(ax, vt - .4f * R, ax + sw, vb + .4f * R));
+                rf.set(ax, vt, ax + sw, vb); SportsLook.ctrl(c, p, rf, R, i == vi);
+                t.setLetterSpacing(air ? .05f : 0);
+                text(c, air ? vs.get(i).toUpperCase(Locale.US) : vs.get(i), ax + sw / 2, vy + .46f * R, fSemi, SportsLook.T_CTRL, SportsLook.ctrlText(i == vi), Paint.Align.CENTER);
+            }
+        }
+        t.setLetterSpacing(0);
+        // the conferences as tabs, the one shown underlined in the look's highlight
+        if (allPanes.size() > 1) {
+            float ty = 9.4f * R, tx = pad;
+            for (int i = 0; i < allPanes.size(); i++) {
+                String nm = i < confNames.size() && !confNames.get(i).isEmpty() ? confNames.get(i) : i == 0 ? "First" : "Second";
+                t.setTypeface(fSemi); t.setTextSize(1.3f * R); float tw = t.measureText(nm);
+                confHits.add(new RectF(tx - R, ty - 2.2f * R, tx + tw + R, ty + 1.4f * R));
+                text(c, nm, tx, ty, fSemi, 1.3f, i == pcf ? INK : TER, Paint.Align.LEFT);
+                if (i == pcf) { p.setColor(GlassPanel.raiseFill()); c.drawRect(tx, ty + .7f * R, tx + tw, ty + .7f * R + .28f * R, p); }
+                tx += tw + 2.4f * R;
+            }
+            p.setColor(EDGE); c.drawRect(pad, ty + .98f * R, w - pad, ty + .98f * R + Math.max(1, .07f * R), p);
+        }
+    }
+    /* a phone: the table, and the leagues along the top, slide under the finger (Sports hands them on) */
+    private android.widget.OverScroller fling; private int dragWhat, flingWhat;
+    void touchDown() { if (fling != null) fling.forceFinished(true); dragWhat = -1; }
+    boolean drag(char axis, float lx, float ly, float d) {
+        if (!phone || team != null) return false;
+        if (dragWhat < 0) dragWhat = axis == 'h' && ly < 4.4f * R ? 1 : axis == 'v' ? 2 : 0;
+        if (dragWhat == 1) { chipsX = Math.max(0, Math.min(chipsMax, chipsX - d)); invalidate(); return true; }
+        if (dragWhat == 2) { scroll = scrollT = Math.max(0, Math.min(maxScroll(), scrollT - d)); invalidate(); return true; }
+        return false;
+    }
+    void dragEnd(char axis, float v) {
+        int what = dragWhat; dragWhat = -1;
+        if (what <= 0) return;
+        if (fling == null) fling = new android.widget.OverScroller(getContext());
+        flingWhat = what;
+        if (what == 1) fling.fling(Math.round(chipsX), 0, -Math.round(v), 0, 0, Math.round(chipsMax), 0, 0);
+        else fling.fling(0, Math.round(scrollT), 0, -Math.round(v), 0, 0, 0, Math.round(maxScroll()));
+        removeCallbacks(glide); postOnAnimation(glide);
+    }
+    private final Runnable glide = new Runnable() { @Override public void run() {
+        if (fling == null || !shownNow() || !fling.computeScrollOffset()) return;
+        if (flingWhat == 1) chipsX = fling.getCurrX(); else scroll = scrollT = fling.getCurrY();
+        invalidate();
+        if (!fling.isFinished()) postOnAnimation(this);
+    } };
 
     /** a column's panel, its title and column names; returns where each figure column ends (its right edge) */
     private float[] paneBack(Canvas c, Pane pn) {
@@ -1261,7 +1368,7 @@ final class StandingsView extends View {
         p.setShader(new LinearGradient(glow.left, 0, glow.right, 0, new int[] { withA(col, 245), withA(col, 120), withA(col, 46) }, new float[] { 0, .55f, 1 }, Shader.TileMode.CLAMP));
         c.drawRoundRect(glow, .7f * R, .7f * R, p);
         p.setShader(null);
-        SportsLook.ring(c, p, glow, .7f * R, R, 255);
+        if (!phone) SportsLook.ring(c, p, glow, .7f * R, R, 255);        // (a phone has no remote: the glow alone)
     }
     /** soccer: what the coloured rails mean, beside the table */
     private void drawZones(Canvas c, float x, float y) {
@@ -1281,7 +1388,8 @@ final class StandingsView extends View {
     }
     /** the footer: where the chosen team stands, and what the marks mean */
     private void drawFoot(Canvas c, int w) {
-        float pad = 4 * R, fy = footTop();
+        if (phone) { drawFootPhone(c, w); return; }
+        float pad = pad(), fy = footTop();
         p.setColor(EDGE); c.drawRect(pad, fy + .2f * R, w - pad, fy + .2f * R + Math.max(1, .07f * R), p);
         float base = fy + 2.05f * R;
         // the key, right to left, as much as fits beside the sentence
@@ -1315,9 +1423,38 @@ final class StandingsView extends View {
             text(c, hint, pad, base, fMed, 1.1f, TER, Paint.Align.LEFT);
         }
     }
+    /** a phone: what the marks mean on one line, then where the chosen team stands */
+    private void drawFootPhone(Canvas c, int w) {
+        float pad = pad(), fy = footTop();
+        p.setColor(PANEL); c.drawRect(0, fy, w, getHeight(), p);
+        p.setColor(EDGE); c.drawRect(0, fy, w, fy + Math.max(1, .07f * R), p);
+        float base = fy + 2f * R, x = pad;
+        for (Object[] it : legend) {
+            int col = (Integer) it[0]; String mark = (String) it[1], label = (String) it[2];
+            t.setTypeface(fMed); t.setTextSize(1.05f * R); float lw = t.measureText(label);
+            float mw = mark.equals("rail") ? .28f * R : 0;
+            if (!mark.equals("rail")) { t.setTypeface(fSemi); mw = t.measureText(mark); }
+            if (x + mw + .7f * R + lw > w - pad) break;
+            if (mark.equals("rail")) { p.setColor(col); c.drawRect(x, base - R, x + mw, base + .2f * R, p); }
+            else text(c, mark, x + mw, base, fSemi, 1.05f, mark.equals("e") ? TER : IN, Paint.Align.RIGHT);
+            text(c, label, x + mw + .7f * R, base, fMed, 1.05f, TER, Paint.Align.LEFT);
+            x += mw + .7f * R + lw + 1.8f * R;
+        }
+        float y2 = fy + (legend.isEmpty() ? 2.2f : 4.1f) * R, maxW = w - 2 * pad;
+        if (focus == 2 && pi < panes.size() && ri < panes.get(pi).flat.size()) {
+            Row r = panes.get(pi).flat.get(ri);
+            t.setTypeface(fMed); t.setTextSize(1.2f * R);
+            String s = TextUtils.ellipsize(sentence(r), t, maxW, TextUtils.TruncateAt.END).toString();
+            if (s.startsWith(r.name)) {
+                text(c, r.name, pad, y2, fSemi, 1.2f, INK, Paint.Align.LEFT);
+                t.setTypeface(fSemi); t.setTextSize(1.2f * R); float nw = t.measureText(r.name);
+                text(c, s.substring(r.name.length()), pad + nw, y2, fMed, 1.2f, SUB, Paint.Align.LEFT);
+            } else text(c, s, pad, y2, fMed, 1.2f, SUB, Paint.Align.LEFT);
+        } else text(c, "Tap a team to see where it stands.", pad, y2, fMed, 1.1f, TER, Paint.Align.LEFT);
+    }
     /** while the standings load: the board's shape, gently breathing */
     private void skeleton(Canvas c, int w) {
-        float pad = 4 * R, gap = 2 * R, pw = (w - 2 * pad - gap) / 2, top = boardTop();
+        float pad = pad(), gap = 2 * R, pw = (w - 2 * pad - gap) / 2, top = boardTop();
         float k = (float) (.5 + .5 * Math.sin(SystemClock.uptimeMillis() / 380.0));
         for (int pn = 0; pn < 2; pn++) {
             float x = pad + pn * (pw + gap);

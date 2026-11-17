@@ -131,9 +131,9 @@ final class NativeSports extends FrameLayout implements NativeHome.Free {
     private float tabsX;
     private boolean lastOk;
     private android.widget.OverScroller fling;
-    private int dragWhat = -1, flingWhat;          // 1 the tabs, 2 the page, 3 your teams, 4 the leagues, 5 nothing; 0 not ours (Standings: the steps)
+    private int dragWhat = -1, flingWhat;          // 1 the tabs, 2 the page, 3 your teams, 4 the leagues, 5 nothing; 0 Standings' own (its table and leagues)
     private float tabsMax() { return Math.max(0, tabRow.getWidth() + (liveChip.getVisibility() == VISIBLE ? liveChip.getWidth() + h.px(1.2f) : 0) + 2 * h.px(1.2f) - W); }
-    @Override public void touchDown() { if (fling != null) fling.forceFinished(true); dragWhat = -1; }
+    @Override public void touchDown() { if (fling != null) fling.forceFinished(true); dragWhat = -1; standings.touchDown(); }
     @Override public boolean drag(char axis, float x0, float y0, float d) {
         if (!thumb || !shown) return false;
         if (dragWhat < 0) {
@@ -143,7 +143,7 @@ final class NativeSports extends FrameLayout implements NativeHome.Free {
             else if (standings.shownNow()) dragWhat = 0;
             else if (h.hit(phone, x0, y0, 0)) dragWhat = axis == 'v' ? 2 : phone.band(h.local(phone, x0, y0)[1]);
         }
-        if (dragWhat == 0) return false;
+        if (dragWhat == 0) { float[] l = h.local(standings, x0, y0); return standings.drag(axis, l[0], l[1], d); }
         if (dragWhat == 1) { tabsX = Math.max(0, Math.min(tabsMax(), tabsX - d)); tline.setTranslationX(-tabsX); }
         else if (dragWhat == 2) { phone.sy -= d; phone.invalidate(); }
         else if (dragWhat == 3) { phone.teamsX -= d; phone.invalidate(); }
@@ -152,6 +152,7 @@ final class NativeSports extends FrameLayout implements NativeHome.Free {
     }
     @Override public void dragEnd(char axis, float v) {
         int what = dragWhat; dragWhat = -1;
+        if (what == 0 && shown) { standings.dragEnd(axis, v); return; }
         if (what <= 0 || what == 5 || !shown) return;
         if (fling == null) fling = new android.widget.OverScroller(getContext());
         flingWhat = what;
