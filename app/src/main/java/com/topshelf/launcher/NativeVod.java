@@ -255,7 +255,7 @@ final class NativeVod extends FrameLayout implements NativeHome.Free {
         r = Math.min(i, rows.size() - 1);
         if (shown) { syncRows(); focus(false); }
     }
-    private String bgWant = "";
+    private volatile String bgWant = "";
     private long lastMove;
     private final LruCache<String, Bitmap[]> baked = new LruCache<String, Bitmap[]>(3) {   // url → {composite, glass light, glass frost} (full-screen pictures: a few)
         /* a backdrop dropped from here is given back as soon as nothing shows it (it used to wait for the garbage
@@ -266,9 +266,9 @@ final class NativeVod extends FrameLayout implements NativeHome.Free {
             h.reclaim(old);
         }
     };
-    private final Runnable trimmer = new Runnable() { @Override public void run() { baked.evictAll(); } };
+    private final Runnable trimmer = new Runnable() { @Override public void run() { baked.evictAll(); synchronized (bgBytes) { bgBytes.evictAll(); } } };
     { Diag.TRIMMERS.add(trimmer); }
-    void dispose() { Diag.TRIMMERS.remove(trimmer); baked.evictAll(); }
+    void dispose() { Diag.TRIMMERS.remove(trimmer); baked.evictAll(); synchronized (bgBytes) { bgBytes.evictAll(); } }
     private final Runnable bgLater = new Runnable() { @Override public void run() { backdropNow(); } };
     private final Runnable heroLater = new Runnable() { @Override public void run() { drawHero(); } };
     private int heroTok;
@@ -1211,7 +1211,51 @@ final class NativeVod extends FrameLayout implements NativeHome.Free {
     private void scheduleBackdrop() {
         main().removeCallbacks(bgLater);
         boolean quick = SystemClock.uptimeMillis() - lastMove < 450 && bgTop >= 0;
-        main().postDelayed(bgLater, quick ? 380 : 0);
+        main().postDelayed(bgLater, quick ? 200 : 0);
+    }
+
+    /* The backdrop shown here is a screen-size picture: TMDB's "original" ones are often 4K and several MB, which
+       took most of the wait after moving to another poster. The 1280-wide copy is plenty under the shading. */
+    private static String bgUrl(String u) {
+        return u.startsWith("https://image.tmdb.org/t/p/original/") ? "https://image.tmdb.org/t/p/w1280/" + u.substring(36) : u;
+    }
+    /* The posters either side of the one chosen have their backdrops fetched ahead (just the file, a few hundred KB
+       each: baking one is quick once it's here), so stepping along a row doesn't wait on the network. */
+    private final LruCache<String, byte[]> bgBytes = new LruCache<String, byte[]>(6 * 1024 * 1024) {
+        @Override protected int sizeOf(String k, byte[] v) { return v.length; }
+    };
+    private byte[] bgFetch(String url) {
+        if (url.isEmpty()) return null;
+        byte[] d;
+        synchronized (bgBytes) { d = bgBytes.get(url); }
+        if (d != null) return d;
+        try { d = HomeImages.http(bgUrl(url), null); } catch (Throwable e) { d = null; }
+        if (d == null && !bgUrl(url).equals(url)) try { d = HomeImages.http(url, null); } catch (Throwable ignored) { }
+        if (d != null) synchronized (bgBytes) { bgBytes.put(url, d); }
+        return d;
+    }
+    private final java.util.concurrent.ExecutorService bgAhead = java.util.concurrent.Executors.newSingleThreadExecutor();
+    private void fetchAround() {
+        if (r >= rows.size()) return;
+        Row x = rows.get(r);
+        if (x.items == null) return;
+        final List<String> want = new ArrayList<>();
+        for (int d : new int[] { 1, -1, 2 }) {
+            int c = x.col + d;
+            if (c < 0 || c >= x.items.size()) continue;
+            JSONObject m = x.items.get(c);
+            String u = m.optString("background"); if (u.isEmpty()) u = m.optString("poster");
+            if (!u.isEmpty()) want.add(u);
+        }
+        if (want.isEmpty()) return;
+        final String now = bgWant;
+        bgAhead.execute(new Runnable() { @Override public void run() {
+            for (String u : want) {
+                if (!now.equals(bgWant)) return;          // (moved on: what's around the new one is asked for then)
+                synchronized (bgBytes) { if (bgBytes.get(u) != null) continue; }
+                bgFetch(u);
+            }
+        } });
     }
 
     private void backdropNow() {
@@ -1223,21 +1267,27 @@ final class NativeVod extends FrameLayout implements NativeHome.Free {
         if (url.equals(bgWant)) return;
         bgWant = url;
         Bitmap[] have = baked.get(t + url);
-        if (have != null) { bgShownReal = true; showBackdrop(have); return; }
+        if (have != null) { bgShownReal = true; showBackdrop(have); fetchAround(); return; }
+        final long asked = SystemClock.uptimeMillis();
         bgWorker.execute(new Runnable() { @Override public void run() {
             if (!url.equals(bgWant)) return;           // focus moved on before its turn
             Bitmap src = null;
-            try { byte[] d = url.isEmpty() ? null : HomeImages.http(url, null); if (d != null) src = HomeImages.decode(d, W, H); } catch (Throwable ignored) { }
+            try { byte[] d = bgFetch(url); if (d != null) src = HomeImages.decode(d, W, H); } catch (Throwable ignored) { }
+            if (!url.equals(bgWant)) { if (src != null) src.recycle(); return; }
             final Bitmap[] out;
             try { out = bake(src, t); } catch (Throwable e) { return; }
             if (src != null) src.recycle();
-            // kept on the TV: next time this screen opens on it at once
-            try { java.io.FileOutputStream fo = new java.io.FileOutputStream(lastBgFile(t)); out[0].compress(Bitmap.CompressFormat.JPEG, 86, fo); fo.close(); } catch (Throwable ignored) { }
             main().post(new Runnable() { @Override public void run() {
                 baked.put(t + url, out);
                 baked.put("last:" + t, out);
-                if (url.equals(bgWant) && t.equals(type) && shown) { bgShownReal = true; showBackdrop(out); }
+                if (url.equals(bgWant) && t.equals(type) && shown) {
+                    bgShownReal = true; showBackdrop(out);
+                    Flight.time("Movies & TV · backdrop", SystemClock.uptimeMillis() - asked);
+                    fetchAround();
+                }
             } });
+            // kept on the TV: next time this screen opens on it at once (after it's on screen, and only the one you stopped on)
+            if (url.equals(bgWant)) try { java.io.FileOutputStream fo = new java.io.FileOutputStream(lastBgFile(t)); out[0].compress(Bitmap.CompressFormat.JPEG, 86, fo); fo.close(); } catch (Throwable ignored) { }
         } });
     }
 
@@ -1251,7 +1301,7 @@ final class NativeVod extends FrameLayout implements NativeHome.Free {
         nv.setAlpha(0f);
         final int under = bgTop;
         bgTop = next;
-        nv.animate().alpha(1f).setDuration(900).setInterpolator(new LinearInterpolator()).withEndAction(new Runnable() { @Override public void run() {
+        nv.animate().alpha(1f).setDuration(Ui.SLOW).setInterpolator(TileView.EASE).withEndAction(new Runnable() { @Override public void run() {
             if (bgTop == next && under >= 0) bg[under].setAlpha(0f);
         } }).start();
         h.setVodGlass(b[1], b[2]);
