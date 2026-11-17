@@ -61,6 +61,26 @@ public class MainActivity extends Activity {
     private final Handler main = new Handler(Looper.getMainLooper());
     private BroadcastReceiver packageReceiver;
 
+    /* An exit's trace: the whole file was cut at its first 8 KB, which ended before any thread (the freeze on
+       1.0.456 came with no clue). Now: its header, then the main thread's part in full, then a little of the rest. */
+    @android.annotation.TargetApi(30)
+    private static String traceOf(android.app.ApplicationExitInfo x) {
+        try {
+            java.io.InputStream in = x.getTraceInputStream();
+            if (in == null) return "";
+            java.io.ByteArrayOutputStream bo = new java.io.ByteArrayOutputStream();
+            byte[] b = new byte[16384]; int n;
+            while ((n = in.read(b)) > 0 && bo.size() < 4 * 1024 * 1024) bo.write(b, 0, n);
+            in.close();
+            String t = bo.toString("UTF-8");
+            int m = t.indexOf("\n\"main\" ");
+            if (m < 0) return t.substring(0, Math.min(t.length(), 8000));
+            int e = t.indexOf("\n\n", m + 2);
+            String main = t.substring(m + 1, e < 0 ? Math.min(t.length(), m + 12000) : Math.min(e, m + 12000));
+            return t.substring(0, Math.min(m, 1200)) + "\n...\n" + main;
+        } catch (Throwable e) { return ""; }
+    }
+
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -112,6 +132,7 @@ public class MainActivity extends Activity {
         buildWebView();
         showCover();
         // the flight recorder (Flight): timings, smoothness, memory and screen use, sent once a day
+        try { FreezeWatch.start(getSharedPreferences(Bridge.PREFS, MODE_PRIVATE)); } catch (Throwable ignored) { }
         Flight.start(this, new Flight.Screen() { @Override public String now() { return home == null ? "start-up" : home.flightScreen(); } });
         registerPackageReceiver();
         link = new LinkServer(this);
@@ -431,7 +452,11 @@ public class MainActivity extends Activity {
                         else if (r == android.app.ApplicationExitInfo.REASON_CRASH || r == android.app.ApplicationExitInfo.REASON_CRASH_NATIVE) Flight.count("crash");
                         else if (x.getImportance() >= 300 && (r == android.app.ApplicationExitInfo.REASON_LOW_MEMORY || r == android.app.ApplicationExitInfo.REASON_OTHER || r == android.app.ApplicationExitInfo.REASON_SIGNALED)) Flight.count("closed by Android in the background");
                         if (r == android.app.ApplicationExitInfo.REASON_ANR || r == android.app.ApplicationExitInfo.REASON_CRASH_NATIVE) {
-                            try { java.io.InputStream in = x.getTraceInputStream(); if (in != null) { byte[] b = new byte[8000]; int n = in.read(b); in.close(); if (n > 0) reason += "\n" + new String(b, 0, n, "UTF-8"); } } catch (Throwable ignored) { }
+                            reason += "\n" + traceOf(x);
+                            // (TopShelf's own look at what it was busy with, from just before Android gave up on it)
+                            String fz = pr.getString("lastFreeze", "");
+                            long fzAt = pr.getLong("lastFreezeAt", 0);
+                            if (!fz.isEmpty() && Math.abs(x.getTimestamp() - fzAt) < 120000) reason += "\n\n--- busy with, " + ((x.getTimestamp() - fzAt) / 1000) + " s before ---\n" + fz;
                         }
                     }
                 }
