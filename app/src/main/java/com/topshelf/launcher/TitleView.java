@@ -40,7 +40,8 @@ final class TitleView extends FrameLayout implements NativeHome.Free {
     /* ------------------------------------------------------------------ a phone: the page under your finger
        The page slides up and down freely, each row (episodes, cast, videos, more like this, reviews) sideways by
        itself, the list of streams up and down, and all of them glide on after a flick. (On the TV the page follows
-       the highlight; a phone has a finger instead.) The title's own page only: a person's page still moves in steps. */
+       the highlight; a phone has a finger instead.) A person's page too: up and down, their rows sideways, and their
+       biography read in full. */
     private android.widget.OverScroller fling; private String dragT, flingT;
     @Override public void touchDown() { if (fling != null) fling.forceFinished(true); dragT = null; }
     @Override public boolean drag(char axis, float x0, float y0, float dPx) {
@@ -1377,7 +1378,7 @@ final class TitleView extends FrameLayout implements NativeHome.Free {
         private final android.graphics.Path clip = new android.graphics.Path();
         Panel(android.content.Context c) {
             super(c);
-            t1.setTypeface(h.fSemi); t1.setTextSize(1.15f * R);
+            t1.setTypeface(h.fSemi); t1.setTextSize(ph(1.15f) * R);
             t2.setTypeface(h.fReg); t2.setTextSize(.88f * R);
             tc.setTypeface(h.fSemi); tc.setTextSize(.72f * R); tc.setTextAlign(Paint.Align.CENTER); tc.setLetterSpacing(.04f);
             th.setTypeface(h.fSemi); th.setTextSize(1.3f * R);
@@ -1385,20 +1386,37 @@ final class TitleView extends FrameLayout implements NativeHome.Free {
             ts.setTypeface(h.fSemi); ts.setTextSize(.78f * R); ts.setLetterSpacing(.1f);
         }
         void resetScroll() { seasonOff = 0; epScroll = epScrollT = strScroll = strScrollT = 0; dim = 0; pageY = pageYT = 0; castScroll = castScrollT = 0; freeY = 0; }
+        /** the page's smallest text (labels, details, hints) a size up on a phone: drawn for a TV across the room, it was
+            too small to read in a hand; the badges' tiny text stays as it is (it sits in boxes of its own size) */
+        private float ph(float rem) { return h.phone ? Math.max(rem, 1.3f) : rem; }
         // ---- a phone: what a slide of the finger moves, and how far each thing can go (px)
         private float freeY, strMax;
         /** "page", "str" (the streams), "ep", "cast", a row's name; "" when the slide moves nothing here; null: not this page's to take */
         String dragTarget(char axis, float ly) {
-            if (person != null || reviewOpen >= 0 || trFull) return null;
+            if (reviewOpen >= 0 || trFull) return null;
+            if (person != null) {
+                if (person.bioOpen) return axis == 'v' ? "pbio" : "";
+                if (axis == 'v') return "ppage";
+                float y = ly + person.pageY; String in = "";
+                for (String z : new String[] { "known", "movies", "shows" }) if (!person.list(z).isEmpty() && pTop(person, z) <= y && y < pTop(person, z) + pRowH) in = "pr:" + z;
+                return in;
+            }
             if (streamsScreen()) return axis == 'v' ? "str" : "";
             if (axis == 'v') return "page";
             float y = ly + pageY, best = -1; String in = "";
             for (Map.Entry<String, Float> e : tops().entrySet()) if (!e.getKey().equals("end") && e.getValue() <= y && e.getValue() > best) { best = e.getValue(); in = e.getKey(); }
             return in.equals("seasons") ? "ep" : in.equals("cast") || in.equals("videos") || in.equals("similar") || in.equals("reviews") ? in : "";
         }
-        float pos(String t) { return t.equals("page") ? pageY : t.equals("str") ? strScroll : t.equals("ep") ? epScroll : t.equals("cast") ? castScroll : rs(t).scroll; }
+        float pos(String t) {
+            if (person != null && t.startsWith("p")) return t.equals("ppage") ? person.pageY : t.equals("pbio") ? person.bioScroll : person.rs(t.substring(3)).scroll;
+            return t.equals("page") ? pageY : t.equals("str") ? strScroll : t.equals("ep") ? epScroll : t.equals("cast") ? castScroll : rs(t).scroll; }
         float max(String t) {
             float vw = getWidth() - 10 * R;
+            if (person != null && t.startsWith("p")) {
+                if (t.equals("ppage")) return Math.max(0, pTop(person, "end") + 2 * R - getHeight() + 5 * R);
+                if (t.equals("pbio")) return Math.max(0, pBioRoom());
+                return Math.max(0, person.list(t.substring(3)).size() * 15.1f * R - 1.6f * R - vw);
+            }
             switch (t) {
                 case "page": return Math.max(0, tops().get("end") - (getHeight() - 6f * R));
                 case "str": return strMax;
@@ -1412,6 +1430,12 @@ final class TitleView extends FrameLayout implements NativeHome.Free {
         }
         void setPos(String t, float v) {
             v = Math.max(0, Math.min(max(t), v));
+            if (person != null && t.startsWith("p")) {
+                if (t.equals("ppage")) person.pageY = person.pageYT = v;
+                else if (t.equals("pbio")) person.bioScroll = v;
+                else { RowState r = person.rs(t.substring(3)); r.scroll = r.scrollT = v; }
+                invalidate(); return;
+            }
             switch (t) {
                 case "page": freeY = pageY = pageYT = v; break;
                 case "str": strScroll = strScrollT = v; break;
@@ -1556,7 +1580,7 @@ final class TitleView extends FrameLayout implements NativeHome.Free {
             String rating = f.optString("imdbRating", item.optString("rating"));
             if (!rating.isEmpty()) {
                 lx += (r1.isEmpty() ? 0 : 1.6f * R);
-                tc.setTextSize(1.15f * R);
+                tc.setTextSize(ph(1.15f) * R);
                 float iw = tc.measureText("IMDb") + 1.2f * R;
                 rq.set(lx, y - 1.45f * R, lx + iw, y + .35f * R);
                 p.setColor(0xFFF5C518); c.drawRoundRect(rq, .35f * R, .35f * R, p);
@@ -1566,7 +1590,7 @@ final class TitleView extends FrameLayout implements NativeHome.Free {
             }
             if (traktPct > 0) {
                 lx += 1.6f * R;
-                tc.setTextSize(1.15f * R);
+                tc.setTextSize(ph(1.15f) * R);
                 float iw = tc.measureText("TRAKT") + 1.2f * R;
                 rq.set(lx, y - 1.45f * R, lx + iw, y + .35f * R);
                 p.setColor(0xFFED1C24); c.drawRoundRect(rq, .35f * R, .35f * R, p);
@@ -1754,7 +1778,7 @@ final class TitleView extends FrameLayout implements NativeHome.Free {
                 small.setTextSize(1.35f * R); small.setColor(f ? Color.WHITE : Ui.WHITE_60);
                 c.drawText(TextUtils.ellipsize(m.optString("name"), small, iw, TextUtils.TruncateAt.END).toString(), x, y + ih + (f ? 2.6f : 2.1f) * R, small);
                 String sub = m.optString("year") + (m.optString("rating").isEmpty() ? "" : "   ★ " + m.optString("rating"));
-                small.setTextSize(1.15f * R); small.setColor(Ui.WHITE_50);
+                small.setTextSize(ph(1.15f) * R); small.setColor(Ui.WHITE_50);
                 c.drawText(sub.trim(), x, y + ih + (f ? 4.3f : 3.8f) * R, small);
             }
         }
@@ -1779,7 +1803,7 @@ final class TitleView extends FrameLayout implements NativeHome.Free {
                 JSONObject us = m.optJSONObject("user_stats");
                 int rt = us == null ? 0 : us.optInt("rating");
                 String meta2 = (rt > 0 ? "★ " + rt + "/10    " : "") + "♥ " + m.optInt("likes");
-                small.setTextSize(1.25f * R); small.setColor(Ui.WHITE_60); small.setTextAlign(Paint.Align.RIGHT);
+                small.setTextSize(ph(1.25f) * R); small.setColor(Ui.WHITE_60); small.setTextAlign(Paint.Align.RIGHT);
                 c.drawText(meta2, x + iw - 1.6f * R, y + 2.6f * R, small); small.setTextAlign(Paint.Align.LEFT);
                 String tx = m.optString("comment").replaceAll("\\s+", " ").trim();
                 body.setTextSize(1.45f * R); body.setColor(f ? Ui.WHITE_95 : Ui.WHITE_75);
@@ -1830,7 +1854,7 @@ final class TitleView extends FrameLayout implements NativeHome.Free {
             float colW = 42 * R;
             for (int i = 0; i < a.size(); i++) {
                 float x = 5 * R + (i < half ? 0 : colW + 4 * R), y = top + 5.6f * R + (i < half ? i : i - half) * 4.6f * R;
-                small.setTextSize(1.25f * R); small.setColor(Ui.WHITE_50);
+                small.setTextSize(ph(1.25f) * R); small.setColor(Ui.WHITE_50);
                 c.drawText(a.get(i)[0].toUpperCase(Locale.US), x, y, small);
                 body.setTextSize(1.6f * R); body.setColor(on ? Color.WHITE : Ui.WHITE_95);
                 c.drawText(TextUtils.ellipsize(a.get(i)[1], body, colW, TextUtils.TruncateAt.END).toString(), x, y + 2.1f * R, body);
@@ -1974,7 +1998,7 @@ final class TitleView extends FrameLayout implements NativeHome.Free {
                 if (seen) {
                     float bx = rq.right - 1.6f * R, by = rq.bottom - 1.6f * R;
                     p.setColor(0xE630D158); c.drawCircle(bx, by, 1f * R, p);
-                    tq.setTextSize(1.25f * R); tq.setColor(Color.WHITE); c.drawText("✓", bx, by + .45f * R, tq);
+                    tq.setTextSize(ph(1.25f) * R); tq.setColor(Color.WHITE); c.drawText("✓", bx, by + .45f * R, tq);
                 }
                 c.restore();
                 int n = e.optInt("episode", e.optInt("number"));
@@ -2001,7 +2025,7 @@ final class TitleView extends FrameLayout implements NativeHome.Free {
 
         /** a small label on a picture: dark pill, text in colour; right: x is its right edge */
         private void chip(Canvas c, float x, float y, String s, int bg, int fg, boolean right) {
-            tq.setTextSize(1.15f * R);
+            tq.setTextSize(ph(1.15f) * R);
             float tw = tq.measureText(s), cw = tw + 1.4f * R, chh = 2.1f * R;
             float l = right ? x - cw : x;
             rf.set(l, y, l + cw, y + chh);
@@ -2062,6 +2086,7 @@ final class TitleView extends FrameLayout implements NativeHome.Free {
             float want = 0;
             if (!P.zone.equals("bio")) want = pTop(P, P.zone) - 6.5f * R;
             float end = pTop(P, "end") + 2 * R;
+            if (h.phone) want = P.pageYT;           // (a phone: where the finger left it)
             P.pageYT = Math.max(0, Math.min(want, Math.max(0, end - hh + 5 * R)));
             if (Math.abs(P.pageY - P.pageYT) > .5f) { P.pageY += (P.pageYT - P.pageY) * .22f; moving = true; } else P.pageY = P.pageYT;
             for (RowState r : P.rows.values()) if (Math.abs(r.scroll - r.scrollT) > .5f) { r.scroll += (r.scrollT - r.scroll) * .25f; moving = true; } else r.scroll = r.scrollT;
@@ -2080,7 +2105,7 @@ final class TitleView extends FrameLayout implements NativeHome.Free {
             float tx = px + pw + 3.5f * R, tw = Math.max(20 * R, Math.min(72 * R, w - tx - 5 * R));
             float y = py + 1.6f * R;
             String kick = (P.dept.isEmpty() ? "" : (P.dept.equals("Acting") ? "ACTOR" : P.dept.toUpperCase(Locale.US)) + (P.place.isEmpty() ? "" : "   ·   ")) + P.place.toUpperCase(Locale.US);
-            if (!kick.isEmpty()) { ts.setTextSize(1.05f * R); ts.setColor(Ui.WHITE_60); c.drawText(TextUtils.ellipsize(kick, ts, tw, TextUtils.TruncateAt.END).toString(), tx, y, ts); }
+            if (!kick.isEmpty()) { ts.setTextSize(ph(1.05f) * R); ts.setColor(Ui.WHITE_60); c.drawText(TextUtils.ellipsize(kick, ts, tw, TextUtils.TruncateAt.END).toString(), tx, y, ts); }
             y += 4.6f * R;
             big.setTextSize((h.portrait ? 3f : 4.4f) * R); big.setColor(Color.WHITE);
             c.drawText(TextUtils.ellipsize(P.name, big, tw, TextUtils.TruncateAt.END).toString(), tx, y, big);
@@ -2105,7 +2130,7 @@ final class TitleView extends FrameLayout implements NativeHome.Free {
             hit(br.left, br.top - P.pageY, br.right, br.bottom - P.pageY, "p:bio", 0, false);
             body.setColor(bf ? Ui.WHITE_95 : Ui.WHITE_75);
             c.save(); c.translate(tx, y); pBioL.draw(c); c.restore();
-            if (P.bioLong) { small.setTextSize(1.2f * R); small.setColor(bf ? Color.WHITE : Ui.WHITE_50); c.drawText("Read more", tx, y + pBioL.getHeight() + 2f * R, small); }
+            if (P.bioLong) { small.setTextSize(ph(1.2f) * R); small.setColor(bf ? Color.WHITE : Ui.WHITE_50); c.drawText("Read more", tx, y + pBioL.getHeight() + 2f * R, small); }
             // their films and shows
             for (String z : new String[] { "known", "movies", "shows" }) {
                 List<JSONObject> l = P.list(z); if (l.isEmpty()) continue;
@@ -2149,11 +2174,13 @@ final class TitleView extends FrameLayout implements NativeHome.Free {
                 String ch = m.optString("character");
                 String sub = (ch.isEmpty() ? "" : (m.optBoolean("_crew") ? ch : "as " + ch));
                 String yr = m.optString("year") + (m.optInt("_eps") > 1 ? "  ·  " + m.optInt("_eps") + " eps" : "");
-                small.setTextSize(1.15f * R); small.setColor(Ui.WHITE_50);
+                small.setTextSize(ph(1.15f) * R); small.setColor(Ui.WHITE_50);
                 c.drawText(TextUtils.ellipsize(sub.isEmpty() ? yr : sub, small, iw, TextUtils.TruncateAt.END).toString(), x, y + ih + (f ? 4.3f : 3.8f) * R, small);
                 if (!sub.isEmpty() && !yr.trim().isEmpty()) c.drawText(TextUtils.ellipsize(yr, small, iw, TextUtils.TruncateAt.END).toString(), x, y + ih + (f ? 5.9f : 5.4f) * R, small);
             }
         }
+        private float pBioRoomV;
+        private float pBioRoom() { return pBioRoomV; }
         private void drawBioOpen(Canvas c, int w, int hh, Person P) {
             p.setColor(0xE607080D); c.drawRect(0, 0, w, hh, p);
             float bw = Math.min(78 * R, w - 8 * R), x = (w - bw) / 2, y0 = 6 * R, y1 = hh - 6 * R;
@@ -2162,6 +2189,7 @@ final class TitleView extends FrameLayout implements NativeHome.Free {
             if (pBioFull == null) { body.setTextSize(1.55f * R); pBioFull = android.text.StaticLayout.Builder.obtain(P.bio, 0, P.bio.length(), body, Math.round(bw)).setLineSpacing(0, 1.4f).build(); }
             float ty = y0 + 5 * R, room = y1 - ty;
             P.bioScroll = Math.min(P.bioScroll, Math.max(0, pBioFull.getHeight() - room));
+            pBioRoomV = pBioFull.getHeight() - room;
             body.setColor(Ui.WHITE_95);
             c.save(); c.clipRect(x - R, ty, x + bw + R, y1); c.translate(x, ty - P.bioScroll); pBioFull.draw(c); c.restore();
         }
@@ -2197,7 +2225,7 @@ final class TitleView extends FrameLayout implements NativeHome.Free {
                 tq.setTextSize(1.4f * R); tq.setColor(f ? Color.WHITE : Ui.WHITE_85);
                 float tw = castD + castGap * .8f;
                 c.drawText(TextUtils.ellipsize(m.optString("name"), tq, tw, TextUtils.TruncateAt.END).toString(), ccx, y + castD + 2.2f * R, tq);
-                if (!m.optString("character").isEmpty()) { tq.setTextSize(1.2f * R); tq.setColor(Ui.WHITE_50); c.drawText(TextUtils.ellipsize(m.optString("character"), tq, tw, TextUtils.TruncateAt.END).toString(), ccx, y + castD + 3.9f * R, tq); }
+                if (!m.optString("character").isEmpty()) { tq.setTextSize(ph(1.2f) * R); tq.setColor(Ui.WHITE_50); c.drawText(TextUtils.ellipsize(m.optString("character"), tq, tw, TextUtils.TruncateAt.END).toString(), ccx, y + castD + 3.9f * R, tq); }
             }
         }
         private String airDate(JSONObject e) {
@@ -2319,7 +2347,7 @@ final class TitleView extends FrameLayout implements NativeHome.Free {
                 hit(ix0, Math.max(y, ly0 - .4f * R), ix1, Math.min(y + hgt, py1 - .5f * R), "streams", i, false);
             }
             c.restore();
-            if (waiting) { ts.setTextSize(1.15f * R); ts.setColor(Ui.WHITE_60); c.drawText("STILL ASKING " + (asked.size() - countAnswered()) + " ADDON" + (asked.size() - countAnswered() == 1 ? "" : "S") + "…", ix0, py1 + 1.9f * R, ts); }
+            if (waiting) { ts.setTextSize(ph(1.15f) * R); ts.setColor(Ui.WHITE_60); c.drawText("STILL ASKING " + (asked.size() - countAnswered()) + " ADDON" + (asked.size() - countAnswered() == 1 ? "" : "S") + "…", ix0, py1 + 1.9f * R, ts); }
             c.restore();
         }
         private int countAnswered() { int n = 0; for (String v : asked.values()) if (!v.equals("…")) n++; return n; }
@@ -2394,14 +2422,14 @@ final class TitleView extends FrameLayout implements NativeHome.Free {
             ty += l[0].getHeight();
             if (l[1] != null) { descP.setColor(f ? 0xFFD0D0D0 : 0xFFA0A0A0); c.save(); c.translate(tx, ty + .5f * R); l[1].draw(c); c.restore(); }
             // the addon, on the right
-            tq.setTextSize(1.25f * R); tq.setColor(Ui.WHITE_50);
+            tq.setTextSize(ph(1.25f) * R); tq.setColor(Ui.WHITE_50);
             tq.setTextAlign(Paint.Align.RIGHT);
             c.drawText(TextUtils.ellipsize(s.optString("_addon"), tq, addonColW() - R, TextUtils.TruncateAt.END).toString(), rf.right - cardPad(), rf.top + cardPad() + 1.4f * R, tq);
             tq.setTextAlign(Paint.Align.CENTER);
         }
         private float chip(Canvas c, String s, float x, float cy, int bgc, int fg) {
             if (s.isEmpty()) return x;
-            tc.setTextSize(1.15f * R);
+            tc.setTextSize(ph(1.15f) * R);
             float cw = tc.measureText(s) + 1.7f * R;
             rq.set(x, cy - 1.05f * R, x + cw, cy + 1.05f * R);
             p.setColor(bgc); c.drawRoundRect(rq, .55f * R, .55f * R, p);
