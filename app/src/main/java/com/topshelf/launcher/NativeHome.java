@@ -1787,6 +1787,7 @@ final class NativeHome extends FrameLayout {
         if (phone && mode.equals("sheet") && sheet != null && sheet.freeOn()) return sheet;
         if (!phone || !(mode.equals("grid") || mode.equals("top"))) return null;
         if (gameOpenNow() && !saver) return gamePage;
+        if (vodPlayingNow() && !saver && !mode.equals("menu")) return vodPlayer;         // (a phone: dragging along the timeline scrubs)
         if (saver || vodPlayingNow() || addonsOpenNow() || gameOpenNow() || fySetupOpen() || launchOv.getVisibility() == VISIBLE) return null;
         if (titleOpenNow()) return titleView;
         if (onVod() && isLive()) return live;
@@ -1832,6 +1833,7 @@ final class NativeHome extends FrameLayout {
                 if (gamePage != null && gamePage.shownNow()) gamePage.touchDown();
                 if (find != null && find.freeOn()) find.touchDown();
                 if (sheet != null && sheet.freeOn()) sheet.touchDown();
+                if (vodPlayingNow()) vodPlayer.touchDown();
                 if (tVel != null) tVel.recycle();
                 tVel = android.view.VelocityTracker.obtain(); tVel.addMovement(e);
                 main.removeCallbacks(tLong); main.postDelayed(tLong, 460);

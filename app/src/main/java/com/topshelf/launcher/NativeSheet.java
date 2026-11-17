@@ -62,7 +62,7 @@ final class NativeSheet extends FrameLayout implements NativeHome.Free {
     private String chLabel = "", chAbout = "", chRowLabel = "";
     private JSONArray chOpts = new JSONArray();
 
-    /* A phone (Chad picked it from a sketch, 1.0.469): a page of its own. Below the camera cutout a back arrow and
+    /* A phone (Chad picked it from a sketch, 1.0.470): a page of its own. Below the camera cutout a back arrow and
        the page's name; the sections as a list (icon, name, what's in them) with a waiting update as a card above
        them; a section's settings as rows (name, value, ›) under small headings; the page slides under the finger.
        A setting with choices raises a sheet from the bottom with what it does and its choices (setinfo.js's

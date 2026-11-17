@@ -31,8 +31,10 @@ import java.util.Map;
  * forward 30 s, and More (subtitles — the file's own and the addons' — audio, from the start, other streams,
  * next episode). Carries on where you left off; remembers where you got to.
  */
-final class VodPlayer extends FrameLayout {
+final class VodPlayer extends FrameLayout implements NativeHome.Free {
     private static final int ID0 = 2000000;
+    /** a phone (sideways): room kept at both ends for the camera cutout */
+    private static final float PH_PAD = 5.2f;
     private final NativeHome h;
     private final float R;
     private final FrameLayout bar;
@@ -89,6 +91,16 @@ final class VodPlayer extends FrameLayout {
         col.addView(tTitle, ttl);
         LayoutParams cll = new LayoutParams(h.px(Math.min(80, h.SW - 10)), LayoutParams.WRAP_CONTENT, Gravity.TOP | Gravity.LEFT);
         cll.leftMargin = h.px(5); cll.topMargin = h.px(3.6f);
+        if (h.phone) {
+            // a phone (sideways): the back arrow before the title, the title over what it is, room for three buttons on the right
+            View dim = new View(getContext()); dim.setBackgroundColor(0x40000000);
+            bar.addView(dim, 0, new LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.MATCH_PARENT));
+            col.removeAllViews();
+            tTitle.setTextSize(android.util.TypedValue.COMPLEX_UNIT_PX, 1.9f * R); tSub.setTextSize(android.util.TypedValue.COMPLEX_UNIT_PX, 1.45f * R);
+            col.addView(tTitle); LinearLayout.LayoutParams tsl = new LinearLayout.LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT); tsl.topMargin = h.px(.2f); col.addView(tSub, tsl);
+            cll = new LayoutParams(h.px(52), LayoutParams.WRAP_CONTENT, Gravity.TOP | Gravity.LEFT);
+            cll.leftMargin = h.px(PH_PAD + 5.4f); cll.topMargin = h.px(1.6f);
+        }
         bar.addView(col, cll);
         capsule = new FrameLayout(getContext());
         capsule.setClipChildren(false);
@@ -96,6 +108,7 @@ final class VodPlayer extends FrameLayout {
         capsule.addView(ctl, new LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.MATCH_PARENT));
         LayoutParams capl = new LayoutParams(LayoutParams.MATCH_PARENT, h.px(13.2f), Gravity.BOTTOM);
         capl.bottomMargin = h.px(2.4f);
+        if (h.phone) capl = new LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.MATCH_PARENT);     // (a phone: the controls are all over the screen)
         bar.addView(capsule, capl);
         addView(bar, new LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.MATCH_PARENT));
         buildPauseInfo();
@@ -106,6 +119,7 @@ final class VodPlayer extends FrameLayout {
         skipBtn.setElevation(h.px(.6f));
         LayoutParams kl = new LayoutParams(LayoutParams.WRAP_CONTENT, LayoutParams.WRAP_CONTENT, Gravity.BOTTOM | Gravity.RIGHT);
         kl.rightMargin = h.px(5); kl.bottomMargin = h.px(19);
+        if (h.phone) { kl.rightMargin = h.px(PH_PAD); kl.bottomMargin = h.px(11.4f); }
         addView(skipBtn, kl);
         skipBtn.setAlpha(0f); skipBtn.setVisibility(GONE);
         // Up next: the next episode, counting down to it
@@ -130,6 +144,7 @@ final class VodPlayer extends FrameLayout {
         upCard.addView(ubtns, ubl);
         LayoutParams upl = new LayoutParams(LayoutParams.WRAP_CONTENT, LayoutParams.WRAP_CONTENT, Gravity.BOTTOM | Gravity.RIGHT);
         upl.rightMargin = h.px(5); upl.bottomMargin = h.px(19);
+        if (h.phone) { upl.rightMargin = h.px(PH_PAD); upl.bottomMargin = h.px(11.4f); }
         addView(upCard, upl);
         upCard.setAlpha(0f); upCard.setVisibility(GONE);
         setVisibility(GONE);
@@ -912,6 +927,7 @@ final class VodPlayer extends FrameLayout {
     /* a finger (phones): with the bar up, a tap on a button presses it, a tap on the line jumps there, a tap
        anywhere else puts the bar away; "done" then, or null to let OK act (bring the bar up, take a "Skip intro") */
     String focusAt(float x, float y) {
+        if (h.phone) return phoneTap(x, y);
         if (upShown && h.hit(upCard, x, y, .4f)) { goNext(); return "done"; }
         if (!barShown()) return null;
         NativePlayer np = h.act.nativePlayer();
@@ -928,6 +944,91 @@ final class VodPlayer extends FrameLayout {
         removeCallbacks(barHide); bar.animate().alpha(0f).setDuration(Ui.FAST).start(); syncSoon();
         return "done";
     }
+    /* a phone: a tap on a button presses it and one on the timeline jumps there; a tap on the picture brings the
+       controls or puts them away (it no longer takes a showing Skip intro: that's tapped itself), and two quick taps
+       at a side jump back 10 s or ahead 30 s (more taps, more jumps) */
+    private long lastTapAt; private int lastTapSide; private boolean lastTapBar;
+    private TextView flashT;
+    private String phoneTap(float x, float y) {
+        if (openingUp) return "done";
+        if (pauseInfoUp) { hidePauseInfo(true); row = 1; sel = playIndex(); showBar(); return "done"; }
+        if (upShown && h.hit(upCard, x, y, .4f)) { goNext(); return "done"; }
+        if (skipShown() && h.hit(skipBtn, x, y, .4f)) { doSkip(); return "done"; }
+        boolean up = barShown();
+        NativePlayer np = h.act.nativePlayer();
+        if (up) {
+            float[] l = h.local(ctl, x, y);
+            if (l[0] >= ctl.tx0 - R && l[0] <= ctl.tx1 + R && Math.abs(l[1] - ctl.ty) < 2.4f * R) {
+                long d = dur(np);
+                if (np != null && d > 0) { if (scrubbing) { scrubbing = false; removeCallbacks(scrubCommit); removeCallbacks(scrubLive); np.scrubDone(); if (scrubWasPlaying && !paused) np.setPaused(false); } np.seekMs((long) (Math.max(0, Math.min(1, (l[0] - ctl.tx0) / Math.max(1, ctl.tx1 - ctl.tx0))) * Math.max(0, d - 2000))); }
+                showBar(); return "done";
+            }
+            for (Object[] t : ctl.hits) if (((RectF) t[0]).contains(l[0], l[1])) {
+                String id = (String) t[1];
+                if (id.equals("close")) { close(); return "done"; }
+                press(id);
+                if (!id.equals("episodes") && !id.equals("next")) showBar();
+                return "done";
+            }
+        }
+        int w = getWidth(), side = x < w * .38f ? -1 : x > w * .62f ? 1 : 0;
+        long now = SystemClock.uptimeMillis();
+        if (side != 0 && side == lastTapSide && now - lastTapAt < 380) {
+            lastTapAt = now;
+            skip(side < 0 ? -10000 : 30000);
+            flash(side);
+            if (lastTapBar) showBar(); else barAway();
+            return "done";
+        }
+        lastTapAt = now; lastTapSide = side; lastTapBar = up;
+        if (up) barAway(); else { row = 1; sel = playIndex(); showBar(); }
+        return "done";
+    }
+    private void barAway() { removeCallbacks(barHide); bar.animate().cancel(); bar.animate().alpha(0f).setDuration(Ui.FAST).start(); syncSoon(); }
+    /** "−10 s" / "+30 s" at the side tapped, for a moment */
+    private void flash(int side) {
+        if (flashT == null) {
+            flashT = h.text(h.fSemi, 1.8f, Color.WHITE); flashT.setGravity(Gravity.CENTER);
+            GradientDrawable g = new GradientDrawable(); g.setShape(GradientDrawable.OVAL); g.setColor(0x66000000); flashT.setBackground(g);
+            addView(flashT, new LayoutParams(h.px(11), h.px(11), Gravity.CENTER_VERTICAL));
+        }
+        int n = side < 0 ? 10 : 30;
+        CharSequence was = flashT.getText();
+        boolean again = flashT.getAlpha() > .1f && was != null && was.toString().startsWith(side < 0 ? "\u2212" : "+");
+        int total = again ? Integer.parseInt(was.toString().replaceAll("[^0-9]", "")) + n : n;
+        flashT.setText((side < 0 ? "\u2212" : "+") + total + " s");
+        LayoutParams fl = (LayoutParams) flashT.getLayoutParams();
+        fl.gravity = Gravity.CENTER_VERTICAL | (side < 0 ? Gravity.LEFT : Gravity.RIGHT);
+        fl.leftMargin = fl.rightMargin = h.px(PH_PAD + 8);
+        flashT.setLayoutParams(fl);
+        flashT.bringToFront();
+        flashT.animate().cancel(); flashT.setAlpha(1f);
+        flashT.animate().alpha(0f).setStartDelay(650).setDuration(Ui.BASE).start();
+    }
+
+    // ------------------------------------------------------------------ a finger sliding (phones): along the timeline, it scrubs
+    private boolean dragScrub; private float dragX;
+    @Override public void touchDown() { dragScrub = false; }
+    @Override public boolean drag(char axis, float x0, float y0, float d) {
+        if (!h.phone) return false;
+        if (axis != 'h' || !barShown()) return true;
+        NativePlayer np = h.act.nativePlayer(); long du = dur(np);
+        if (np == null || du <= 0) return true;
+        if (!dragScrub) {
+            float[] l = h.local(ctl, x0, y0);
+            if (Math.abs(l[1] - ctl.ty) > 3.5f * R) return true;
+            dragScrub = true; dragX = l[0];
+            if (!scrubbing) { scrubbing = true; scrubBegin(np); }
+            removeCallbacks(scrubCommit);
+        }
+        dragX += d;
+        scrubTo = (long) (Math.max(0, Math.min(1, (dragX - ctl.tx0) / Math.max(1, ctl.tx1 - ctl.tx0))) * Math.max(0, du - 2000));
+        barAt = SystemClock.uptimeMillis(); removeCallbacks(barHide);
+        ctl.invalidate();
+        return true;
+    }
+    @Override public void dragEnd(char axis, float v) { if (dragScrub) { dragScrub = false; commitScrub(); showBar(); } }
+
     private final Runnable scrubCommit = new Runnable() { @Override public void run() { commitScrub(); } };
     private void commitScrub() {
         removeCallbacks(scrubCommit);
@@ -1079,6 +1180,7 @@ final class VodPlayer extends FrameLayout {
             st.setStyle(Paint.Style.STROKE); st.setStrokeCap(Paint.Cap.ROUND); st.setStrokeJoin(Paint.Join.ROUND);
         }
         @Override protected void onDraw(Canvas c) {
+            if (h.phone) { drawPhone(c); return; }
             NativePlayer np = h.act.nativePlayer();
             int w = getWidth();
             float pad = 5f * R;
@@ -1131,6 +1233,82 @@ final class VodPlayer extends FrameLayout {
                 p.setColor(f ? Color.WHITE : 0x17FFFFFF); c.drawCircle(x, by, rad, p);
                 icon(c, id, x, by, f ? 0xFF111418 : Color.WHITE);
             }
+        }
+        /* a phone, sideways (Chad picked it from a sketch, 1.0.472): the standard player's touch layout — the back
+           arrow (the title beside it is a view) and Subtitles, Audio and More along the top; back 10, play/pause and
+           ahead 30 in the middle; the timeline (drag along it to scrub) and Episodes, From the start and Next
+           episode along the foot. Where each is goes in `hits` for a finger. */
+        final List<Object[]> hits = new ArrayList<>();          // {RectF, id}
+        private final TextPaint tBtn = new TextPaint(Paint.ANTI_ALIAS_FLAG);
+        private void hit(String id, float x0, float y0, float x1, float y1) { hits.add(new Object[] { new RectF(x0, y0, x1, y1), id }); }
+        private void drawPhone(Canvas c) {
+            hits.clear();
+            NativePlayer np = h.act.nativePlayer();
+            int w = getWidth(), hh = getHeight();
+            float pad = PH_PAD * R;
+            long pos = np == null ? 0 : np.positionMs(), dur = dur(np), buf = np == null ? 0 : np.bufferedMs();
+            float span = Math.max(1, dur);
+            long tw = scrubbing ? scrubTo : pos;
+            List<String> bs = buttons();
+            // the top: back arrow, then Subtitles, Audio, More at the right
+            float topY = 3.6f * R;
+            st.setColor(Color.WHITE); st.setStrokeWidth(.24f * R);
+            float ax = pad + 1.5f * R;
+            c.drawLine(ax + .8f * R, topY - 1.1f * R, ax - .3f * R, topY, st); c.drawLine(ax - .3f * R, topY, ax + .8f * R, topY + 1.1f * R, st);
+            hit("close", 0, 0, pad + 4.6f * R, topY + 3f * R);
+            float rx = w - pad - 2.2f * R;
+            for (String id : new String[] { "more", "audio", "subs" }) {
+                if (!bs.contains(id)) continue;
+                pic(c, id, rx, topY, 1.45f, Color.WHITE);
+                hit(id, rx - 2.6f * R, topY - 2.6f * R, rx + 2.6f * R, topY + 2.6f * R);
+                rx -= 5.4f * R;
+            }
+            // the middle: back 10, play/pause, ahead 30
+            float cy = hh * .46f, mid = w / 2f, gap = 14f * R;
+            p.setColor(Color.WHITE); c.drawCircle(mid, cy, 4.5f * R, p);
+            pic(c, "play", mid, cy, 1.5f, 0xFF111418);
+            hit("play", mid - 5f * R, cy - 5f * R, mid + 5f * R, cy + 5f * R);
+            pic(c, "back", mid - gap, cy, 1.8f, Color.WHITE); hit("back", mid - gap - 4f * R, cy - 4f * R, mid - gap + 4f * R, cy + 4f * R);
+            pic(c, "fwd", mid + gap, cy, 1.8f, Color.WHITE); hit("fwd", mid + gap - 4f * R, cy - 4f * R, mid + gap + 4f * R, cy + 4f * R);
+            // the timeline
+            ty = hh - 7.2f * R;
+            tTime.setTextSize(1.5f * R); tTime.setColor(Color.WHITE);
+            String left = TitleView.clock(tw), right = dur > 0 ? "\u2212" + TitleView.clock(Math.max(0, dur - tw)) : "";
+            float tl = tTime.measureText("0:00:00") + 1.6f * R;
+            tx0 = pad + tl; tx1 = w - pad - tl;
+            float base = ty + tTime.getTextSize() * .36f;
+            tTime.setTextAlign(Paint.Align.LEFT); c.drawText(left, pad, base, tTime);
+            tTime.setTextAlign(Paint.Align.RIGHT); c.drawText(right, w - pad, base, tTime);
+            float th = (scrubbing ? .7f : .5f) * R, len = tx1 - tx0;
+            p.setColor(0x4DFFFFFF); r.set(tx0, ty - th / 2, tx1, ty + th / 2); c.drawRect(r, p);
+            p.setColor(0x66FFFFFF); r.set(tx0, ty - th / 2, tx0 + len * Math.min(1, buf / span), ty + th / 2); c.drawRect(r, p);
+            float kx = tx0 + len * Math.min(1, tw / span);
+            p.setColor(Color.WHITE); r.set(tx0, ty - th / 2, kx, ty + th / 2); c.drawRect(r, p);
+            c.drawCircle(kx, ty, (scrubbing ? 1.3f : .95f) * R, p);
+            // the foot: Episodes and From the start on the left, Next episode on the right
+            float fy = hh - 3f * R;
+            tBtn.setTypeface(h.fSemi); tBtn.setTextSize(1.6f * R); tBtn.setColor(Color.WHITE);
+            float x = pad;
+            for (String id : new String[] { "episodes", "start" }) {
+                if (!bs.contains(id)) continue;
+                String t = id.equals("episodes") ? "Episodes" : "From the start";
+                pic(c, id, x + 1.3f * R, fy, 1.1f, Color.WHITE);
+                tBtn.setTextAlign(Paint.Align.LEFT); c.drawText(t, x + 3.2f * R, fy + tBtn.getTextSize() * .36f, tBtn);
+                float x1 = x + 3.2f * R + tBtn.measureText(t);
+                hit(id, x - R, fy - 2.6f * R, x1 + R, fy + 2.6f * R);
+                x = x1 + 3f * R;
+            }
+            if (bs.contains("next")) {
+                String t = "Next episode";
+                float xr = w - pad;
+                pic(c, "next", xr - 1.3f * R, fy, 1.1f, Color.WHITE);
+                tBtn.setTextAlign(Paint.Align.RIGHT); c.drawText(t, xr - 3.2f * R, fy + tBtn.getTextSize() * .36f, tBtn);
+                hit("next", xr - 3.2f * R - tBtn.measureText(t) - R, fy - 2.6f * R, xr + R, fy + 2.6f * R);
+            }
+        }
+        /** a button's picture at k times its TV size */
+        private void pic(Canvas c, String id, float x, float y, float k, int col) {
+            c.save(); c.scale(k, k, x, y); icon(c, id, x, y, col); c.restore();
         }
         /** each button's picture, drawn in lines */
         private void icon(Canvas c, String id, float x, float y, int col) {
