@@ -238,6 +238,22 @@ final class GlassPanel extends FrameLayout {
         b.setAllCaps(air); b.setLetterSpacing(air ? .06f : 0f);
         b.setPadding(Math.round(padX), Math.round(padY), Math.round(padX + (air ? .9f * rem : 0)), Math.round(padY));
     }
+    /** the player's Skip intro / recap / credits and Up next's Play now: on (OK presses it) it is the look's
+        highlight (On Air with a white outline round it, so it reads as the thing you're on and not a label: the
+        red bar alone looked like a tag); off (the toolbar is up and has OK) it is the look's plain button, a little
+        smaller and dimmer. Called whenever that changes. */
+    static void playerButton(android.widget.TextView b, boolean on, float radius, float padX, float padY) {
+        boolean air = look.equals("air");
+        float ring = Math.max(2f, .2f * rem);
+        Drawable bg = buttonBg(on, radius, 0xB31A1A1F);
+        if (on && air) bg = new Cut(airColor, 0xFFFFFFFF, ring);     // (the other looks' lit button already stands out)
+        b.setBackground(bg);
+        b.setTextColor(buttonText(on));
+        b.setAllCaps(air); b.setLetterSpacing(air ? .06f : 0f);
+        b.setPadding(Math.round(padX), Math.round(padY), Math.round(padX + (air ? .9f * rem : 0)), Math.round(padY));
+        b.animate().cancel();
+        b.animate().scaleX(on ? 1f : .92f).scaleY(on ? 1f : .92f).setDuration(Ui.FAST).start();
+    }
     static int buttonText(boolean on) {
         if (look.equals("air")) return 0xFFFFFFFF;
         if (look.equals("shelf")) return on ? 0xFF1A1410 : 0xFFFFFFFF;
@@ -246,15 +262,26 @@ final class GlassPanel extends FrameLayout {
     }
     /** On Air: a bar with its right end cut on a slant */
     static final class Cut extends Drawable {
-        private final Paint p = new Paint(Paint.ANTI_ALIAS_FLAG);
-        private final android.graphics.Path path = new android.graphics.Path();
-        Cut(int color) { p.setColor(color); }
+        private final Paint p = new Paint(Paint.ANTI_ALIAS_FLAG), rp = new Paint(Paint.ANTI_ALIAS_FLAG);
+        private final android.graphics.Path path = new android.graphics.Path(), rpath = new android.graphics.Path();
+        private final float ring;
+        Cut(int color) { this(color, 0, 0); }
+        /** with an outline of `ringColor`, `ring` px wide, just inside its edge (the player's button you're on) */
+        Cut(int color, int ringColor, float ring) {
+            p.setColor(color); this.ring = ring;
+            rp.setStyle(Paint.Style.STROKE); rp.setStrokeWidth(ring); rp.setColor(ringColor); rp.setStrokeJoin(Paint.Join.MITER);
+        }
         @Override protected void onBoundsChange(android.graphics.Rect b) {
             float k = Math.min(b.height() * .4f, 1.1f * rem);
             path.reset(); path.moveTo(b.left, b.top); path.lineTo(b.right, b.top); path.lineTo(b.right - k, b.bottom); path.lineTo(b.left, b.bottom); path.close();
+            if (ring > 0) {
+                float i = ring / 2, ki = k * (b.height() - ring) / Math.max(1f, b.height());
+                rpath.reset(); rpath.moveTo(b.left + i, b.top + i); rpath.lineTo(b.right - i * 1.3f, b.top + i);
+                rpath.lineTo(b.right - i * 1.3f - ki, b.bottom - i); rpath.lineTo(b.left + i, b.bottom - i); rpath.close();
+            }
         }
-        @Override public void draw(Canvas c) { c.drawPath(path, p); }
-        @Override public void setAlpha(int a) { p.setAlpha(a); }
+        @Override public void draw(Canvas c) { c.drawPath(path, p); if (ring > 0) c.drawPath(rpath, rp); }
+        @Override public void setAlpha(int a) { p.setAlpha(a); rp.setAlpha(a); }
         @Override public void setColorFilter(ColorFilter cf) { }
         @Override public int getOpacity() { return PixelFormat.TRANSLUCENT; }
     }

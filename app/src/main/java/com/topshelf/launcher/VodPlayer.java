@@ -364,7 +364,7 @@ final class VodPlayer extends FrameLayout {
         hideSkip();
         GradientDrawable ub = new GradientDrawable(); ub.setCornerRadius(GlassPanel.corner(h.px(1.8f))); ub.setColor(0xE6141820); ub.setStroke(Math.max(1, h.px(.08f)), Ui.WHITE_20);
         upCard.setBackground(ub);
-        GlassPanel.onButton(upPlay, h.px(1.6f), h.px(1.6f), h.px(.7f));
+        btnOn = null; syncButtons();
         upCard.setVisibility(VISIBLE); upCard.bringToFront();
         upCard.setTranslationX(h.px(3)); upCard.animate().alpha(1f).translationX(0).setDuration(Ui.MOVE).start();
         removeCallbacks(upTick); postDelayed(upTick, 1000);
@@ -452,11 +452,25 @@ final class VodPlayer extends FrameLayout {
         if (in == null) { hideSkip(); return; }
         if (in[2] == 2 && next != null && from != null && h.S.optBoolean("autoNext", true)) { segNow = null; return; }   // (the Up next card has the credits)
         skipBtn.setText(in[2] == 2 ? (next != null ? "Next episode  ›" : "Skip credits  ›") : in[2] == 1 ? "Skip recap  ›" : "Skip intro  ›");
-        GlassPanel.onButton(skipBtn, h.px(2.4f), h.px(2.2f), h.px(1.1f));
+        btnOn = null; syncButtons();
         skipBtn.setElevation(GlassPanel.look.equals("air") ? 0 : h.px(.6f));     // (no square shadow behind the slanted end)
         skipBtn.setVisibility(VISIBLE); skipBtn.bringToFront();
         skipBtn.animate().alpha(1f).setDuration(Ui.BASE).start();
     }
+    /* Skip and Up next's Play now show whether OK will press them: lit (On Air: red with a white outline) while
+       the toolbar's away, plain and a little smaller while it's up (OK is the toolbar's then). Chad: there was
+       no sign the button was the one you're on. */
+    private Boolean btnOn;
+    private void syncButtons() {
+        boolean on = !barShown();
+        if (btnOn != null && btnOn == on) return;
+        btnOn = on;
+        if (skipBtn.getVisibility() == VISIBLE || segNow != null) GlassPanel.playerButton(skipBtn, on, h.px(2.4f), h.px(2.2f), h.px(1.1f));
+        if (upShown) GlassPanel.playerButton(upPlay, on, h.px(1.6f), h.px(1.6f), h.px(.7f));
+    }
+    private final Runnable syncLater = new Runnable() { @Override public void run() { syncButtons(); } };
+    /** once the bar has finished coming or going */
+    private void syncSoon() { removeCallbacks(syncLater); postDelayed(syncLater, Ui.MOVE + 50); }
     private void hideSkip() { segNow = null; skipBtn.animate().cancel(); skipBtn.animate().alpha(0f).setDuration(Ui.FAST).withEndAction(new Runnable() { @Override public void run() { if (segNow == null) skipBtn.setVisibility(GONE); } }).start(); }
     private boolean skipShown() { return segNow != null && skipBtn.getVisibility() == VISIBLE; }
     private void doSkip() {
@@ -703,6 +717,7 @@ final class VodPlayer extends FrameLayout {
         if (bar.getAlpha() > .05f) ctl.invalidate();
         checkSkip();
         checkUpNext();
+        syncButtons();
         prepareNext();
         /* the bar (all of it) goes once nothing's happened for 7 s while playing: it used to stay up after a menu
            (More, Subtitles) had closed, since nothing set it going again */
@@ -809,6 +824,7 @@ final class VodPlayer extends FrameLayout {
         if (paused) return;
         if (scrubbing) commitScrub();
         bar.animate().alpha(0f).setDuration(Ui.MOVE).start();
+        syncSoon();
     } };
     private boolean barShown() { return bar.getAlpha() > .5f; }
     private long barAt;
@@ -817,6 +833,7 @@ final class VodPlayer extends FrameLayout {
         bar.animate().alpha(1f).setDuration(Ui.BASE).start();
         ctl.invalidate();
         removeCallbacks(barHide); postDelayed(barHide, 6000);
+        syncSoon();
     }
     /** left to right as drawn: From the start, Episodes (a show) · back 10, play, ahead 30 · Subtitles, Audio (more
         than one), Next episode (when there is one), More */
@@ -859,7 +876,7 @@ final class VodPlayer extends FrameLayout {
         }
         if (c == KeyEvent.KEYCODE_BACK || c == KeyEvent.KEYCODE_ESCAPE) {
             if (scrubbing) { removeCallbacks(scrubCommit); scrubbing = false; scrubEnd(false); ctl.invalidate(); return true; }
-            if (barShown()) { removeCallbacks(barHide); bar.animate().alpha(0f).setDuration(Ui.FAST).start(); return true; }
+            if (barShown()) { removeCallbacks(barHide); bar.animate().alpha(0f).setDuration(Ui.FAST).start(); syncSoon(); return true; }
             close(); return true;
         }
         // a "Skip intro" button showing (and the bar away): OK takes it
@@ -908,7 +925,7 @@ final class VodPlayer extends FrameLayout {
         for (int i = 0; i < bs.size() && i < ctl.bx.length; i++) {
             if (Math.hypot(l[0] - ctl.bx[i], l[1] - ctl.by) < 2.9f * R) { row = 1; sel = i; press(bs.get(i)); showBar(); return "done"; }
         }
-        removeCallbacks(barHide); bar.animate().alpha(0f).setDuration(Ui.FAST).start();
+        removeCallbacks(barHide); bar.animate().alpha(0f).setDuration(Ui.FAST).start(); syncSoon();
         return "done";
     }
     private final Runnable scrubCommit = new Runnable() { @Override public void run() { commitScrub(); } };
