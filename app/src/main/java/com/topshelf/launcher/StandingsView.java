@@ -502,6 +502,7 @@ final class StandingsView extends View {
     }
 
     void ok() {
+        if (team != null && phone) { if (tpPick != null) h.sportsData().openEvent(tpPick); return; }
         if (team != null) { List<SportsData.Ev> it = teamList(tcol); if (tsel < it.size()) h.sportsData().openEvent(it.get(tsel)); return; }
         if (cache.get(lgId()) == null && errors.containsKey(lgId())) { load(); invalidate(); return; }
         if (focus == 0) { if (views().size() > 1) focus = 1; else intoBoard(); invalidate(); return; }
@@ -517,6 +518,15 @@ final class StandingsView extends View {
 
     /** a finger (phones): a league, a view, a team or a team's game; "ok" when OK should open what's under it */
     String tapAt(float x, float y) {
+        if (team != null && phone) {
+            for (Object[] hit : tpHits) if (((RectF) hit[0]).contains(x, y)) {
+                Object o = hit[1];
+                if ("back".equals(o)) { closeTeam(); invalidate(); return "done"; }
+                if ("earlier".equals(o)) { tpEarlier = true; invalidate(); return "done"; }
+                tpPick = (SportsData.Ev) o; return "ok";
+            }
+            return null;
+        }
         if (team != null) {
             for (Object[] hit : teamHits) if (((RectF) hit[0]).contains(x, y)) { tcol = (Integer) hit[1]; tsel = (Integer) hit[2]; invalidate(); return "ok"; }
             return null;
@@ -534,7 +544,13 @@ final class StandingsView extends View {
         for (int a = 0; a < panes.size(); a++) {
             Pane pn = panes.get(a);
             if (x < pn.x || x > pn.x + pn.w) continue;
-            for (int k = 0; k < pn.rowY.size(); k++) if (cy >= pn.rowY.get(k) && cy < pn.rowY.get(k) + rowH) { focus = 2; pi = a; ri = k; invalidate(); return phone ? "done" : "ok"; }
+            for (int k = 0; k < pn.rowY.size(); k++) if (cy >= pn.rowY.get(k) && cy < pn.rowY.get(k) + rowH) {
+                // (a phone: the first tap chooses a team, so the foot says where it stands; a tap on the chosen one opens its page)
+                boolean again = phone && focus == 2 && pi == a && ri == k;
+                focus = 2; pi = a; ri = k; invalidate();
+                if (again && k < pn.flat.size()) { openTeam(pn.flat.get(k), chips.get(sel)); return "done"; }
+                return phone ? "done" : "ok";
+            }
         }
         return null;
     }
@@ -877,7 +893,7 @@ final class StandingsView extends View {
     private void closeTeam() { team = null; td = null; teamLogo = null; featLogo = null; featFor = ""; teamHits.clear(); glowSnap = true; }
 
     private void openTeam(final Row r, final String[] lg) {
-        team = r; teamLg = lg; tcol = 0; tsel = 0; teamLogo = null; featLogo = null; featFor = "";
+        team = r; teamLg = lg; tcol = 0; tsel = 0; tpY = 0; tpEarlier = false; tpPick = null; teamLogo = null; featLogo = null; featFor = "";
         teamAt = SystemClock.uptimeMillis();
         final int s = Math.round(8 * R);
         if (!r.logo.isEmpty()) h.imgs.load("standbig3:" + r.logo, new HomeImages.Source() { @Override public byte[] bytes() throws Exception { return darkFirst(r.logo); } }, s, s,
@@ -905,6 +921,10 @@ final class StandingsView extends View {
     /** the logos the page needs: every opponent small, the next one big */
     private void afterTeam() {
         for (int c = 0; c < 2; c++) for (SportsData.Ev e : teamList(c)) for (SportsData.Team x : e.teams) wantLogo(x.logo);
+        if (phone && td != null) {             // (a phone lists the whole season)
+            List<SportsData.Ev> all = new ArrayList<>(td.past); all.addAll(td.next);
+            for (SportsData.Ev e : all) for (SportsData.Team x : e.teams) wantLogo(x.logo);
+        }
         if (td == null || td.next.isEmpty()) return;
         final SportsData.Team opp = other(td.next.get(0), team.id);
         if (opp == null || opp.logo.isEmpty()) return;
@@ -1045,7 +1065,7 @@ final class StandingsView extends View {
     @Override protected void onDraw(Canvas c) {
         anim = false;
         if (Math.abs(scroll - scrollT) > .5f && motion) { scroll += (scrollT - scroll) * .25f; anim = true; } else scroll = scrollT;
-        if (team != null) drawTeam(c, getWidth(), getHeight());
+        if (team != null) { if (phone) drawTeamPhone(c, getWidth(), getHeight()); else drawTeam(c, getWidth(), getHeight()); }
         else drawBoard(c, getWidth(), getHeight());
         if (anim) postInvalidateOnAnimation();
     }
@@ -1199,7 +1219,11 @@ final class StandingsView extends View {
     private android.widget.OverScroller fling; private int dragWhat, flingWhat;
     void touchDown() { if (fling != null) fling.forceFinished(true); dragWhat = -1; }
     boolean drag(char axis, float lx, float ly, float d) {
-        if (!phone || team != null) return false;
+        if (!phone) return false;
+        if (team != null) {
+            if (axis != 'v') return false;
+            dragWhat = 3; tpY = Math.max(0, Math.min(tpMax, tpY - d)); invalidate(); return true;
+        }
         if (dragWhat < 0) dragWhat = axis == 'h' && ly < 4.4f * R ? 1 : axis == 'v' ? 2 : 0;
         if (dragWhat == 1) { chipsX = Math.max(0, Math.min(chipsMax, chipsX - d)); invalidate(); return true; }
         if (dragWhat == 2) { scroll = scrollT = Math.max(0, Math.min(maxScroll(), scrollT - d)); invalidate(); return true; }
@@ -1211,12 +1235,13 @@ final class StandingsView extends View {
         if (fling == null) fling = new android.widget.OverScroller(getContext());
         flingWhat = what;
         if (what == 1) fling.fling(Math.round(chipsX), 0, -Math.round(v), 0, 0, Math.round(chipsMax), 0, 0);
+        else if (what == 3) fling.fling(0, Math.round(tpY), 0, -Math.round(v), 0, 0, 0, Math.round(tpMax));
         else fling.fling(0, Math.round(scrollT), 0, -Math.round(v), 0, 0, 0, Math.round(maxScroll()));
         removeCallbacks(glide); postOnAnimation(glide);
     }
     private final Runnable glide = new Runnable() { @Override public void run() {
         if (fling == null || !shownNow() || !fling.computeScrollOffset()) return;
-        if (flingWhat == 1) chipsX = fling.getCurrX(); else scroll = scrollT = fling.getCurrY();
+        if (flingWhat == 1) chipsX = fling.getCurrX(); else if (flingWhat == 3) { if (team == null) return; tpY = fling.getCurrY(); } else scroll = scrollT = fling.getCurrY();
         invalidate();
         if (!fling.isFinished()) postOnAnimation(this);
     } };
@@ -1450,7 +1475,7 @@ final class StandingsView extends View {
                 t.setTypeface(fSemi); t.setTextSize(1.2f * R); float nw = t.measureText(r.name);
                 text(c, s.substring(r.name.length()), pad + nw, y2, fMed, 1.2f, SUB, Paint.Align.LEFT);
             } else text(c, s, pad, y2, fMed, 1.2f, SUB, Paint.Align.LEFT);
-        } else text(c, "Tap a team to see where it stands.", pad, y2, fMed, 1.1f, TER, Paint.Align.LEFT);
+        } else text(c, "Tap a team to see where it stands, and again for its page.", pad, y2, fMed, 1.1f, TER, Paint.Align.LEFT);
     }
     /** while the standings load: the board's shape, gently breathing */
     private void skeleton(Canvas c, int w) {
@@ -1608,6 +1633,215 @@ final class StandingsView extends View {
         text(c, "OK on a game to watch it, set a reminder or open the game page", pad, fty + 2.05f * R, fMed, 1.1f, TER, Paint.Align.LEFT);
         text(c, "Back returns to the standings", w - pad, fty + 2.05f * R, fMed, 1.1f, TER, Paint.Align.RIGHT);
         c.restoreToCount(save);
+    }
+
+    // ------------------------------------------------------------------ a team's page on a phone
+    /* A phone held upright (Chad picked it from a sketch, 1.0.474): the team fills the top in its colour (the back
+       arrow, its logo large and centred, the name, record and place, the last results as W / L squares), then its
+       leaders as three small cards, then the season as one list by month: results with the score and W / L, games
+       to come with the time and channel, the next one marked with a Watch button. Months before the last couple of
+       results fold into one "Earlier this season" row (a tap opens them). The page slides up and down under the
+       finger; a tap on a game is OK on the TV (watch on your channel, remind me, the game page). */
+    private float tpY, tpMax;
+    private boolean tpEarlier;
+    private SportsData.Ev tpPick;
+    private final List<Object[]> tpHits = new ArrayList<>();            // {rect on screen, Ev | "back" | "earlier"}
+    private void tpHit(float l, float t0, float r0, float b, Object o) { tpHits.add(new Object[] { new RectF(l, t0 - tpY, r0, b - tpY), o }); }
+
+    private void drawTeamPhone(Canvas c, int w, int hh) {
+        float pad = pad(), view = hh - h.BOT * h.R;
+        Row r = team;
+        tpHits.clear();
+        float a = motion ? ease((SystemClock.uptimeMillis() - teamAt) / 300f) : 1;
+        int save;
+        if (a < 1) { anim = true; save = c.saveLayerAlpha(0, 0, w, hh, (int) (a * 255)); c.translate(0, (1 - a) * 1.5f * R); }
+        else save = c.save();
+        tpY = Math.max(0, Math.min(tpY, tpMax));
+        c.translate(0, -tpY);
+        // the team, across the top in its colour
+        float ls = 6.4f * R, ly = 1.4f * R, ny = ly + ls + 2.5f * R, sy = ny + 1.9f * R, fy = sy + 1.2f * R;
+        boolean form = td != null && !td.past.isEmpty();
+        float heroH = (form ? fy + 1.5f * R : sy) + 1.8f * R;
+        int col = lift(teamColor(r), .14);
+        p.setShader(new LinearGradient(0, 0, 0, heroH, new int[] { withA(col, 255), withA(col, 70), BG }, new float[] { 0, .62f, 1 }, Shader.TileMode.CLAMP));
+        c.drawRect(0, 0, w, heroH, p); p.setShader(null);
+        float ay = 2.1f * R;
+        p.setStyle(Paint.Style.STROKE); p.setStrokeWidth(.2f * R); p.setStrokeCap(Paint.Cap.ROUND); p.setStrokeJoin(Paint.Join.ROUND); p.setColor(Color.WHITE);
+        android.graphics.Path ar = new android.graphics.Path(); ar.moveTo(pad + R, ay - .9f * R); ar.lineTo(pad + .1f * R, ay); ar.lineTo(pad + R, ay + .9f * R); c.drawPath(ar, p);
+        p.setStyle(Paint.Style.FILL); p.setStrokeCap(Paint.Cap.BUTT);
+        tpHit(0, 0, pad + 5 * R, ay + 2.2f * R, "back");
+        if (teamLogo != null) { rf.set(w / 2f - ls / 2, ly, w / 2f + ls / 2, ly + ls); c.drawBitmap(teamLogo, null, rf, p); }
+        else { p.setColor(Skel.tone()); c.drawCircle(w / 2f, ly + ls / 2, ls / 2, p); anim = true; }
+        t.setTypeface(fSemi); t.setTextSize(2.1f * R);
+        text(c, TextUtils.ellipsize(r.full, t, w - 2 * pad, TextUtils.TruncateAt.END).toString(), w / 2f, ny, fSemi, 2.1f, INK, Paint.Align.CENTER);
+        String rec = td != null && !td.record.isEmpty() ? td.record : recordOf(r);
+        Group g = groupOf(r);
+        String where = td != null && !td.summary.isEmpty() ? td.summary : g != null ? g.name : "";
+        String sub = rec + (rec.isEmpty() || where.isEmpty() ? "" : "  ·  ") + where;
+        t.setTypeface(fMed); t.setTextSize(1.15f * R);
+        text(c, TextUtils.ellipsize(sub, t, w - 2 * pad, TextUtils.TruncateAt.END).toString(), w / 2f, sy, fMed, 1.15f, Ui.WHITE_75, Paint.Align.CENTER);
+        if (form) {
+            int n = Math.min(10, td.past.size());
+            float d = 1.5f * R, gp = .35f * R, x0 = w / 2f - (n * d + (n - 1) * gp) / 2;
+            boolean soccer = teamLg[1].equals("soccer");
+            for (int i = 0; i < n; i++) {
+                int res = result(td.past.get(n - 1 - i), r.id);
+                rf.set(x0 + i * (d + gp), fy, x0 + i * (d + gp) + d, fy + d);
+                p.setColor(res > 0 ? IN : res < 0 ? RED : SportsLook.TER); c.drawRoundRect(rf, SportsLook.card(.35f * R), SportsLook.card(.35f * R), p);
+                text(c, res > 0 ? "W" : res < 0 ? "L" : soccer ? "D" : "T", rf.centerX(), rf.top + 1.08f * R, fSemi, .85f, BG, Paint.Align.CENTER);
+            }
+        }
+        float y = heroH + .6f * R, cw = w - 2 * pad;
+        if (td == null || td.loading) {
+            p.setColor(Skel.tone());
+            float bw = (cw - 1.6f * R) / 3;
+            for (int i = 0; i < 3; i++) Skel.block(c, p, rf, pad + i * (bw + .8f * R), y + 2 * R, bw, 6.2f * R, SportsLook.card(.8f * R));
+            for (int i = 0; i < 6; i++) Skel.block(c, p, rf, pad, y + 10.4f * R + i * 4.6f * R, cw, 3.8f * R, SportsLook.card(.8f * R));
+            anim = true;
+            tpMax = 0;
+            c.restoreToCount(save);
+            return;
+        }
+        // the leaders: three small cards
+        List<JSONObject[]> lead = new ArrayList<>();
+        if (td.leaders != null) for (int k = 0; k < td.leaders.length() && lead.size() < 3; k++) {
+            JSONObject cat = td.leaders.optJSONObject(k);
+            JSONArray who = cat == null ? null : cat.optJSONArray("leaders");
+            JSONObject one = who == null ? null : who.optJSONObject(0);
+            if (one != null) lead.add(new JSONObject[] { cat, one });
+        }
+        if (!lead.isEmpty()) {
+            label(c, td.leadLabel, pad, y + 1.3f * R);
+            float gp = .8f * R, bw = (cw - (lead.size() - 1) * gp) / lead.size(), by0 = y + 2.2f * R, bh = 6.2f * R;
+            for (int i = 0; i < lead.size(); i++) {
+                JSONObject cat = lead.get(i)[0], one = lead.get(i)[1], ath = one.optJSONObject("athlete");
+                float bx = pad + i * (bw + gp), iw = bw - 2 * R;
+                rf.set(bx, by0, bx + bw, by0 + bh); p.setColor(PANEL); c.drawRoundRect(rf, SportsLook.card(.8f * R), SportsLook.card(.8f * R), p);
+                String cn = cat.optString("shortDisplayName", cat.optString("displayName"));
+                if (cn.isEmpty()) cn = cat.optString("displayName");
+                t.setTypeface(fSemi); t.setTextSize(.85f * R); t.setLetterSpacing(.08f);
+                text(c, TextUtils.ellipsize(cn.toUpperCase(Locale.US), t, iw, TextUtils.TruncateAt.END).toString(), bx + R, by0 + 1.7f * R, fSemi, .85f, TER, Paint.Align.LEFT);
+                t.setLetterSpacing(0);
+                String v = one.optString("displayValue"); int cut = v.indexOf(", "); if (cut > 0) v = v.substring(0, cut);
+                t.setTypeface(fSemi); t.setTextSize(1.6f * R);
+                text(c, TextUtils.ellipsize(v, t, iw, TextUtils.TruncateAt.END).toString(), bx + R, by0 + 3.85f * R, fSemi, 1.6f, INK, Paint.Align.LEFT);
+                String nm = ath == null ? "" : ath.optString("shortName", ath.optString("displayName"));
+                t.setTypeface(fMed); t.setTextSize(1f * R);
+                text(c, TextUtils.ellipsize(nm, t, iw, TextUtils.TruncateAt.END).toString(), bx + R, by0 + 5.3f * R, fMed, 1f, SUB, Paint.Align.LEFT);
+            }
+            y = by0 + bh + .8f * R;
+        }
+        // the season, one list by month: results first (oldest at the top), then the games to come
+        List<SportsData.Ev> all = new ArrayList<>(td.past); Collections.reverse(all);
+        int nextAt = td.next.isEmpty() ? -1 : all.size();
+        all.addAll(td.next);
+        if (all.isEmpty()) {
+            text(c, td.err.isEmpty() ? "No games this season yet." : "ESPN didn't send the schedule (" + td.err + ").", pad, y + 2.4f * R, fMed, 1.15f, SUB, Paint.Align.LEFT);
+            tpMax = 0;
+            c.restoreToCount(save);
+            return;
+        }
+        SimpleDateFormat mf = new SimpleDateFormat("MMMM", Locale.US), kf = new SimpleDateFormat("yyyyMM", Locale.US);
+        int start = 0;
+        if (!tpEarlier) {
+            start = Math.max(0, (nextAt >= 0 ? nextAt : all.size()) - 2);
+            while (start > 0 && kf.format(new Date(all.get(start - 1).at)).equals(kf.format(new Date(all.get(start).at)))) start--;
+        }
+        if (start > 0) {
+            float rh = 3.8f * R;
+            y += .6f * R;
+            rf.set(pad, y, pad + cw, y + rh); p.setColor(PANEL); c.drawRoundRect(rf, SportsLook.card(.8f * R), SportsLook.card(.8f * R), p);
+            text(c, "Earlier this season", pad + 1.2f * R, y + rh / 2 + .42f * R, fSemi, 1.15f, INK, Paint.Align.LEFT);
+            text(c, start + (start == 1 ? " game" : " games"), pad + cw - 3.2f * R, y + rh / 2 + .42f * R, fMed, 1.05f, SUB, Paint.Align.RIGHT);
+            float vx = pad + cw - 1.6f * R, vy = y + rh / 2;
+            p.setStyle(Paint.Style.STROKE); p.setStrokeWidth(.16f * R); p.setStrokeCap(Paint.Cap.ROUND); p.setStrokeJoin(Paint.Join.ROUND); p.setColor(SUB);
+            ar.reset(); ar.moveTo(vx - .55f * R, vy - .3f * R); ar.lineTo(vx, vy + .3f * R); ar.lineTo(vx + .55f * R, vy - .3f * R); c.drawPath(ar, p);
+            p.setStyle(Paint.Style.FILL); p.setStrokeCap(Paint.Cap.BUTT);
+            tpHit(pad, y, pad + cw, y + rh, "earlier");
+            y += rh;
+        }
+        String month = "";
+        float rowH = 4.4f * R;
+        for (int i = start; i < all.size(); i++) {
+            SportsData.Ev e = all.get(i);
+            String mk = kf.format(new Date(e.at));
+            if (!mk.equals(month)) {
+                month = mk;
+                y += .4f * R;
+                if (y + 2.4f * R - tpY > 0 && y - tpY < view) label(c, mf.format(new Date(e.at)), pad + .2f * R, y + 1.9f * R);
+                y += 2.6f * R;
+            }
+            if (y + rowH - tpY > 0 && y - tpY < view) seasonRow(c, e, r, pad, y, cw, rowH, i == nextAt, i < (nextAt >= 0 ? nextAt : all.size()));
+            tpHit(pad, y, pad + cw, y + rowH, e);
+            y += rowH;
+        }
+        tpMax = Math.max(0, y + 2 * R - view);
+        c.restoreToCount(save);
+    }
+    /** a small heading in capitals, spaced out */
+    private void label(Canvas c, String s, float x, float y) {
+        t.setLetterSpacing(.1f);
+        text(c, s.toUpperCase(Locale.US), x, y, fSemi, .95f, TER, Paint.Align.LEFT);
+        t.setLetterSpacing(0);
+    }
+    /** one game in the season list: the date, the other team's logo and name (the time and channel under it for a
+        game to come), and on the right the score with W / L, or Live, or for the next game a Watch button */
+    private void seasonRow(Canvas c, SportsData.Ev e, Row us, float x, float y, float w, float rh, boolean next, boolean past) {
+        SportsData.Team me = ours(e, us.id), them = other(e, us.id);
+        boolean live = e.state.equals("in");
+        if (next) {
+            rf.set(x, y + .2f * R, x + w, y + rh - .2f * R); p.setColor(PANEL); c.drawRoundRect(rf, SportsLook.card(.8f * R), SportsLook.card(.8f * R), p);
+            p.setColor(GlassPanel.raiseFill()); c.drawRect(x, y + .2f * R, x + .28f * R, y + rh - .2f * R, p);
+        } else { p.setColor(TRACK); c.drawRect(x, y + rh - Math.max(1, .07f * R), x + w, y + rh, p); }
+        if (me == null || them == null) return;
+        float mid = y + rh / 2, dx = x + (next ? 1 : .3f) * R;
+        Date at = new Date(e.at);
+        if (past) text(c, new SimpleDateFormat("MMM d", Locale.US).format(at), dx, mid + .4f * R, fMed, 1f, SUB, Paint.Align.LEFT);
+        else {
+            text(c, new SimpleDateFormat("EEE", Locale.US).format(at), dx, mid - .3f * R, fMed, 1f, SUB, Paint.Align.LEFT);
+            text(c, new SimpleDateFormat("MMM d", Locale.US).format(at), dx, mid + 1.05f * R, fMed, 1f, SUB, Paint.Align.LEFT);
+        }
+        float lx = x + 5.4f * R, lsz = 2.2f * R;
+        Bitmap b = logos.get(them.logo);
+        if (b != null) { rf.set(lx, mid - lsz / 2, lx + lsz, mid + lsz / 2); c.drawBitmap(b, null, rf, p); }
+        float nx = lx + lsz + .9f * R;
+        // the right side first, so the name knows how much room it has
+        float rx = x + w - (next ? 1 : .3f) * R, left = rx;
+        if (past || live) {
+            String sc = me.score + "–" + them.score;
+            if (past) {
+                int res = result(e, us.id);
+                float d = 1.6f * R;
+                rf.set(rx - d, mid - d / 2, rx, mid + d / 2);
+                p.setColor(res > 0 ? IN : res < 0 ? RED : SportsLook.TER); c.drawRoundRect(rf, SportsLook.card(.35f * R), SportsLook.card(.35f * R), p);
+                text(c, res > 0 ? "W" : res < 0 ? "L" : teamLg[1].equals("soccer") ? "D" : "T", rf.centerX(), mid + .38f * R, fSemi, .9f, BG, Paint.Align.CENTER);
+                left = rx - d - .7f * R;
+            } else {
+                t.setTypeface(fSemi); t.setTextSize(.85f * R); float lw = t.measureText("LIVE") + R;
+                rf.set(rx - lw, mid - .8f * R, rx, mid + .8f * R); p.setColor(RED); c.drawRoundRect(rf, SportsLook.card(.4f * R), SportsLook.card(.4f * R), p);
+                text(c, "LIVE", rf.centerX(), mid + .32f * R, fSemi, .85f, Color.WHITE, Paint.Align.CENTER);
+                left = rx - lw - .7f * R;
+            }
+            text(c, sc, left, mid + .45f * R, fSemi, 1.2f, INK, Paint.Align.RIGHT);
+            t.setTypeface(fSemi); t.setTextSize(1.2f * R); left -= t.measureText(sc) + R;
+        } else if (next) {
+            boolean air = GlassPanel.look.equals("air");
+            String bt = air ? "WATCH" : "Watch";
+            t.setTypeface(fSemi); t.setTextSize(SportsLook.T_CTRL * .85f * R); t.setLetterSpacing(air ? .05f : 0);
+            float bw = t.measureText(bt) + 2.2f * R + (air ? .6f * R : 0), bh = 2.5f * R;
+            rf.set(rx - bw, mid - bh / 2, rx, mid + bh / 2); SportsLook.ctrl(c, p, rf, R, true);
+            text(c, bt, rf.centerX() - (air ? .3f * R : 0), mid + .4f * R, fSemi, SportsLook.T_CTRL * .85f, SportsLook.ctrlText(true), Paint.Align.CENTER);
+            t.setLetterSpacing(0);
+            left = rx - bw - R;
+        }
+        String vs = (me.home ? "vs " : "at ") + them.name;
+        t.setTypeface(fSemi); t.setTextSize(1.2f * R);
+        float room = Math.max(4 * R, left - nx);
+        if (past || live) { text(c, TextUtils.ellipsize(vs, t, room, TextUtils.TruncateAt.END).toString(), nx, mid + .45f * R, fSemi, 1.2f, INK, Paint.Align.LEFT); return; }
+        text(c, TextUtils.ellipsize(vs, t, room, TextUtils.TruncateAt.END).toString(), nx, mid - .25f * R, fSemi, 1.2f, INK, Paint.Align.LEFT);
+        String when = Reminders.time(h, e.at) + (e.nets.isEmpty() ? "" : "  ·  " + SportsData.join(e.nets, 2, ", ")) + (next ? "  ·  Next game" : "");
+        t.setTypeface(fMed); t.setTextSize(.95f * R);
+        text(c, TextUtils.ellipsize(when, t, room, TextUtils.TruncateAt.END).toString(), nx, mid + 1.2f * R, fMed, .95f, TER, Paint.Align.LEFT);
     }
     /** the chosen game: the team's colour from the left and a white edge, like the board's chosen row */
     private void chosenFill(Canvas c, RectF box, float rad, Row r) {
