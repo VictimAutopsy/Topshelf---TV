@@ -84,6 +84,12 @@ Quick compile check without building:
   before the guide returns (Chad asked, 1.0.458): `NativePlayer.zoom` moves and scales the full-screen picture only (its
   surface is never resized), `NativeLive.exitFullZoom` / `leaving`. Not on a phone (it turns sideways), nor for a
   recording, a rewound channel or the external player.
+- A live channel standing still with plenty downloaded (`NativePlayer.frozenCheck`): unless its sound is Dolby it goes to
+  the live point (`seekToDefaultPosition`, no restart) twice in two minutes, then starts again the same way; the sound
+  steps (and sound off for a day) are only for Dolby sound (1.0.476, after Comedy Central froze on Chad and stalls went
+  from 4 to 100 a day). The error tries reset after a quiet minute. The flight report counts each kind ("live freeze ·
+  went to the live point", "live · fell behind the stream", "live picture stopped · …"). Stream info's decoding ways,
+  last stall and last error are the channel on screen's.
 - Freezes: `FreezeWatch` notes the main thread's stack when it hasn't answered for 3 s (prefs `lastFreeze`, a `freeze:` event),
   and the crash report carries it plus the main thread's part of Android's trace (`MainActivity.traceOf`; it used to be cut
   before any thread).

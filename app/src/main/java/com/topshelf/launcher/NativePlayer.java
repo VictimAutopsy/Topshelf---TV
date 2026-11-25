@@ -478,6 +478,7 @@ final class NativePlayer implements Player.Listener {
         } catch (Throwable t) { return false; }
     }
     private long freezePos = -1, freezeSince;
+    private long edgeJumpAt; private int edgeJumps;
     private String audioKey() { return "nvAud." + Integer.toHexString(url.hashCode()); }
 
     /** the whole stream stands still (position not moving) although plenty is downloaded */
@@ -496,6 +497,33 @@ final class NativePlayer implements Player.Listener {
             Format a = player.getAudioFormat(); if (a != null) d.put("audio", a.sampleMimeType + " " + a.channelCount + "ch");
         } catch (Exception ignored) { }
         lastStall = "stood still with " + (buf / 1000) + " s downloaded (sound " + (audioMode == 0 ? "passed through" : audioMode == 1 ? "decoded here" : "off") + ")";
+        /* A live channel whose sound isn't Dolby: the sound way isn't what's wrong (stepping it turned a channel's
+           sound off for a day after a few ordinary freezes), and the usual cause — the stream's clock jumping, as at
+           an ad break — clears by going to the live point, without starting the channel again. Twice within two
+           minutes; a third time it's started again the same way. (Chad: Comedy Central frozen, 1.0.474.) */
+        Format af = player.getAudioFormat();
+        String am = af == null || af.sampleMimeType == null ? "" : af.sampleMimeType;
+        boolean dolby = am.contains("ac3") || am.contains("ac4") || am.contains("dts") || am.contains("eac3");
+        if (!vod() && !local() && !dolby) {
+            if (now - edgeJumpAt > 120000) edgeJumps = 0;
+            edgeJumpAt = now; edgeJumps++;
+            if (edgeJumps <= 2) {
+                lastStall += "; went to the live point";
+                Diag.ev("video: stood still with " + (buf / 1000) + " s downloaded, going to the live point (" + edgeJumps + ")");
+                Flight.count("live freeze · went to the live point");
+                movedAt = now;          // (give it a moment before looking again)
+                player.seekToDefaultPosition();
+                return true;
+            }
+            edgeJumps = 0;
+            lastStall += "; started again";
+            Flight.count("live freeze · started again");
+            try { d.put("next", "restart"); } catch (Exception ignored) { }
+            out.event(id, "stall", d.toString());
+            build(strategy);
+            return true;
+        }
+        Flight.count("freeze · sound way changed");
         if (audioMode == 1 && tryOtherAudio()) {
             lastStall += "; trying the channel's other sound track";
             try { d.put("next", "other sound track"); } catch (Exception ignored) { }
@@ -555,11 +583,13 @@ final class NativePlayer implements Player.Listener {
             if (strategy < 2 && readyAt > 0 && now - readyAt > 10 * 60000) {
                 // stalled after playing a long while: start the same way again (resets the decoder's timestamps)
                 d.put("restart", true);
+                Flight.count((vod() ? "" : "live ") + "picture stopped · started again");
                 out.event(id, "stall", d.toString());
                 build(strategy);
             } else if (strategy < 2) {
                 // try the next way of driving the decoder (and remember what works on this TV)
                 d.put("next", strategy + 1);
+                Flight.count((vod() ? "" : "live ") + "picture stopped · next decoding way");
                 out.event(id, "stall", d.toString());
                 build(strategy + 1);
             } else {
@@ -587,7 +617,10 @@ final class NativePlayer implements Player.Listener {
         Diag.ev("play " + kind + " " + ("vod".equals(kind) ? Uri.parse(url).getHost() + " (" + url.replaceAll("[?#].*$", "").replaceAll(".*\\.", ".") + ")" : shortSafe(url)));
         id = newId;
         Flight.playAsked("vod".equals(kind) ? Flight.takeVod() : "live channel");
-        if (!url.equals(this.url)) afrAsked = false;      // (a new film or channel: its frame rate is looked at again; an added subtitle isn't new)
+        if (!url.equals(this.url)) {
+            afrAsked = false;      // (a new film or channel: its frame rate is looked at again; an added subtitle isn't new)
+            history = ""; lastStall = ""; edgeJumps = 0;   // (Stream info is about what's on now: these used to run on across every channel)
+        }
         this.kind = kind == null ? "" : kind;
         this.url = url; this.ua = ua == null ? "" : ua;
         // each stream starts on the TV's own (hardware) decoder: Android's software decoder (way 2) is
@@ -876,9 +909,16 @@ final class NativePlayer implements Player.Listener {
         else if (state == Player.STATE_ENDED) out.event(id, vod() ? "ended" : "error", "stream ended");
     }
 
+    private long lastErrAt;
     @Override public void onPlayerError(PlaybackException e) {
         Diag.ev("video error " + e.getErrorCodeName() + ": " + e.getMessage());
         if (player == null) return;
+        // (the tries are for one bad patch: a channel that played a good while since starts with them all again —
+        // they used to last as long as the channel did, so its fourth hiccup in an evening stopped it)
+        long en = android.os.SystemClock.elapsedRealtime();
+        if (firstFrame && en - lastErrAt > 60000) retries = 0;
+        lastErrAt = en;
+        if (e.errorCode == PlaybackException.ERROR_CODE_BEHIND_LIVE_WINDOW) Flight.count("live · fell behind the stream");
         if (e.errorCode == PlaybackException.ERROR_CODE_BEHIND_LIVE_WINDOW && retries++ < 3) {
             player.seekToDefaultPosition();
             player.prepare();

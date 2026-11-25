@@ -1862,7 +1862,7 @@ final class NativeLive extends FrameLayout implements NativeHome.Free {
     private void start(Ch ch, String kind, String url) {
         NativePlayer np = h.act.nativePlayer();
         boolean same = playing != null && playing.u.equals(ch.u);
-        if (!same) { swRetries = 0; wasReady = false; reconnects = 0; stopShift(); }
+        if (!same) { swRetries = 0; wasReady = false; reconnects = 0; stopShift(); lastErr = ""; }   // (Stream info's last error is this channel's)
         lastUrl = url;
         playing = ch; tried = kind; ready = false;
         if (np == null) { fail("the TV's video player isn't available"); return; }
