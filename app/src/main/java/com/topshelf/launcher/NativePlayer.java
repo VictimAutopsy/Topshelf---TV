@@ -627,25 +627,81 @@ final class NativePlayer implements Player.Listener {
         // only a stopgap for one stream, never what's remembered — on this TV it drops most frames
         // a channel whose sound wouldn't play keeps it off for a day (then it's tried again)
         audioMode = System.currentTimeMillis() - prefs().getLong(audioKey() + ".off", 0) < 24 * 3600000L ? 2 : prefs().getInt(audioKey(), 0);
-        build(Math.min(1, prefs().getInt("nvStrategy2", 0)));
+        startWarm = liveKind() && LiveWarm.fresh(url);
+        build(Math.min(1, prefs().getInt("nvStrategy2", 0)), true);
     }
+
+    /* Changing channel keeps the player (1.0.478): the next channel goes into the same player, with its
+       decoder kept ready (foreground mode), instead of a new player being made for every channel. Making
+       one each time cost part of every change, and the TV's decoder was often still being let go by the
+       old player when the new one asked for it (the "swdecoder" tries, 0.6 s apart). Only for live
+       channels played the same way (same decoding way and sound setting); anything else, or a player in
+       error, is made again as before. A kept player whose picture doesn't come once the video is there
+       is made again at once, and after twice in a day channels get a new player each time for a day. */
+    private boolean builtLive, builtAudio, kept, startWarm, swSeen;   // (swSeen: this player got the software decoder: not kept)
+    private boolean liveKind() { return !vod() && !local(); }
+    private boolean keepOff() { return System.currentTimeMillis() - prefs().getLong("nvKeepOff", 0) < 24 * 3600000L; }
+    private boolean canKeep(int strat) {
+        return player != null && player.getPlayerError() == null && builtLive && liveKind()
+                && strat == strategy && builtAudio == (audioMode >= 1) && !swSeen && !keepOff();
+    }
+    private final Runnable keptCheck = new Runnable() { @Override public void run() {
+        if (player == null || !kept || firstFrame || !liveKind()) return;
+        Diag.ev("live: the kept player gave no picture, making a new one");
+        Flight.count("live start · kept player gave no picture");
+        android.content.SharedPreferences p = prefs();
+        long day = System.currentTimeMillis() / 86400000L;
+        int n = p.getLong("nvKeepFailDay", 0) == day ? p.getInt("nvKeepFails", 0) + 1 : 1;
+        android.content.SharedPreferences.Editor e = p.edit().putLong("nvKeepFailDay", day).putInt("nvKeepFails", n);
+        if (n >= 2) { e.putLong("nvKeepOff", System.currentTimeMillis()); Diag.ev("live: keeping the player is off for a day"); }
+        e.apply();
+        build(strategy);
+    } };
 
     /* Ways of driving the TV's decoder, tried in turn if the picture stalls:
        0 the TV's decoder with small timestamps (MediaTek decoders stalled after a few frames with
          Media3's usual 11-day timestamp offset, while the page's player — timestamps from 0 — played),
        1 the same without asynchronous buffer queueing, 2 Android's software decoder (always works, uses
          more processor). */
-    private void build(int strat) {
+    private void build(int strat) { build(strat, false); }
+    private void build(int strat, boolean mayKeep) {
         // the saved copy being rebuilt (another way of decoding after a stall): carry on from the same moment, not its live end
         if (local() && player != null && pendingWall <= 0) { long w = wallPos(); if (w > 0) { pendingWall = w; startPaused = !player.getPlayWhenReady(); } }
         if (vod() && player != null && vodStartMs <= 0) { long p = player.getCurrentPosition(); if (p > 0) { vodStartMs = p; startPaused = !player.getPlayWhenReady(); } }
-        stopPlayer();
-        strategy = Math.max(0, Math.min(2, strat));
+        int st = Math.max(0, Math.min(2, strat));
+        kept = mayKeep && canKeep(st);
+        main.removeCallbacks(keptCheck);
+        if (kept) {
+            // (the old channel's stream is let go first: on a one-stream account the new one needs its place)
+            main.removeCallbacks(watch);
+            try { player.stop(); } catch (Throwable t) { kept = false; }
+        }
+        if (liveKind()) Flight.count(kept ? "live start · player kept" : "live start · new player");
+        if (!kept) stopPlayer();
+        strategy = st;
         history = (history.length() > 60 ? history.substring(history.length() - 60) : history) + strategy;
         firstFrame = false; vw = vh = 0; par = 1; lastCues = ""; retries = 0;
         lastRendered = -1; stallSince = 0; readyAt = 0; freezeSince = 0; freezePos = -1; audioTried.clear();
         setWebClear(true);
         Context c = act;
+        if (!kept) makePlayer(c);
+        main.removeCallbacks(watch);
+        main.postDelayed(watch, 1000);
+        String lang = act.getSharedPreferences(Bridge.PREFS, Context.MODE_PRIVATE).getString("liveAudLangN", "");
+        TrackSelectionParameters.Builder tp = player.getTrackSelectionParameters().buildUpon();
+        // (a kept player starts the next channel as a new one would: no track the last channel's menu chose, subtitles as they come)
+        if (kept) tp.clearOverrides().setTrackTypeDisabled(C.TRACK_TYPE_TEXT, false);
+        if (!lang.isEmpty()) tp.setPreferredAudioLanguage(lang);
+        tp.setTrackTypeDisabled(C.TRACK_TYPE_AUDIO, audioMode >= 2);
+        if ("vod".equals(kind)) {
+            String sl = act.getSharedPreferences(Bridge.PREFS, Context.MODE_PRIVATE).getString("vodSubLang", "");
+            if (!sl.isEmpty()) tp.setPreferredTextLanguage(sl).setSelectUndeterminedTextLanguage(false);
+        }
+        player.setTrackSelectionParameters(tp.build());
+        setSource();
+    }
+
+    private void makePlayer(Context c) {
         meter = new DefaultBandwidthMeter.Builder(c).build();
         DefaultLoadControl load = new DefaultLoadControl.Builder()
                 .setBufferDurationsMs(15000, 40000, 1200, "vod".equals(kind) ? 2500 : 4000)
@@ -692,31 +748,46 @@ final class NativePlayer implements Player.Listener {
                 .build();
         player.addListener(this);
         player.setVideoSurfaceView(sv());
+        builtLive = liveKind(); builtAudio = audioMode >= 1; swSeen = false;
+        // (a live player keeps its decoder between channels, see canKeep; it's let go when the player is)
+        if (builtLive) try { player.setForegroundMode(true); } catch (Throwable ignored) { }
         rateRule();
         player.addAnalyticsListener(new AnalyticsListener() {
             @Override public void onVideoDecoderInitialized(AnalyticsListener.EventTime t, String name, long initializedTimestampMs, long initializationDurationMs) {
                 decoderName = name;
                 boolean sw = name != null && (name.startsWith("c2.android.") || name.startsWith("OMX.google."));
-                if (sw && strategy < 2) out.event(id, "swdecoder", name);    // the TV's decoder was busy or refused
+                if (sw && strategy < 2) { swSeen = true; out.event(id, "swdecoder", name); }   // the TV's decoder was busy or refused
+                if (liveKind()) { Flight.liveStep("decoder ready", -1); Flight.liveStep("decoder setup took", initializationDurationMs); }
+            }
+            @Override public void onVideoInputFormatChanged(AnalyticsListener.EventTime t, androidx.media3.common.Format f, androidx.media3.exoplayer.DecoderReuseEvaluation r) {
+                if (liveKind()) Flight.liveStep("video arriving", -1);
+                if (kept && !firstFrame) { main.removeCallbacks(keptCheck); main.postDelayed(keptCheck, 4000); }
+            }
+            @Override public void onLoadError(AnalyticsListener.EventTime t, androidx.media3.exoplayer.source.LoadEventInfo l, androidx.media3.exoplayer.source.MediaLoadData d, java.io.IOException e, boolean cancelled) {
+                if (!firstFrame && !cancelled && liveKind()) Flight.count("live start · a request failed and was asked again");
             }
         });
-        main.removeCallbacks(watch);
-        main.postDelayed(watch, 1000);
-        String lang = act.getSharedPreferences(Bridge.PREFS, Context.MODE_PRIVATE).getString("liveAudLangN", "");
-        TrackSelectionParameters.Builder tp = player.getTrackSelectionParameters().buildUpon();
-        if (!lang.isEmpty()) tp.setPreferredAudioLanguage(lang);
-        tp.setTrackTypeDisabled(C.TRACK_TYPE_AUDIO, audioMode >= 2);
-        if ("vod".equals(kind)) {
-            String sl = act.getSharedPreferences(Bridge.PREFS, Context.MODE_PRIVATE).getString("vodSubLang", "");
-            if (!sl.isEmpty()) tp.setPreferredTextLanguage(sl).setSelectUndeterminedTextLanguage(false);
-        }
-        player.setTrackSelectionParameters(tp.build());
+    }
 
+    /** where the time to a channel's first picture goes: the provider's first answer (and where the video really comes from, for LiveWarm) */
+    private final androidx.media3.datasource.TransferListener firstAnswer = new androidx.media3.datasource.TransferListener() {
+        @Override public void onTransferInitializing(androidx.media3.datasource.DataSource s, androidx.media3.datasource.DataSpec d, boolean net) { }
+        @Override public void onTransferStart(androidx.media3.datasource.DataSource s, androidx.media3.datasource.DataSpec d, boolean net) {
+            if (!net) return;
+            Flight.liveStep(startWarm ? "server answered · reached ahead" : "server answered", -1);
+            try { LiveWarm.seen(s.getUri()); } catch (Throwable ignored) { }
+        }
+        @Override public void onBytesTransferred(androidx.media3.datasource.DataSource s, androidx.media3.datasource.DataSpec d, boolean net, int n) { }
+        @Override public void onTransferEnd(androidx.media3.datasource.DataSource s, androidx.media3.datasource.DataSpec d, boolean net) { }
+    };
+
+    private void setSource() {
         DefaultHttpDataSource.Factory http = new DefaultHttpDataSource.Factory()
                 .setAllowCrossProtocolRedirects(true)
                 .setConnectTimeoutMs(10000)
                 .setReadTimeoutMs(20000)
                 .setUserAgent(!this.ua.isEmpty() ? this.ua : LiveTv.DEFAULT_UA);
+        if (liveKind()) http.setTransferListener(firstAnswer);
         Map<String, String> hdr = new HashMap<>();
         hdr.put("Accept", "*/*");
         if ("vod".equals(kind)) {
@@ -873,6 +944,7 @@ final class NativePlayer implements Player.Listener {
     }
 
     private void stopPlayer() {
+        main.removeCallbacks(keptCheck); kept = false;
         if (player != null) {
             try { main.removeCallbacks(watch); player.removeListener(this); player.stop(); player.clearVideoSurface(); player.release(); } catch (Throwable t) {}
             act.keepAwake(false);

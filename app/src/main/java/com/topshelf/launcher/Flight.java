@@ -80,7 +80,21 @@ final class Flight {
     private static String playKind = "";
     private static boolean firstSeen;
     /** a stream is asked for (kind: movie | continue | next | live | trailer) */
-    static void playAsked(String kind) { synchronized (L) { playAt = SystemClock.uptimeMillis(); playKind = kind; firstSeen = false; stallAt = 0; playingAt = 0; } }
+    static void playAsked(String kind) { synchronized (L) { playAt = SystemClock.uptimeMillis(); playKind = kind; firstSeen = false; stallAt = 0; playingAt = 0; steps.clear(); } }
+    /* Where a live channel's start goes (1.0.478), once per start and only before its first picture:
+       "live start · server answered" (the provider's first answer; "· reached ahead" when LiveWarm had
+       reached that server just before), "· video arriving" (the first video found in what came),
+       "· decoder ready" (ms from asking), and "· decoder setup took" (how long the decoder took itself;
+       missing when the kept player's decoder carried on). */
+    private static final java.util.Set<String> steps = new java.util.HashSet<>();
+    /** ms < 0: the time since the channel was asked for */
+    static void liveStep(String step, long ms) {
+        synchronized (L) {
+            if (playAt == 0 || firstSeen || !"live channel".equals(playKind) || !steps.add(step)) return;
+            if (ms < 0) ms = SystemClock.uptimeMillis() - playAt;
+        }
+        time("live start · " + step, ms);
+    }
     private static String nextKind = ""; private static long nextKindAt;
     /** the next stream asked for is the next episode (TitleView.afterEpisode) */
     static void nextIsEpisode() { nextKind = "next episode"; nextKindAt = SystemClock.uptimeMillis(); }

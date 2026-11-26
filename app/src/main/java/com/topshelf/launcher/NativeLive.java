@@ -444,6 +444,15 @@ final class NativeLive extends FrameLayout implements NativeHome.Free {
         if (glassLight != null) h.setTabGlass(glassLight, glassFrost);
         schedulePreview();
         resume();
+        warmAhead();
+    }
+
+    /** the highlighted channel's server is reached ahead (LiveWarm: no stream, only the connection) */
+    private void warmAhead() {
+        if ("external".equals(h.S.optString("livePlayer"))) return;
+        Ch c = row >= 0 && row < list.size() ? list.get(row) : playing;
+        if (c == null) c = playing;
+        if (c != null) LiveWarm.warm(c.u, c.ua);
     }
 
     /* Coming back to Live TV picks up where you left: the channel that was playing when you left (the
@@ -1509,6 +1518,7 @@ final class NativeLive extends FrameLayout implements NativeHome.Free {
         guide.invalidate();
         drawInfo();
         schedulePreview();
+        warmAhead();
     }
 
     // ================================================================== menus
@@ -2167,6 +2177,7 @@ final class NativeLive extends FrameLayout implements NativeHome.Free {
     private void toggleOsd() { if (osd.getAlpha() > .5f) { main().removeCallbacks(osdHide); osdHide.run(); } else showOsd(); }
     private void showOsd() {
         if (playing == null || zap) return;
+        warmAhead();
         drawOsd();
         osd.animate().alpha(1f).translationY(0).setDuration(Ui.MOVE).setInterpolator(TileView.EASE).start();
         main().removeCallbacks(osdHide); main().postDelayed(osdHide, barFocus ? 7000 : 5000);
@@ -3312,6 +3323,7 @@ final class NativeLive extends FrameLayout implements NativeHome.Free {
         if (list.isEmpty()) return;
         zap = true;
         zapSel = 0;
+        warmAhead();
         if (playing != null) for (int i = 0; i < list.size(); i++) if (list.get(i).u.equals(playing.u)) zapSel = i;
         main().removeCallbacks(osdHide); osd.animate().alpha(0f).setDuration(Ui.QUICK).start();
         zapView.setVisibility(VISIBLE);

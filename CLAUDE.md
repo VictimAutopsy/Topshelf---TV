@@ -90,6 +90,14 @@ Quick compile check without building:
   from 4 to 100 a day). The error tries reset after a quiet minute. The flight report counts each kind ("live freeze ·
   went to the live point", "live · fell behind the stream", "live picture stopped · …"). Stream info's decoding ways,
   last stall and last error are the channel on screen's.
+- Changing live channel keeps the player (1.0.478, Chad picked it): `NativePlayer.canKeep` puts the next channel in the same
+  player with its decoder kept (foreground mode) when the decoding way and sound setting match; otherwise, after an error or
+  the software decoder, a new one is made as before. No picture 4 s after the video arrives → made again (`keptCheck`); twice
+  in a day turns keeping off for a day (pref `nvKeepOff`). `LiveWarm` reaches the highlighted channel's server ahead (a HEAD
+  for "/", never a stream: Chad's provider allows one stream at a time, so nothing may open a second one) when Live TV opens,
+  the guide moves, or the full-screen bar or channel list comes up. The flight report splits each start: "live start ·
+  server answered" (or "· reached ahead"), "· video arriving", "· decoder ready", "· decoder setup took", plus counts of
+  "player kept" / "new player" and failed requests before the picture. Compare those before changing anything else here.
 - Freezes: `FreezeWatch` notes the main thread's stack when it hasn't answered for 3 s (prefs `lastFreeze`, a `freeze:` event),
   and the crash report carries it plus the main thread's part of Android's trace (`MainActivity.traceOf`; it used to be cut
   before any thread).
